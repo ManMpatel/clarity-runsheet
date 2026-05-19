@@ -1,0 +1,43 @@
+import { NavLink } from 'react-router-dom'
+import { useUiStore } from '../../store/uiStore'
+
+const links = [
+  { to: '/dashboard',        label: 'Dashboard' },
+  { to: '/live-map',         label: 'Live Map' },
+  { to: '/trips',            label: 'Trips & History' },
+  { to: '/driver-behaviour', label: 'Driver Behaviour' },
+  { to: '/vehicle-health',   label: 'Vehicle Health' },
+  { to: '/maintenance',      label: 'Maintenance' },
+  { to: '/geofences',        label: 'Geofence Manager' },
+  { to: '/alerts',           label: 'Alerts' },
+  { to: '/reports',          label: 'Reports' },
+  { to: '/fbt',              label: 'FBT Logbook' },
+  { to: '/settings',         label: 'Settings' },
+]
+
+export default function Sidebar() {
+  return (
+    <aside className='hidden md:flex flex-col fixed left-0 top-0 h-full w-60 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-40'>
+      <div className='h-[60px] flex items-center px-6 border-b border-gray-200 dark:border-gray-800'>
+        <span className='text-lg font-bold text-blue-600'>Clarity Fleet</span>
+      </div>
+      <nav className='flex-1 overflow-y-auto py-4'>
+        {links.map(link => (
+          <NavLink
+            key={link.to}
+            to={link.to}
+            className={({ isActive }) =>
+              `flex items-center px-6 py-2.5 text-sm font-medium border-l-4 transition-colors ${
+                isActive
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-600'
+                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`
+            }
+          >
+            {link.label}
+          </NavLink>
+        ))}
+      </nav>
+    </aside>
+  )
+}
