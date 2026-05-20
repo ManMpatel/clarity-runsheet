@@ -90,4 +90,76 @@ router.delete('/:id', requireAuth, requireCompany,
   }
 })
 
+
+router.put('/:id/tier', requireAuth, requireCompany, async (req, res) => {
+  try {
+    const { tier } = req.body
+    if (!['entry', 'mid', 'top'].includes(tier)) {
+      return res.status(400).json({ error: 'Invalid tier' })
+    }
+
+    const collection = await getCollection('vehicles')
+    const vehicle = await collection.findOne({
+      _id: new ObjectId(req.params.id),
+      ...req.companyFilter,
+    })
+
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' })
+    if (vehicle.tierChangesRemaining <= 0) {
+      return res.status(403).json({ error: 'No tier changes remaining. Contact support.' })
+    }
+
+    const companies = await getCollection('companies')
+    const company = await companies.findOne({
+      _id: new ObjectId(req.companyId)
+    })
+
+    const slots = company.slots || {}
+    const usedSlots = await countUsedSlots(req.companyId, tier, vehicle._id.toString())
+    const totalSlots = slots[`${tier}Slots`] || 0
+
+    if (usedSlots >= totalSlots) {
+      return res.status(403).json({
+        error: `No ${tier} slots available`,
+        used: usedSlots,
+        total: totalSlots,
+      })
+    }
+
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id), ...req.companyFilter },
+      {
+        $set: {
+          tier,
+          tierChangesRemaining: vehicle.tierChangesRemaining - 1,
+          updatedAt: new Date(),
+        },
+        $push: {
+          tierHistory: {
+            from:      vehicle.tier || 'entry',
+            to:        tier,
+            changedAt: new Date(),
+            changedBy: req.user.userId,
+          }
+        }
+      },
+      { returnDocument: 'after' }
+    )
+
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+async function countUsedSlots(companyId, tier, excludeVehicleId) {
+  const collection = await getCollection('vehicles')
+  const count = await collection.countDocuments({
+    companyId,
+    tier,
+    active: true,
+    _id: { $ne: new ObjectId(excludeVehicleId) }
+  })
+  return count
+}
 module.exports = router

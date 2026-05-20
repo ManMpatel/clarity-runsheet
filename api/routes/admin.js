@@ -73,4 +73,84 @@ router.put('/companies/:id/tier', requireSuperAdmin, async (req, res) => {
   }
 })
 
+
+router.get('/companies/:id/slots', requireSuperAdmin, async (req, res) => {
+  try {
+    const { ObjectId } = require('mongodb')
+    const companies = await getCollection('companies')
+    const company = await companies.findOne({
+      _id: new ObjectId(req.params.id)
+    })
+    if (!company) return res.status(404).json({ error: 'Company not found' })
+
+    const vehicles = await getCollection('vehicles')
+    const entryUsed = await vehicles.countDocuments({ companyId: req.params.id, tier: 'entry', active: true })
+    const midUsed   = await vehicles.countDocuments({ companyId: req.params.id, tier: 'mid',   active: true })
+    const topUsed   = await vehicles.countDocuments({ companyId: req.params.id, tier: 'top',   active: true })
+
+    return res.json({
+      company,
+      slots: company.slots || { entrySlots: 0, midSlots: 0, topSlots: 0 },
+      used:  { entry: entryUsed, mid: midUsed, top: topUsed },
+    })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.put('/companies/:id/slots', requireSuperAdmin, async (req, res) => {
+  try {
+    const { entrySlots, midSlots, topSlots } = req.body
+    const { ObjectId } = require('mongodb')
+    const companies = await getCollection('companies')
+
+    const result = await companies.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      {
+        $set: {
+          slots: {
+            entrySlots: parseInt(entrySlots) || 0,
+            midSlots:   parseInt(midSlots)   || 0,
+            topSlots:   parseInt(topSlots)   || 0,
+          },
+          updatedAt: new Date(),
+        }
+      },
+      { returnDocument: 'after' }
+    )
+
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.get('/upgrade-requests', requireSuperAdmin, async (req, res) => {
+  try {
+    const collection = await getCollection('upgrade_requests')
+    const requests = await collection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray()
+    return res.json(requests)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.put('/upgrade-requests/:id/action', requireSuperAdmin, async (req, res) => {
+  try {
+    const { action } = req.body
+    const { ObjectId } = require('mongodb')
+    const collection = await getCollection('upgrade_requests')
+    const result = await collection.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { status: action, actionedAt: new Date() } },
+      { returnDocument: 'after' }
+    )
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
 module.exports = router

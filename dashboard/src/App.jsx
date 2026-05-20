@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import AppShell from './components/layout/AppShell'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import LiveMap from './pages/LiveMap'
 import TripsHistory from './pages/TripsHistory'
@@ -13,6 +14,8 @@ import Alerts from './pages/Alerts'
 import Reports from './pages/Reports'
 import FbtLogbook from './pages/FbtLogbook'
 import Settings from './pages/Settings'
+import Billing from './pages/Billing'
+import AdminPanel from './pages/AdminPanel'
 
 function ProtectedRoute({ children }) {
   const token = useAuthStore(s => s.token)
@@ -20,10 +23,19 @@ function ProtectedRoute({ children }) {
   return children
 }
 
+function SuperAdminRoute({ children }) {
+  const token = useAuthStore(s => s.token)
+  const role  = useAuthStore(s => s.role)
+  if (!token) return <Navigate to='/login' replace />
+  if (role !== 'superAdmin') return <Navigate to='/dashboard' replace />
+  return children
+}
+
 export default function App() {
   return (
     <Routes>
-      <Route path='/login' element={<Login />} />
+      <Route path='/login'  element={<Login />} />
+      <Route path='/signup' element={<Signup />} />
       <Route
         path='/'
         element={
@@ -33,17 +45,26 @@ export default function App() {
         }
       >
         <Route index element={<Navigate to='/dashboard' replace />} />
-        <Route path='dashboard'         element={<Dashboard />} />
-        <Route path='live-map'          element={<LiveMap />} />
-        <Route path='trips'             element={<TripsHistory />} />
-        <Route path='driver-behaviour'  element={<DriverBehaviour />} />
-        <Route path='vehicle-health'    element={<VehicleHealth />} />
-        <Route path='maintenance'       element={<Maintenance />} />
-        <Route path='geofences'         element={<GeofenceManager />} />
-        <Route path='alerts'            element={<Alerts />} />
-        <Route path='reports'           element={<Reports />} />
-        <Route path='fbt'               element={<FbtLogbook />} />
-        <Route path='settings'          element={<Settings />} />
+        <Route path='dashboard'        element={<Dashboard />} />
+        <Route path='live-map'         element={<LiveMap />} />
+        <Route path='trips'            element={<TripsHistory />} />
+        <Route path='driver-behaviour' element={<DriverBehaviour />} />
+        <Route path='vehicle-health'   element={<VehicleHealth />} />
+        <Route path='maintenance'      element={<Maintenance />} />
+        <Route path='geofences'        element={<GeofenceManager />} />
+        <Route path='alerts'           element={<Alerts />} />
+        <Route path='reports'          element={<Reports />} />
+        <Route path='fbt'              element={<FbtLogbook />} />
+        <Route path='settings'         element={<Settings />} />
+        <Route path='billing'          element={<Billing />} />
+        <Route
+          path='admin'
+          element={
+            <SuperAdminRoute>
+              <AdminPanel />
+            </SuperAdminRoute>
+          }
+        />
       </Route>
     </Routes>
   )

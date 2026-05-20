@@ -4,6 +4,7 @@ const cors = require('cors')
 const { connect } = require('./db/mongo')
 const { setupDatabase } = require('./db/setup')
 const { rateLimiter } = require('./middleware/rateLimiter')
+const upgradeRoutes = require('./routes/upgrade')
 
 const authRoutes        = require('./routes/auth')
 const vehicleRoutes     = require('./routes/vehicles')
@@ -37,6 +38,7 @@ app.use('/api/reports',     reportsRoutes)
 app.use('/api/fbt',         fbtRoutes)
 app.use('/api/settings',    settingsRoutes)
 app.use('/api/admin',       adminRoutes)
+app.use('/api/upgrade', upgradeRoutes)
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
