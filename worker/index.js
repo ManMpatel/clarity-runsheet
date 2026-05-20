@@ -13,6 +13,11 @@ const POLL_INTERVAL = 100
 async function start() {
   await connect()
   initSocket()
+  
+  const { startSafetyScoreCron }    = require('./cron/safety-scores')
+  const { startMaintenanceCron }    = require('./cron/maintenance-flags')
+  startSafetyScoreCron()
+  startMaintenanceCron()
   const redis = getClient()
   console.log('[Worker] Started — polling queue')
   poll(redis)

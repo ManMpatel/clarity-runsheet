@@ -1,3 +1,229 @@
+import { useEffect, useState } from 'react'
+import api from '../lib/api'
+
 export default function TripsHistory() {
-  return <div>Trips History</div>
+  const [trips, setTrips]       = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [selected, setSelected] = useState(null)
+  const [vehicles, setVehicles] = useState([])
+  const [filters, setFilters]   = useState({
+    vehicleId: '',
+    from: '',
+    to: '',
+  })
+
+  useEffect(() => {
+    async function loadVehicles() {
+      try {
+        const res = await api.get('/api/vehicles')
+        setVehicles(res.data)
+      } catch (err) {
+        console.error(err.message)
+      }
+    }
+    loadVehicles()
+    loadTrips()
+  }, [])
+
+  async function loadTrips() {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filters.vehicleId) params.append('vehicleId', filters.vehicleId)
+      if (filters.from)      params.append('from', filters.from)
+      if (filters.to)        params.append('to', filters.to)
+
+      const res = await api.get(`/api/trips?${params}`)
+      setTrips(res.data.trips || [])
+    } catch (err) {
+      console.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function formatDuration(mins) {
+    if (!mins) return '--'
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return h > 0 ? `${h}h ${m}m` : `${m}m`
+  }
+
+  function formatDate(date) {
+    if (!date) return '--'
+    return new Date(date).toLocaleString('en-AU', {
+      day: '2-digit', month: 'short',
+      hour: '2-digit', minute: '2-digit',
+    })
+  }
+
+  return (
+    <div className='p-6'>
+
+      <div className='mb-6'>
+        <h1 className='text-2xl font-bold text-gray-900'>Trips & History</h1>
+        <p className='text-sm text-gray-500 mt-1'>
+          View and replay all vehicle trips
+        </p>
+      </div>
+
+      <div className='bg-white rounded-xl border border-gray-200 p-4 mb-6'>
+        <div className='flex flex-wrap gap-3'>
+          <select
+            value={filters.vehicleId}
+            onChange={e => setFilters(f => ({ ...f, vehicleId: e.target.value }))}
+            className='h-9 px-3 rounded-lg border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
+          >
+            <option value=''>All vehicles</option>
+            {vehicles.map(v => (
+              <option key={v._id} value={v._id}>{v.name}</option>
+            ))}
+          </select>
+
+          <input
+            type='date'
+            value={filters.from}
+            onChange={e => setFilters(f => ({ ...f, from: e.target.value }))}
+            className='h-9 px-3 rounded-lg border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
+          />
+
+          <input
+            type='date'
+            value={filters.to}
+            onChange={e => setFilters(f => ({ ...f, to: e.target.value }))}
+            className='h-9 px-3 rounded-lg border border-gray-300 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500'
+          />
+
+          <button
+            onClick={loadTrips}
+            className='h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition'
+          >
+            Search
+          </button>
+        </div>
+      </div>
+
+      <div className='bg-white rounded-xl border border-gray-200 overflow-hidden'>
+        <div className='overflow-x-auto'>
+          <table className='w-full text-sm'>
+            <thead>
+              <tr className='border-b border-gray-200 bg-gray-50'>
+                <th className='text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide'>Vehicle</th>
+                <th className='text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide'>Start</th>
+                <th className='text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide'>End</th>
+                <th className='text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide'>Distance</th>
+                <th className='text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide'>Duration</th>
+                <th className='text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide'>FBT</th>
+                <th className='px-4 py-3'></th>
+              </tr>
+            </thead>
+            <tbody className='divide-y divide-gray-100'>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className='px-4 py-8 text-center text-sm text-gray-400'>
+                    Loading trips...
+                  </td>
+                </tr>
+              ) : trips.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className='px-4 py-8 text-center text-sm text-gray-400'>
+                    No trips found
+                  </td>
+                </tr>
+              ) : (
+                trips.map((trip, i) => (
+                  <tr
+                    key={i}
+                    className={`hover:bg-gray-50 cursor-pointer transition ${
+                      selected?._id === trip._id ? 'bg-blue-50' : ''
+                    }`}
+                    onClick={() => setSelected(trip)}
+                  >
+                    <td className='px-4 py-3 font-medium text-gray-800'>
+                      {trip.vehicleName || trip.vehicleId}
+                    </td>
+                    <td className='px-4 py-3 text-gray-600'>
+                      {formatDate(trip.startTime)}
+                    </td>
+                    <td className='px-4 py-3 text-gray-600'>
+                      {formatDate(trip.endTime)}
+                    </td>
+                    <td className='px-4 py-3 text-gray-600'>
+                      {trip.distanceKm ? `${trip.distanceKm.toFixed(1)} km` : '--'}
+                    </td>
+                    <td className='px-4 py-3 text-gray-600'>
+                      {formatDuration(trip.durationMinutes)}
+                    </td>
+                    <td className='px-4 py-3'>
+                      {trip.classification ? (
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          trip.classification === 'business'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {trip.classification}
+                        </span>
+                      ) : (
+                        <span className='text-xs text-gray-400'>Unclassified</span>
+                      )}
+                    </td>
+                    <td className='px-4 py-3 text-right'>
+                      <button className='text-xs text-blue-600 hover:underline'>
+                        Replay
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {selected && (
+        <div className='fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center p-4'>
+          <div className='bg-white rounded-xl w-full max-w-md p-6'>
+            <div className='flex items-center justify-between mb-4'>
+              <h3 className='text-base font-semibold text-gray-800'>Trip Detail</h3>
+              <button
+                onClick={() => setSelected(null)}
+                className='text-gray-400 hover:text-gray-600 text-xl leading-none'
+              >
+                ×
+              </button>
+            </div>
+            <div className='space-y-3'>
+              <DetailRow label='Vehicle'  value={selected.vehicleName || selected.vehicleId} />
+              <DetailRow label='Start'    value={formatDate(selected.startTime)} />
+              <DetailRow label='End'      value={formatDate(selected.endTime)} />
+              <DetailRow label='Distance' value={selected.distanceKm ? `${selected.distanceKm.toFixed(1)} km` : '--'} />
+              <DetailRow label='Duration' value={formatDuration(selected.durationMinutes)} />
+              <DetailRow label='FBT'      value={selected.classification || 'Unclassified'} />
+            </div>
+            <div className='flex gap-3 mt-5'>
+              <button className='flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition'>
+                Replay trip
+              </button>
+              <button
+                onClick={() => setSelected(null)}
+                className='flex-1 h-9 border border-gray-300 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition'
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className='flex justify-between py-1.5 border-b border-gray-100'>
+      <span className='text-sm text-gray-500'>{label}</span>
+      <span className='text-sm font-medium text-gray-800'>{value}</span>
+    </div>
+  )
 }
