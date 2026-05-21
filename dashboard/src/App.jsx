@@ -5,6 +5,7 @@ import AppShell from './components/layout/AppShell'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
+import RegisterDevice from './pages/garage/RegisterDevice'
 import LiveMap from './pages/LiveMap'
 import TripsHistory from './pages/TripsHistory'
 import DriverBehaviour from './pages/DriverBehaviour'
@@ -54,6 +55,7 @@ export default function App() {
         <Route path='vehicle-health'   element={<VehicleHealth />} />
         <Route path='maintenance'      element={<Maintenance />} />
         <Route path='geofences'        element={<GeofenceManager />} />
+        <Route path='garage/register-device' element={<RegisterDevice />} />
         <Route path='alerts'           element={<Alerts />} />
         <Route path='reports'          element={<Reports />} />
         <Route path='fbt'              element={<FbtLogbook />} />
