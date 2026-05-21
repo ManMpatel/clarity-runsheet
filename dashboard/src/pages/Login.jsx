@@ -21,9 +21,9 @@ export default function Login() {
 
     try {
       const res = await api.post('/api/auth/login', { email, password })
-      login(res.data.token, res.data.user)
+      login(res.data.token, res.data.user, res.data.onboardingComplete)
       initDark()
-      navigate('/dashboard')
+      navigate(res.data.onboardingComplete ? '/dashboard' : '/onboarding')
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed')
     } finally {

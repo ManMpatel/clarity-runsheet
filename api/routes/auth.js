@@ -35,8 +35,12 @@ router.post('/login', async (req, res) => {
       { expiresIn: '7d' }
     )
 
+    const companies = await getCollection('companies')
+    const company = await companies.findOne({ _id: require('mongodb').ObjectId.createFromHexString(user.companyId.toString()) })
+
     return res.json({
       token,
+      onboardingComplete: company?.onboardingComplete || false,
       user: {
         id:    user._id,
         name:  user.name,

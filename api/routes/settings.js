@@ -102,4 +102,22 @@ router.put('/users/:id/role', requireAuth, requireCompany,
   }
 })
 
+// PUT /api/settings/onboarding-complete
+// Called when user finishes or skips the onboarding wizard
+// Sets flag on company record so wizard never shows again
+router.put('/onboarding-complete', requireAuth, requireCompany, async (req, res) => {
+  try {
+    const companies = await getCollection('companies')
+    await companies.updateOne(
+      { _id: new ObjectId(req.companyId) },
+      { $set: { onboardingComplete: true, updatedAt: new Date() } }
+    )
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+module.exports = router
+
 module.exports = router
