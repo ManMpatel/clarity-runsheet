@@ -1,5 +1,6 @@
 const { getCollection } = require('../db/mongo')
 const { getClient } = require('../db/redis')
+const { autoClassifyTrip } = require('../services/fbt-classifier')
 
 const TRIP_END_SECONDS = 300
 const MIN_TRIP_DISTANCE_METRES = 200
@@ -111,7 +112,8 @@ async function endTrip(redis, tripKey, activeTrip, record, vehicleId, companyId)
     createdAt:      new Date(),
   }
 
-  await collection.insertOne(trip)
+  const result = await collection.insertOne(trip)
+  await autoClassifyTrip(result.insertedId, companyId, startTime)
   console.log(`[Trip] Saved — ${distanceKm}km, ${durationMinutes}min for IMEI ${activeTrip.imei}`)
 }
 

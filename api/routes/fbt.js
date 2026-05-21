@@ -41,10 +41,10 @@ router.put('/:id/classify', requireAuth, requireCompany, async (req, res) => {
       {
         $set: {
           classification,
-          purpose:        purpose || null,
-          classifiedAt:   new Date(),
-          classifiedBy:   req.user.userId,
-          updatedAt:      new Date(),
+          purpose:      purpose || null,
+          classifiedAt: new Date(),
+          classifiedBy: req.user.userId,
+          updatedAt:    new Date(),
         }
       },
       { returnDocument: 'after' }
@@ -86,6 +86,60 @@ router.get('/summary', requireAuth, requireCompany, async (req, res) => {
     }
 
     return res.json(summary)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// GET /api/fbt/settings
+// Returns business hours setting for this company
+router.get('/settings', requireAuth, requireCompany, async (req, res) => {
+  try {
+    const collection = await getCollection('fbt_settings')
+    const settings = await collection.findOne({ companyId: req.companyId })
+
+    if (!settings) {
+      return res.json({
+        companyId:     req.companyId,
+        businessHours: { start: '07:00', end: '18:00' },
+        businessDays:  [1, 2, 3, 4, 5],
+        mode:          'auto',
+      })
+    }
+
+    return res.json(settings)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// PUT /api/fbt/settings
+// Contractor sets business hours once — all trips auto-classified from this point
+// mode: 'auto' = classify by hours, 'all_business' = everything is business
+router.put('/settings', requireAuth, requireCompany, async (req, res) => {
+  try {
+    const { businessHours, businessDays, mode } = req.body
+
+    if (!businessHours?.start || !businessHours?.end) {
+      return res.status(400).json({ error: 'businessHours.start and end required' })
+    }
+
+    const collection = await getCollection('fbt_settings')
+    const settings = {
+      companyId:     req.companyId,
+      businessHours: { start: businessHours.start, end: businessHours.end },
+      businessDays:  businessDays || [1, 2, 3, 4, 5],
+      mode:          mode || 'auto',
+      updatedAt:     new Date(),
+    }
+
+    await collection.updateOne(
+      { companyId: req.companyId },
+      { $set: settings },
+      { upsert: true }
+    )
+
+    return res.json(settings)
   } catch (err) {
     return res.status(500).json({ error: 'Server error' })
   }
