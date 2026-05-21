@@ -10,9 +10,15 @@ function requireSuperAdmin(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET)
+
     if (decoded.role !== 'superAdmin') {
       return res.status(403).json({ error: 'Super admin only' })
     }
+
+    if (!decoded.totp_verified) {
+      return res.status(403).json({ error: 'TOTP verification required' })
+    }
+
     req.user = decoded
     next()
   } catch (err) {

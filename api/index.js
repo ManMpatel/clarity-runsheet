@@ -18,6 +18,8 @@ const reportsRoutes     = require('./routes/reports')
 const fbtRoutes         = require('./routes/fbt')
 const settingsRoutes    = require('./routes/settings')
 const adminRoutes       = require('./routes/admin')
+const adminAuthRoutes   = require('./routes/admin-auth')
+const imeiRoutes = require('./routes/imei')
 
 const app  = express()
 const PORT = process.env.PORT || 3000
@@ -38,7 +40,9 @@ app.use('/api/reports',     reportsRoutes)
 app.use('/api/fbt',         fbtRoutes)
 app.use('/api/settings',    settingsRoutes)
 app.use('/api/admin',       adminRoutes)
+app.use('/api/admin/auth',  adminAuthRoutes)
 app.use('/api/upgrade', upgradeRoutes)
+app.use('/api/imei', imeiRoutes)
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 

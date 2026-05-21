@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
+import IMEICheck from './pages/garage/IMEICheck'
 import AppShell from './components/layout/AppShell'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -47,6 +48,7 @@ export default function App() {
         <Route index element={<Navigate to='/dashboard' replace />} />
         <Route path='dashboard'        element={<Dashboard />} />
         <Route path='live-map'         element={<LiveMap />} />
+        <Route path='garage/imei-check' element={<IMEICheck />} />
         <Route path='trips'            element={<TripsHistory />} />
         <Route path='driver-behaviour' element={<DriverBehaviour />} />
         <Route path='vehicle-health'   element={<VehicleHealth />} />

@@ -12,6 +12,7 @@ const links = [
   { to: '/alerts',           label: 'Alerts' },
   { to: '/reports',          label: 'Reports' },
   { to: '/fbt',              label: 'FBT Logbook' },
+  { to: '/garage/imei-check', label: 'IMEI Pre-Check' },
   { to: '/billing',          label: 'Billing & Plans' },
   { to: '/settings',         label: 'Settings' },
 ]
