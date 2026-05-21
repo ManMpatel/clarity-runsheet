@@ -5,12 +5,12 @@ import { useAlertStore } from '../store/alertStore'
 import api from '../lib/api'
 
 export default function Dashboard() {
-  const [loading, setLoading]     = useState(true)
-  const [stats, setStats]         = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const [stats, setStats]       = useState(null)
+  const navigate                = useNavigate()
   const setFleet                  = useFleetStore(s => s.setFleet)
   const getAllVans                 = useFleetStore(s => s.getAllVans)
   const { alerts, unreadCount }   = useAlertStore()
-  const navigate                  = useNavigate()
 
   useEffect(() => {
     async function load() {
@@ -43,6 +43,30 @@ export default function Dashboard() {
   }
 
   const vans = getAllVans()
+
+  const isLocked = !stats && !loading
+
+if (isLocked) {
+  return (
+    <div className='flex flex-col items-center justify-center h-[60vh] px-4 text-center'>
+      <div className='w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-2xl'>
+        🔒
+      </div>
+      <h2 className='text-xl font-bold text-gray-800 mb-2'>
+        Your account is pending activation
+      </h2>
+      <p className='text-sm text-gray-500 max-w-sm mb-6'>
+        Choose a plan to activate your fleet tracking. We will contact you to confirm payment and activate your account within 24 hours.
+      </p>
+      <button
+        onClick={() => navigate('/billing')}
+        className='h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition'
+      >
+        View plans and pricing
+      </button>
+    </div>
+  )
+}
 
   if (loading) {
     return (

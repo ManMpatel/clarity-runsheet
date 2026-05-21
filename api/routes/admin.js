@@ -118,12 +118,18 @@ router.put('/companies/:id/slots', requireSuperAdmin, async (req, res) => {
       },
       { returnDocument: 'after' }
     )
-
+    const highestTier = parseInt(topSlots) > 0 ? 'top' : parseInt(midSlots) > 0 ? 'mid' : parseInt(entrySlots) > 0 ? 'entry' : 'locked'
+    await companies.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { subscriptionTier: highestTier } }
+    )
     return res.json(result)
   } catch (err) {
     return res.status(500).json({ error: 'Server error' })
   }
 })
+
+
 
 router.get('/upgrade-requests', requireSuperAdmin, async (req, res) => {
   try {

@@ -1,5 +1,6 @@
 const express = require('express')
 const { getCollection } = require('../db/mongo')
+const { sendUpgradeNotification } = require('../services/resend')
 const { requireAuth } = require('../middleware/auth')
 const { requireCompany } = require('../middleware/requireCompany')
 const { ObjectId } = require('mongodb')
@@ -27,6 +28,7 @@ router.post('/request', requireAuth, requireCompany, async (req, res) => {
     }
 
     await collection.insertOne(request)
+    await sendUpgradeNotification(request)
     return res.status(201).json(request)
   } catch (err) {
     return res.status(500).json({ error: 'Server error' })

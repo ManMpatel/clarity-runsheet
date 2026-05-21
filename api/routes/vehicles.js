@@ -44,12 +44,20 @@ router.post('/', requireAuth, requireCompany,
     if (existing) return res.status(409).json({ error: 'IMEI already registered' })
 
     const vehicle = {
-      companyId: req.companyId, name, imei,
-      registration: registration || null,
-      make: make || null, model: model || null,
-      year: year || null, driverMobile: driverMobile || null,
-      active: true, createdAt: new Date(),
-    }
+  companyId:            req.companyId,
+  name,
+  imei,
+  registration:         registration || null,
+  make:                 make || null,
+  model:                model || null,
+  year:                 year || null,
+  driverMobile:         driverMobile || null,
+  tier:                 'entry',
+  tierChangesRemaining: 3,
+  tierHistory:          [],
+  active:               true,
+  createdAt:            new Date(),
+}
     const result = await collection.insertOne(vehicle)
     return res.status(201).json({ ...vehicle, _id: result.insertedId })
   } catch (err) {

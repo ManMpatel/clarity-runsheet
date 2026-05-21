@@ -6,6 +6,7 @@ const { writeTelemetry } = require('./processors/telemetry')
 const { processDriverEvents } = require('./processors/driver-events')
 const { processGeofences } = require('./processors/geofence')
 const { processAlerts } = require('./processors/alerts')
+const { processTripDetection } = require('./processors/trip-builder')
 
 const QUEUE_KEY = 'telemetry_queue'
 const POLL_INTERVAL = 100
@@ -56,6 +57,7 @@ async function processPayload(payload) {
   const geofenceEvents = await processGeofences(imei, companyId, vehicleId, doc)
   const driverEvents = await processDriverEvents(imei, companyId, vehicleId, doc)
   await processAlerts(imei, companyId, vehicleId, doc, geofenceEvents)
+  await processTripDetection(imei, companyId, vehicleId, doc)
 
   broadcastVanUpdate(companyId, {
     imei,
