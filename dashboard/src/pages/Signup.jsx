@@ -127,6 +127,20 @@ export default function Signup() {
               />
             </div>
 
+            <div className='flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3'>
+              <input
+                type='checkbox'
+                id='driverConsent'
+                checked={form.driverConsent || false}
+                onChange={e => setForm(f => ({ ...f, driverConsent: e.target.checked }))}
+                required
+                className='mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+              />
+              <label htmlFor='driverConsent' className='text-xs text-gray-600 leading-relaxed'>
+                I confirm that all drivers have been informed their vehicle is being tracked by a GPS device. I understand it is my responsibility to obtain driver consent in accordance with Australian privacy law.
+              </label>
+            </div>
+
             {error && (
               <div className='text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2'>
                 {error}
