@@ -10,6 +10,7 @@ import LiveMap from './pages/LiveMap'
 import TripsHistory from './pages/TripsHistory'
 import DriverBehaviour from './pages/DriverBehaviour'
 import VehicleHealth from './pages/VehicleHealth'
+import AdminLogin from './pages/admin/AdminLogin'
 import Onboarding from './pages/Onboarding'
 import Maintenance from './pages/Maintenance'
 import GeofenceManager from './pages/GeofenceManager'
@@ -37,8 +38,14 @@ function SuperAdminRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path='/login'  element={<Login />} />
-      <Route path='/signup' element={<Signup />} />
+      <Route path='/login'       element={<Login />} />
+      <Route path='/signup'      element={<Signup />} />
+      <Route path='/admin/login' element={<AdminLogin />} />
+      <Route path='/onboarding' element={
+        <ProtectedRoute>
+          <Onboarding />
+        </ProtectedRoute>
+      } />
       <Route
         path='/'
         element={
@@ -46,6 +53,7 @@ export default function App() {
             <AppShell />
           </ProtectedRoute>
         }
+        
       >
         <Route index element={<Navigate to='/dashboard' replace />} />
         <Route path='dashboard'        element={<Dashboard />} />
@@ -61,6 +69,7 @@ export default function App() {
         <Route path='reports'          element={<Reports />} />
         <Route path='fbt'              element={<FbtLogbook />} />
         <Route path='settings'         element={<Settings />} />
+        <Route path='/admin/login' element={<AdminLogin />} />
         <Route path='billing'          element={<Billing />} />
         <Route
           path='admin'

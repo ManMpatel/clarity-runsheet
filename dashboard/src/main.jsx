@@ -8,7 +8,7 @@ document.documentElement.classList.remove('dark')
 
 const stored = JSON.parse(localStorage.getItem('clarity-ui') || '{}')
 const dark = stored?.state?.darkMode ?? false
-if (dark) document.documentElement.classList.add('dark')
+document.documentElement.classList.toggle('dark', dark)
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
