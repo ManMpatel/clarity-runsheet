@@ -11,6 +11,7 @@ import TripsHistory from './pages/TripsHistory'
 import DriverBehaviour from './pages/DriverBehaviour'
 import VehicleHealth from './pages/VehicleHealth'
 import AdminLogin from './pages/admin/AdminLogin'
+import AdminShell from './components/layout/AdminShell'
 import Onboarding from './pages/Onboarding'
 import Maintenance from './pages/Maintenance'
 import GeofenceManager from './pages/GeofenceManager'
@@ -56,6 +57,18 @@ export default function App() {
         }
         
       >
+        <Route
+        path='/admin'
+        element={
+          <SuperAdminRoute>
+            <AdminShell />
+          </SuperAdminRoute>
+        }
+      >
+        <Route index element={<AdminPanel />} />
+        <Route path='tickets' element={<AdminPanel />} />
+        <Route path='devices' element={<AdminPanel />} />
+      </Route>
         <Route index element={<Navigate to='/dashboard' replace />} />
         <Route path='dashboard'        element={<Dashboard />} />
         <Route path='live-map'         element={<LiveMap />} />
@@ -73,14 +86,7 @@ export default function App() {
         <Route path='garage/my-devices' element={<MyDevices />} />
         <Route path='/admin/login' element={<AdminLogin />} />
         <Route path='billing'          element={<Billing />} />
-        <Route
-          path='admin'
-          element={
-            <SuperAdminRoute>
-              <AdminPanel />
-            </SuperAdminRoute>
-          }
-        />
+        
       </Route>
     </Routes>
   )
