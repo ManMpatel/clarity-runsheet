@@ -15,6 +15,7 @@ import Onboarding from './pages/Onboarding'
 import Maintenance from './pages/Maintenance'
 import GeofenceManager from './pages/GeofenceManager'
 import Alerts from './pages/Alerts'
+import MyDevices from './pages/garage/MyDevices'
 import Reports from './pages/Reports'
 import FbtLogbook from './pages/FbtLogbook'
 import Settings from './pages/Settings'
@@ -69,6 +70,7 @@ export default function App() {
         <Route path='reports'          element={<Reports />} />
         <Route path='fbt'              element={<FbtLogbook />} />
         <Route path='settings'         element={<Settings />} />
+        <Route path='garage/my-devices' element={<MyDevices />} />
         <Route path='/admin/login' element={<AdminLogin />} />
         <Route path='billing'          element={<Billing />} />
         <Route
