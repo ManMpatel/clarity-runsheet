@@ -272,15 +272,15 @@ export default function Onboarding() {
 const styles = {
   page: {
     minHeight: '100vh',
-    background: '#0f1117',
+    background: '#f9fafb',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     padding: '24px',
   },
   card: {
-    background: '#1a1d27',
-    border: '1px solid #2a2d3a',
+    background: '#ffffff',
+    border: '1px solid #e5e7eb',
     borderRadius: '16px',
     padding: '40px',
     width: '100%',
@@ -330,7 +330,7 @@ const styles = {
     marginBottom: '24px',
   },
   stepTitle: {
-    color: '#ffffff',
+    color: '#111827',
     fontSize: '20px',
     fontWeight: '600',
     margin: '0 0 6px 0',
@@ -353,10 +353,10 @@ const styles = {
   input: {
     width: '100%',
     padding: '10px 14px',
-    background: '#0f1117',
-    border: '1px solid #2a2d3a',
+    background: '#ffffff',
+    border: '1px solid #d1d5db',
     borderRadius: '8px',
-    color: '#ffffff',
+    color: '#111827',
     fontSize: '14px',
     boxSizing: 'border-box',
     outline: 'none',

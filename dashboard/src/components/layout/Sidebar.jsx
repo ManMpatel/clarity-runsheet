@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 
-const links = [
+const contractorLinks = [
   { to: '/dashboard',        label: 'Dashboard' },
   { to: '/live-map',         label: 'Live Map' },
   { to: '/trips',            label: 'Trips & History' },
@@ -12,19 +12,34 @@ const links = [
   { to: '/alerts',           label: 'Alerts' },
   { to: '/reports',          label: 'Reports' },
   { to: '/fbt',              label: 'FBT Logbook' },
-  { to: '/garage/imei-check', label: 'IMEI Pre-Check' },
   { to: '/billing',          label: 'Billing & Plans' },
   { to: '/settings',         label: 'Settings' },
+]
+
+const garageLinks = [
+  { to: '/garage/imei-check',     label: 'IMEI Pre-Check' },
+  { to: '/garage/register-device', label: 'Register Device' },
+  { to: '/garage/my-devices',     label: 'My Devices' },
+  { to: '/billing',               label: 'Billing & Plans' },
+  { to: '/settings',              label: 'Settings' },
 ]
 
 export default function Sidebar() {
   const role = useAuthStore(s => s.role)
 
+  const links = role === 'garageOwner' ? garageLinks : contractorLinks
+
   return (
     <aside className='hidden md:flex flex-col fixed left-0 top-0 h-full w-60 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-40'>
       <div className='h-[60px] flex items-center px-6 border-b border-gray-200 dark:border-gray-800'>
-        <span className='text-lg font-bold text-blue-600'>Clarity Fleet</span>
+        <div>
+          <span className='text-lg font-bold text-blue-600'>Clarity Fleet</span>
+          {role === 'garageOwner' && (
+            <p className='text-xs text-gray-400 leading-none mt-0.5'>Garage Portal</p>
+          )}
+        </div>
       </div>
+
       <nav className='flex-1 overflow-y-auto py-4'>
         {links.map(link => (
           <NavLink
