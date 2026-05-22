@@ -159,4 +159,25 @@ router.put('/upgrade-requests/:id/action', requireSuperAdmin, async (req, res) =
     return res.status(500).json({ error: 'Server error' })
   }
 })
+
+router.put('/companies/:id/set-role', requireSuperAdmin, async (req, res) => {
+  try {
+    const { role } = req.body
+    if (!['contractor', 'garageOwner'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' })
+    }
+    const { ObjectId } = require('mongodb')
+    const companies = await getCollection('companies')
+    await companies.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { role, updatedAt: new Date() } }
+    )
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+module.exports = router
+
 module.exports = router

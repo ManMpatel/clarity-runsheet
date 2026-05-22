@@ -67,6 +67,17 @@ export default function AdminPanel() {
     }
   }
 
+  async function setRole(companyId, role) {
+  try {
+    await api.put(`/api/admin/companies/${companyId}/set-role`, { role })
+    setCompanies(prev =>
+      prev.map(c => c._id === companyId ? { ...c, role } : c)
+    )
+  } catch (err) {
+    console.error(err.message)
+  }
+}
+
   return (
     <div className='p-6'>
 
@@ -144,17 +155,31 @@ export default function AdminPanel() {
                   <p className='text-sm font-medium text-gray-800'>{company.name}</p>
                   <p className='text-xs text-gray-400 mt-0.5'>{company.slug}</p>
                 </div>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                  company.subscriptionTier === 'locked'
-                    ? 'bg-gray-100 text-gray-600'
-                    : company.subscriptionTier === 'top'
-                    ? 'bg-purple-100 text-purple-700'
-                    : company.subscriptionTier === 'mid'
-                    ? 'bg-teal-100 text-teal-700'
-                    : 'bg-blue-100 text-blue-700'
-                }`}>
-                  {company.subscriptionTier}
-                </span>
+                <div className='flex items-center gap-2'>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    company.subscriptionTier === 'locked'
+                      ? 'bg-gray-100 text-gray-600'
+                      : company.subscriptionTier === 'top'
+                      ? 'bg-purple-100 text-purple-700'
+                      : company.subscriptionTier === 'mid'
+                      ? 'bg-teal-100 text-teal-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {company.subscriptionTier}
+                  </span>
+                  {company.role === 'garageOwner' ? (
+                    <span className='text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700'>
+                      Garage
+                    </span>
+                  ) : (
+                    <button
+                      onClick={e => { e.stopPropagation(); setRole(company._id, 'garageOwner') }}
+                      className='text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 hover:bg-orange-100 hover:text-orange-700 transition'
+                    >
+                      + Garage
+                    </button>
+                  )}
+                </div>
               </button>
             ))}
           </div>
