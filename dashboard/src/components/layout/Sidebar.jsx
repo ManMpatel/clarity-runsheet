@@ -1,75 +1,158 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
+import { useEffect, useState } from 'react'
+import api from '../../lib/api'
 
-const contractorLinks = [
-  { to: '/dashboard',        label: 'Dashboard' },
-  { to: '/live-map',         label: 'Live Map' },
-  { to: '/trips',            label: 'Trips & History' },
+const CORE_LINKS = [
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/live-map',  label: 'Live Map' },
+  { to: '/trips',     label: 'Trips & History' },
+  { to: '/alerts',    label: 'Alerts' },
+]
+
+const MID_LINKS = [
   { to: '/driver-behaviour', label: 'Driver Behaviour' },
-  { to: '/vehicle-health',   label: 'Vehicle Health' },
-  { to: '/maintenance',      label: 'Maintenance' },
   { to: '/geofences',        label: 'Geofence Manager' },
-  { to: '/alerts',           label: 'Alerts' },
-  { to: '/reports',          label: 'Reports' },
   { to: '/fbt',              label: 'FBT Logbook' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/maintenance',      label: 'Maintenance' },
 ]
 
-const garageLinks = [
-  { to: '/garage/imei-check',     label: 'IMEI Pre-Check' },
-  { to: '/garage/register-device', label: 'Register Device' },
-  { to: '/garage/my-devices',     label: 'My Devices' },
-  { to: '/settings', label: 'Settings' },
+const TOP_LINKS = [
+  { to: '/vehicle-health', label: 'Vehicle Health' },
+  { to: '/reports',        label: 'Reports' },
 ]
+
+const GARAGE_LINKS = [
+  { to: '/garage/imei-check',      label: 'IMEI Pre-Check' },
+  { to: '/garage/register-device', label: 'Register Device' },
+  { to: '/garage/my-devices',      label: 'My Devices' },
+  { to: '/settings',               label: 'Settings' },
+]
+
+function NavItem({ to, label }) {
+  return (
+    <NavLink to={to}
+      className={({ isActive }) =>
+        `flex items-center px-6 py-2.5 text-sm font-medium border-l-4 transition-colors ${
+          isActive
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-600'
+            : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+        }`
+      }>
+      {label}
+    </NavLink>
+  )
+}
+
+function LockedItem({ label, plan }) {
+  const navigate = useNavigate()
+  const [tip, setTip] = useState(false)
+
+  return (
+    <div className='relative'>
+      <button
+        onClick={() => navigate('/settings')}
+        onMouseEnter={() => setTip(true)}
+        onMouseLeave={() => setTip(false)}
+        className='w-full flex items-center justify-between px-6 py-2.5 text-sm font-medium border-l-4 border-transparent text-gray-300 dark:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors'>
+        <span>{label}</span>
+        <span className='text-xs'>🔒</span>
+      </button>
+      {tip && (
+        <div className='absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-xl pointer-events-none'>
+          Requires {plan} plan — click to upgrade
+          <div className='absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900' />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SectionLabel({ label }) {
+  return (
+    <div className='mx-6 mt-5 mb-2 flex items-center gap-2'>
+      <span className='text-xs font-semibold text-gray-400 dark:text-gray-600 uppercase tracking-wider whitespace-nowrap'>
+        {label}
+      </span>
+      <div className='flex-1 h-px bg-gray-100 dark:bg-gray-800' />
+    </div>
+  )
+}
 
 export default function Sidebar() {
   const role = useAuthStore(s => s.role)
+  const [hasMid, setHasMid] = useState(false)
+  const [hasTop, setHasTop] = useState(false)
 
-  const links = role === 'garageOwner' ? garageLinks : contractorLinks
+  useEffect(() => {
+    if (role === 'garageOwner') return
+    api.get('/api/vehicles')
+      .then(res => {
+        const v = res.data
+        setHasMid(v.some(x => x.tier === 'mid' || x.tier === 'top'))
+        setHasTop(v.some(x => x.tier === 'top'))
+      })
+      .catch(() => {})
+  }, [role])
+
+  if (role === 'garageOwner') {
+    return (
+      <aside className='hidden md:flex flex-col fixed left-0 top-0 h-full w-60 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-40'>
+        <div className='h-[60px] flex items-center px-6 border-b border-gray-200 dark:border-gray-800'>
+          <div>
+            <span className='text-lg font-bold text-blue-600'>Clarity Fleet</span>
+            <p className='text-xs text-gray-400 mt-0.5'>Garage Portal</p>
+          </div>
+        </div>
+        <nav className='flex-1 overflow-y-auto py-3'>
+          {GARAGE_LINKS.map(l => <NavItem key={l.to} {...l} />)}
+        </nav>
+      </aside>
+    )
+  }
 
   return (
     <aside className='hidden md:flex flex-col fixed left-0 top-0 h-full w-60 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 z-40'>
       <div className='h-[60px] flex items-center px-6 border-b border-gray-200 dark:border-gray-800'>
-        <div>
-          <span className='text-lg font-bold text-blue-600'>Clarity Fleet</span>
-          {role === 'garageOwner' && (
-            <p className='text-xs text-gray-400 leading-none mt-0.5'>Garage Portal</p>
-          )}
-        </div>
+        <span className='text-lg font-bold text-blue-600'>Clarity Fleet</span>
       </div>
 
-      <nav className='flex-1 overflow-y-auto py-4'>
-        {links.map(link => (
-          <NavLink
-            key={link.to}
-            to={link.to}
+      <nav className='flex-1 overflow-y-auto py-3'>
+
+        {/* Core — always visible */}
+        {CORE_LINKS.map(l => <NavItem key={l.to} {...l} />)}
+
+        {/* Mid features */}
+        <SectionLabel label='Mid Plan' />
+        {MID_LINKS.map(l =>
+          hasMid
+            ? <NavItem key={l.to} {...l} />
+            : <LockedItem key={l.to} label={l.label} plan='Mid' />
+        )}
+
+        {/* Top features */}
+        <SectionLabel label='Top Plan' />
+        {TOP_LINKS.map(l =>
+          hasTop
+            ? <NavItem key={l.to} {...l} />
+            : <LockedItem key={l.to} label={l.label} plan='Top' />
+        )}
+
+        {/* Bottom */}
+        <div className='mx-6 mt-5 mb-2 h-px bg-gray-100 dark:bg-gray-800' />
+        <NavItem to='/settings' label='Settings' />
+
+        {role === 'superAdmin' && (
+          <NavLink to='/admin'
             className={({ isActive }) =>
               `flex items-center px-6 py-2.5 text-sm font-medium border-l-4 transition-colors ${
                 isActive
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-600'
-                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                  ? 'border-purple-500 bg-purple-50 text-purple-600'
+                  : 'border-transparent text-purple-600 hover:bg-purple-50'
               }`
-            }
-          >
-            {link.label}
+            }>
+            Super Admin Panel
           </NavLink>
-        ))}
-
-        {role === 'superAdmin' && (
-          <div className='mt-4 pt-4 border-t border-gray-200 dark:border-gray-800'>
-            <NavLink
-              to='/admin'
-              className={({ isActive }) =>
-                `flex items-center px-6 py-2.5 text-sm font-medium border-l-4 transition-colors ${
-                  isActive
-                    ? 'border-purple-500 bg-purple-50 text-purple-600'
-                    : 'border-transparent text-purple-600 hover:bg-purple-50'
-                }`
-              }
-            >
-              Super Admin Panel
-            </NavLink>
-          </div>
         )}
       </nav>
     </aside>
