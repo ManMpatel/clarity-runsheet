@@ -1,8 +1,11 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
+const crypto = require('crypto')
 const { getCollection } = require('../db/mongo')
 const { requireAuth } = require('../middleware/auth')
+const { sendEmailVerification } = require('../services/resend')
+
 
 const router = express.Router()
 
@@ -22,6 +25,10 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) {
       return res.status(401).json({ error: 'Invalid credentials' })
+    }
+
+    if (!user.emailVerified) {
+      return res.status(403).json({ error: 'Please verify your email before logging in. Check your inbox.' })
     }
 
     const token = jwt.sign(
@@ -94,6 +101,8 @@ router.post('/signup', async (req, res) => {
     const companyId = companyResult.insertedId.toString()
 
     const passwordHash = await bcrypt.hash(password, 12)
+    const verifyToken = crypto.randomBytes(32).toString('hex')
+
     const user = {
       companyId,
       name,
@@ -101,12 +110,17 @@ router.post('/signup', async (req, res) => {
       passwordHash,
       role:             'companyAdmin',
       subscriptionTier: 'locked',
+      emailVerified:    false,
+      emailVerifyToken: verifyToken,
+      emailVerifyExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
       createdAt:        new Date(),
     }
 
     await users.insertOne(user)
 
-    return res.status(201).json({ message: 'Account created successfully' })
+    sendEmailVerification(email.toLowerCase(), name, verifyToken)
+
+    return res.status(201).json({ message: 'Account created. Please check your email to verify your account.' })
   } catch (err) {
     console.error('[Auth] Signup error:', err.message)
     return res.status(500).json({ error: 'Server error' })
@@ -148,6 +162,33 @@ router.get('/me', requireAuth, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' })
     return res.json(user)
   } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.get('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query
+    if (!token) return res.status(400).json({ error: 'Token required' })
+
+    const users = await getCollection('users')
+    const user = await users.findOne({
+      emailVerifyToken: token,
+      emailVerifyExpiry: { $gt: new Date() },
+    })
+
+    if (!user) {
+      return res.status(400).json({ error: 'Invalid or expired verification link' })
+    }
+
+    await users.updateOne(
+      { _id: user._id },
+      { $set: { emailVerified: true, emailVerifyToken: null, emailVerifyExpiry: null } }
+    )
+
+    return res.json({ success: true, message: 'Email verified. You can now log in.' })
+  } catch (err) {
+    console.error('[Auth] Verify email error:', err.message)
     return res.status(500).json({ error: 'Server error' })
   }
 })

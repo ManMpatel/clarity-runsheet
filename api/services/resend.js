@@ -86,4 +86,36 @@ module.exports = {
   sendUpgradeNotification,
   sendSupportAutoReply,
   sendSupportAdminNotification,
+  sendEmailVerification,
+}
+
+
+
+
+async function sendEmailVerification(to, name, token) {
+  const url = `${process.env.DASHBOARD_URL}/verify-email?token=${token}`
+  try {
+    await client.emails.send({
+      from:    'Clarity Fleet <noreply@clarity-software.com.au>',
+      to,
+      subject: 'Verify your Clarity Fleet account',
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #3b82f6;">Clarity Fleet</h2>
+          <p>Hi ${name},</p>
+          <p>Thanks for signing up. Click the button below to verify your email address and activate your account.</p>
+          <div style="margin: 32px 0;">
+            <a href="${url}" style="background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+              Verify my email
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 13px;">This link expires in 24 hours. If you did not sign up for Clarity Fleet, ignore this email.</p>
+          <p style="color: #6b7280; font-size: 12px;">Or copy this link: ${url}</p>
+        </div>
+      `,
+    })
+    console.log(`[Resend] Verification email sent to ${to}`)
+  } catch (err) {
+    console.error('[Resend] Verification email failed:', err.message)
+  }
 }
