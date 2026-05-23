@@ -13,7 +13,7 @@ export default function GeofenceManager() {
   const [form, setForm] = useState({
     name: '', alertOnExit: true, alertOnEntry: false, radiusMetres: 200
   })
-  const [mapCenter, setMapCenter] = useState({ lng: 151.2093, lat: -33.8688 })
+  
   
 
   useEffect(() => {
