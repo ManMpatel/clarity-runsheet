@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import api from '../lib/api'
 
+const ZONE_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444',
+  '#8b5cf6', '#06b6d4', '#f97316', '#84cc16',
+]
+
 function generateCirclePolygon(lng, lat, radiusMetres, points = 64) {
   const coords = []
   for (let i = 0; i < points; i++) {
@@ -13,6 +18,10 @@ function generateCirclePolygon(lng, lat, radiusMetres, points = 64) {
   return { type: 'Polygon', coordinates: [coords] }
 }
 
+function getZoneColor(index) {
+  return ZONE_COLORS[index % ZONE_COLORS.length]
+}
+
 export default function GeofenceManager() {
   const mapContainer = useRef(null)
   const map          = useRef(null)
@@ -23,22 +32,22 @@ export default function GeofenceManager() {
   const [adding, setAdding]       = useState(false)
   const [selected, setSelected]   = useState(null)
   const [saving, setSaving]       = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [vehicles, setVehicles]   = useState([])
+  const [selectedVehicles, setSelectedVehicles] = useState([])
+  const [searchQuery, setSearchQuery]   = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
   const [center, setCenter]       = useState({ lng: 151.2093, lat: -33.8688 })
   const [form, setForm]           = useState({
     name: '', alertOnExit: true, alertOnEntry: false, radiusMetres: 500
   })
-  const [vehicles, setVehicles]   = useState([])
-  const [selectedVehicles, setSelectedVehicles] = useState([])
 
   useEffect(() => {
-    loadZones()
+    loadData()
     initMap()
   }, [])
 
-  async function loadZones() {
+  async function loadData() {
     try {
       const [zonesRes, vehiclesRes] = await Promise.all([
         api.get('/api/geofences'),
@@ -84,15 +93,72 @@ export default function GeofenceManager() {
       })
       map.current.addLayer({
         id: 'zones-fill', type: 'fill', source: 'zones',
-        paint: { 'fill-color': '#10b981', 'fill-opacity': 0.1 }
+        paint: {
+          'fill-color': ['get', 'color'],
+          'fill-opacity': ['get', 'opacity']
+        }
       })
       map.current.addLayer({
         id: 'zones-line', type: 'line', source: 'zones',
-        paint: { 'line-color': '#10b981', 'line-width': 2 }
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': ['get', 'lineWidth']
+        }
+      })
+      map.current.addLayer({
+        id: 'zones-label', type: 'symbol', source: 'zones',
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-size': 12,
+          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+        },
+        paint: {
+          'text-color': ['get', 'color'],
+          'text-halo-color': '#ffffff',
+          'text-halo-width': 2,
+        }
       })
     })
   }
 
+  // Update zones on map with colors and selection state
+  useEffect(() => {
+    if (!map.current) return
+    const tryUpdate = () => {
+      const source = map.current.getSource('zones')
+      if (!source) return
+      source.setData({
+        type: 'FeatureCollection',
+        features: zones.filter(z => z.geometry).map((z, i) => {
+          const color = getZoneColor(i)
+          const isSelected = selected?._id === z._id
+          const hasSelection = selected !== null
+          return {
+            type: 'Feature',
+            geometry: z.geometry,
+            properties: {
+              name: z.name,
+              color,
+              opacity: hasSelection ? (isSelected ? 0.2 : 0.05) : 0.12,
+              lineWidth: isSelected ? 3 : 1.5,
+            }
+          }
+        })
+      })
+
+      // Fly to selected zone
+      if (selected?.centre) {
+        map.current.flyTo({
+          center: [selected.centre.lng, selected.centre.lat],
+          zoom: selected.radiusMetres > 5000 ? 10 : selected.radiusMetres > 1000 ? 12 : 14,
+        })
+      }
+    }
+    if (map.current.loaded()) tryUpdate()
+    else map.current.on('load', tryUpdate)
+  }, [zones, selected])
+
+  // Preview circle when adding
   useEffect(() => {
     if (!map.current) return
     const tryUpdate = () => {
@@ -120,22 +186,6 @@ export default function GeofenceManager() {
     if (map.current.loaded()) tryUpdate()
     else map.current.on('load', tryUpdate)
   }, [adding, form.radiusMetres, center])
-
-  useEffect(() => {
-    if (!map.current) return
-    const tryUpdate = () => {
-      const source = map.current.getSource('zones')
-      if (!source) return
-      source.setData({
-        type: 'FeatureCollection',
-        features: zones.filter(z => z.geometry).map(z => ({
-          type: 'Feature', geometry: z.geometry, properties: { name: z.name }
-        }))
-      })
-    }
-    if (map.current.loaded()) tryUpdate()
-    else map.current.on('load', tryUpdate)
-  }, [zones])
 
   async function searchLocation(query) {
     if (!query || query.length < 3) { setSearchResults([]); return }
@@ -179,9 +229,7 @@ export default function GeofenceManager() {
     try {
       const geometry = generateCirclePolygon(center.lng, center.lat, form.radiusMetres)
       const res = await api.post('/api/geofences', {
-        ...form,
-        geometry,
-        centre: center,
+        ...form, geometry, centre: center,
         radiusMetres: form.radiusMetres,
         vehicleIds: selectedVehicles,
       })
@@ -206,7 +254,9 @@ export default function GeofenceManager() {
   return (
     <div className='flex h-[calc(100vh-60px)] md:h-screen'>
 
+      {/* Left Panel */}
       <div className='hidden md:flex flex-col w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800'>
+
         <div className='p-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between'>
           <h2 className='text-sm font-semibold text-gray-700 dark:text-gray-300'>Geofence Zones</h2>
           {!adding && (
@@ -217,8 +267,9 @@ export default function GeofenceManager() {
           )}
         </div>
 
+        {/* Add Form */}
         {adding && (
-          <div className='p-4 border-b border-gray-200 dark:border-gray-800 space-y-4 overflow-y-auto'>
+          <div className='p-4 border-b border-gray-200 dark:border-gray-800 space-y-4 overflow-y-auto flex-1'>
             <div className='flex items-center justify-between'>
               <p className='text-sm font-semibold text-gray-800 dark:text-white'>New zone</p>
               <button onClick={cancelAdding} className='text-gray-400 hover:text-gray-600 text-xl leading-none'>×</button>
@@ -265,37 +316,31 @@ export default function GeofenceManager() {
             </div>
 
             <div className='bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2'>
-              <p className='text-xs text-gray-500 mb-0.5'>Center point — drag blue pin on map to move</p>
+              <p className='text-xs text-gray-500 mb-0.5'>Center — drag blue pin to move</p>
               <p className='text-xs font-mono text-gray-700 dark:text-gray-300'>{center.lat}, {center.lng}</p>
             </div>
 
             {vehicles.length > 0 && (
               <div>
                 <label className='block text-xs font-medium text-gray-500 mb-2'>
-                  Apply to vehicles
+                  Applies to
                   <span className='ml-1 text-gray-400 font-normal'>
-                    ({selectedVehicles.length === 0 ? 'All vehicles' : `${selectedVehicles.length} selected`})
+                    ({selectedVehicles.length === 0 ? 'all vehicles' : `${selectedVehicles.length} selected`})
                   </span>
                 </label>
-                <div className='space-y-1.5 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2'>
+                <div className='space-y-1.5 max-h-28 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2'>
                   <label className='flex items-center gap-2 cursor-pointer'>
-                    <input type='checkbox'
-                      checked={selectedVehicles.length === 0}
+                    <input type='checkbox' checked={selectedVehicles.length === 0}
                       onChange={() => setSelectedVehicles([])}
                       className='w-3.5 h-3.5 accent-blue-600' />
                     <span className='text-xs text-gray-600 dark:text-gray-300 font-medium'>All vehicles</span>
                   </label>
                   {vehicles.map(v => (
                     <label key={v._id} className='flex items-center gap-2 cursor-pointer'>
-                      <input type='checkbox'
-                        checked={selectedVehicles.includes(v._id)}
-                        onChange={e => {
-                          if (e.target.checked) {
-                            setSelectedVehicles(s => [...s, v._id])
-                          } else {
-                            setSelectedVehicles(s => s.filter(id => id !== v._id))
-                          }
-                        }}
+                      <input type='checkbox' checked={selectedVehicles.includes(v._id)}
+                        onChange={e => setSelectedVehicles(s =>
+                          e.target.checked ? [...s, v._id] : s.filter(id => id !== v._id)
+                        )}
                         className='w-3.5 h-3.5 accent-blue-600' />
                       <span className='text-xs text-gray-600 dark:text-gray-300'>{v.name}</span>
                     </label>
@@ -331,69 +376,121 @@ export default function GeofenceManager() {
           </div>
         )}
 
-        <div className='flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800'>
-          {loading ? (
-            <p className='text-sm text-gray-400 p-4'>Loading...</p>
-          ) : zones.length === 0 && !adding ? (
-            <div className='p-6 text-center'>
-              <p className='text-2xl mb-2'>📍</p>
-              <p className='text-sm text-gray-400 mb-1'>No zones yet</p>
-              <p className='text-xs text-gray-300'>Click "+ New zone" to get started</p>
-            </div>
-          ) : zones.map((zone, i) => (
-            <button key={i} onClick={() => setSelected(selected?._id === zone._id ? null : zone)}
-              className={`w-full flex items-center justify-between px-4 py-3 text-left transition ${
-                selected?._id === zone._id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-              }`}>
-              <div>
-                <p className='text-sm font-medium text-gray-800 dark:text-white'>{zone.name}</p>
-                <div className='flex gap-2 mt-0.5'>
-                  {zone.alertOnExit  && <span className='text-xs text-amber-600'>Exit alert</span>}
-                  {zone.alertOnEntry && <span className='text-xs text-blue-600'>Entry alert</span>}
-                  {zone.radiusMetres && (
-                    <span className='text-xs text-gray-400'>
-                      {zone.radiusMetres >= 1000 ? `${(zone.radiusMetres/1000).toFixed(1)}km` : `${zone.radiusMetres}m`}
-                    </span>
-                  )}
-                </div>
+        {/* Zone List */}
+        {!adding && (
+          <div className='flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800'>
+            {loading ? (
+              <p className='text-sm text-gray-400 p-4'>Loading...</p>
+            ) : zones.length === 0 ? (
+              <div className='p-6 text-center'>
+                <p className='text-2xl mb-2'>📍</p>
+                <p className='text-sm text-gray-400 mb-1'>No zones yet</p>
+                <p className='text-xs text-gray-300'>Click "+ New zone" to get started</p>
               </div>
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${zone.active ? 'bg-teal-500' : 'bg-gray-300'}`} />
-            </button>
-          ))}
-        </div>
+            ) : zones.map((zone, i) => {
+              const color = getZoneColor(i)
+              const isSelected = selected?._id === zone._id
+              return (
+                <button key={i}
+                  onClick={() => setSelected(isSelected ? null : zone)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${
+                    isSelected ? 'bg-gray-50 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                  }`}>
+                  <div className='w-3 h-3 rounded-full flex-shrink-0' style={{ backgroundColor: color }} />
+                  <div className='flex-1 min-w-0'>
+                    <p className='text-sm font-medium text-gray-800 dark:text-white truncate'>{zone.name}</p>
+                    <div className='flex gap-2 mt-0.5'>
+                      {zone.alertOnExit  && <span className='text-xs text-amber-600'>Exit</span>}
+                      {zone.alertOnEntry && <span className='text-xs text-blue-600'>Entry</span>}
+                      {zone.radiusMetres && (
+                        <span className='text-xs text-gray-400'>
+                          {zone.radiusMetres >= 1000 ? `${(zone.radiusMetres/1000).toFixed(1)}km` : `${zone.radiusMetres}m`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${zone.active ? 'bg-teal-500' : 'bg-gray-300'}`} />
+                </button>
+              )
+            })}
+          </div>
+        )}
 
+        {/* Zone Detail */}
         {selected && !adding && (
-          <div className='border-t border-gray-200 dark:border-gray-800 p-4'>
-            <div className='flex items-center justify-between mb-3'>
-              <p className='text-sm font-semibold text-gray-800 dark:text-white'>{selected.name}</p>
-              <button onClick={() => setSelected(null)} className='text-gray-400 hover:text-gray-600 text-lg leading-none'>×</button>
-            </div>
-            <div className='space-y-1.5 mb-3'>
-              {selected.radiusMetres && <Row label='Radius' value={selected.radiusMetres >= 1000 ? `${(selected.radiusMetres/1000).toFixed(1)} km` : `${selected.radiusMetres} m`} />}
-            <Row label='Exit alert'  value={selected.alertOnExit  ? 'Yes' : 'No'} />
-            <Row label='Entry alert' value={selected.alertOnEntry ? 'Yes' : 'No'} />
-            <Row label='Applies to' value={
-              !selected.vehicleIds || selected.vehicleIds.length === 0
-                ? 'All vehicles'
-                : `${selected.vehicleIds.length} vehicle${selected.vehicleIds.length > 1 ? 's' : ''}`
-            } />
-            {selected.vehicleIds && selected.vehicleIds.length > 0 && (
-              <div className='mt-1'>
-                {vehicles.filter(v => selected.vehicleIds.includes(v._id)).map(v => (
-                  <p key={v._id} className='text-xs text-blue-600 py-0.5'>• {v.name}</p>
-                ))}
+          <div className='border-t border-gray-200 dark:border-gray-800'>
+            {/* Color header */}
+            <div className='px-4 py-3 flex items-center gap-3'
+              style={{ backgroundColor: getZoneColor(zones.findIndex(z => z._id === selected._id)) + '18' }}>
+              <div className='w-4 h-4 rounded-full flex-shrink-0'
+                style={{ backgroundColor: getZoneColor(zones.findIndex(z => z._id === selected._id)) }} />
+              <div className='flex-1 min-w-0'>
+                <p className='text-sm font-bold text-gray-900 dark:text-white truncate'>{selected.name}</p>
+                <p className='text-xs text-gray-500'>
+                  {selected.radiusMetres >= 1000
+                    ? `${(selected.radiusMetres/1000).toFixed(1)} km radius`
+                    : `${selected.radiusMetres || '?'} m radius`}
+                </p>
               </div>
-            )}
-            <Row label='Created' value={new Date(selected.createdAt).toLocaleDateString('en-AU')} />
+              <button onClick={() => setSelected(null)}
+                className='text-gray-400 hover:text-gray-600 text-lg leading-none flex-shrink-0'>×</button>
             </div>
-            <button onClick={() => handleDelete(selected._id)}
-              className='w-full h-8 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg transition'>
-              Delete zone
-            </button>
+
+            <div className='px-4 py-3 space-y-2'>
+              {/* Alert badges */}
+              <div className='flex gap-2'>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  selected.alertOnExit ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {selected.alertOnExit ? '✓' : '✕'} Exit alert
+                </span>
+                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                  selected.alertOnEntry ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
+                }`}>
+                  {selected.alertOnEntry ? '✓' : '✕'} Entry alert
+                </span>
+              </div>
+
+              {/* Vehicles */}
+              <div>
+                <p className='text-xs text-gray-500 mb-1.5'>Applies to</p>
+                {!selected.vehicleIds || selected.vehicleIds.length === 0 ? (
+                  <span className='text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-1 rounded-full'>
+                    All vehicles
+                  </span>
+                ) : (
+                  <div className='flex flex-wrap gap-1.5'>
+                    {vehicles
+                      .filter(v => selected.vehicleIds.includes(v._id))
+                      .map(v => (
+                        <span key={v._id}
+                          className='text-xs px-2 py-1 rounded-full font-medium text-white'
+                          style={{ backgroundColor: getZoneColor(zones.findIndex(z => z._id === selected._id)) }}>
+                          🚐 {v.name}
+                        </span>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
+
+              <p className='text-xs text-gray-400'>
+                Created {new Date(selected.createdAt).toLocaleDateString('en-AU')}
+              </p>
+
+              {/* Actions */}
+              <div className='flex gap-2 pt-1'>
+                <button onClick={() => handleDelete(selected._id)}
+                  className='flex-1 h-8 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg transition'>
+                  🗑 Delete zone
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
+      {/* Map */}
       <div className='flex-1 relative'>
         <div ref={mapContainer} className='w-full h-full' />
         {adding && (
@@ -402,15 +499,6 @@ export default function GeofenceManager() {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-function Row({ label, value }) {
-  return (
-    <div className='flex justify-between py-1 border-b border-gray-100 dark:border-gray-800'>
-      <span className='text-xs text-gray-500'>{label}</span>
-      <span className='text-xs font-medium text-gray-800 dark:text-white'>{value}</span>
     </div>
   )
 }
