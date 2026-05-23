@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import api from '../lib/api'
 
 export default function VerifyEmail() {
-  const [params]    = useSearchParams()
-  const navigate    = useNavigate()
-  const setAuth     = useAuthStore(s => s.setAuth)
-  const token       = params.get('token')
-
+  const [params]  = useSearchParams()
+  const navigate  = useNavigate()
+  const setAuth   = useAuthStore(s => s.setAuth)
+  const token     = params.get('token')
   const [status, setStatus] = useState('waiting')
   const [error, setError]   = useState('')
 
@@ -38,27 +37,26 @@ export default function VerifyEmail() {
       <div className='h-14 flex items-center px-8 border-b border-gray-200 bg-white'>
         <span className='text-base font-bold text-blue-600'>Clarity Fleet</span>
       </div>
-
       <div className='flex-1 flex items-center justify-center px-4'>
         <div className='w-full max-w-sm text-center'>
 
           {status === 'waiting' && (
             <>
-              <div className='text-5xl mb-4'>✉️</div>
+              <div className='text-5xl mb-4'>&#128140;</div>
               <h1 className='text-2xl font-bold text-gray-900 mb-2'>Confirm your email</h1>
               <p className='text-sm text-gray-500 mb-8'>
                 Click the button below to verify your email address and access your dashboard.
               </p>
               <button onClick={confirm}
                 className='w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition shadow-sm'>
-                Confirm my email →
+                Confirm my email
               </button>
             </>
           )}
 
           {status === 'loading' && (
             <>
-              <div className='text-5xl mb-4'>⏳</div>
+              <div className='text-5xl mb-4'>&#9203;</div>
               <h1 className='text-2xl font-bold text-gray-900 mb-2'>Verifying...</h1>
               <p className='text-sm text-gray-500'>Just a moment</p>
             </>
@@ -66,7 +64,7 @@ export default function VerifyEmail() {
 
           {status === 'success' && (
             <>
-              <div className='text-5xl mb-4'>✅</div>
+              <div className='text-5xl mb-4'>&#10003;</div>
               <h1 className='text-2xl font-bold text-gray-900 mb-2'>Email confirmed!</h1>
               <p className='text-sm text-gray-500'>Taking you to your dashboard...</p>
             </>
@@ -74,7 +72,7 @@ export default function VerifyEmail() {
 
           {status === 'error' && (
             <>
-              <div className='text-5xl mb-4'>❌</div>
+              <div className='text-5xl mb-4'>&#10007;</div>
               <h1 className='text-2xl font-bold text-gray-900 mb-2'>Link expired</h1>
               <p className='text-sm text-gray-500 mb-6'>{error}</p>
               <button onClick={() => navigate('/login')}
