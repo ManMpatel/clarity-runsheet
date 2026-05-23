@@ -9,9 +9,12 @@ export default function GeofenceManager() {
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
   const [selected, setSelected] = useState(null)
+  const [mapCenter, setMapCenter] = useState({ lng: 151.2093, lat: -33.8688 })
   const [form, setForm] = useState({
     name: '', alertOnExit: true, alertOnEntry: false, radiusMetres: 200
   })
+  const [mapCenter, setMapCenter] = useState({ lng: 151.2093, lat: -33.8688 })
+  const [showAdd, setShowAdd] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -28,6 +31,19 @@ export default function GeofenceManager() {
     initMap()
   }, [])
 
+  useEffect(() => {
+    if (!map.current || !showAdd) {
+      if (map.current?.getSource('preview-zone')) {
+        map.current.getSource('preview-zone').setData({ type: 'FeatureCollection', features: [] })
+      }
+      return
+    }
+    const source = map.current.getSource('preview-zone')
+    if (!source) return
+    const polygon = generateCirclePolygon(mapCenter.lng, mapCenter.lat, form.radiusMetres)
+    source.setData({ type: 'Feature', geometry: polygon })
+  }, [form.radiusMetres, mapCenter, showAdd])
+
   async function initMap() {
     const mapboxgl = (await import('mapbox-gl')).default
     await import('mapbox-gl/dist/mapbox-gl.css')
@@ -41,6 +57,30 @@ export default function GeofenceManager() {
     })
 
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
+
+    map.current.on('move', () => {
+      const c = map.current.getCenter()
+      setMapCenter({ lng: parseFloat(c.lng.toFixed(6)), lat: parseFloat(c.lat.toFixed(6)) })
+    })
+
+    map.current.on('load', () => {
+      map.current.addSource('preview-zone', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      })
+      map.current.addLayer({
+        id: 'preview-zone-fill',
+        type: 'fill',
+        source: 'preview-zone',
+        paint: { 'fill-color': '#3b82f6', 'fill-opacity': 0.15 }
+      })
+      map.current.addLayer({
+        id: 'preview-zone-line',
+        type: 'line',
+        source: 'preview-zone',
+        paint: { 'line-color': '#3b82f6', 'line-width': 2, 'line-dasharray': [2, 1] }
+      })
+    })
   }
 
  function generateCirclePolygon(lng, lat, radiusMetres, points = 64) {
@@ -147,7 +187,10 @@ export default function GeofenceManager() {
                 className='text-gray-400 hover:text-gray-600 text-xl leading-none'>×</button>
             </div>
             <div className='space-y-3'>
-               <p className='text-xs text-gray-500 mb-1'>Pan the map to centre on your zone location first</p>
+               <p className='text-xs text-gray-500 mb-1'>Pan the map to centre on your zone location. Blue circle shows the zone.</p>
+              <div className='bg-gray-50 rounded-lg px-3 py-2 text-xs text-gray-500 font-mono'>
+                Centre: {mapCenter.lat}, {mapCenter.lng}
+              </div>
               <input
                 placeholder='Zone name'
                 value={form.name}
@@ -165,9 +208,11 @@ export default function GeofenceManager() {
                   className='w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
                 />
                 <p className='text-xs text-gray-400 mt-1'>
-                  {form.radiusMetres >= 1000
-                    ? `${(form.radiusMetres / 1000).toFixed(1)} km radius`
-                    : `${form.radiusMetres} metres radius`}
+                  {form.radiusMetres
+                    ? form.radiusMetres >= 1000
+                      ? `${(form.radiusMetres / 1000).toFixed(1)} km radius`
+                      : `${form.radiusMetres} metres radius`
+                    : 'Enter a radius'}
                 </p>
               </div>
               <label className='flex items-center gap-3 cursor-pointer'>
