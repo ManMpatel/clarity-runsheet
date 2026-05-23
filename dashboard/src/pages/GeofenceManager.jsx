@@ -63,7 +63,8 @@ export default function GeofenceManager() {
       setMapCenter({ lng: parseFloat(c.lng.toFixed(6)), lat: parseFloat(c.lat.toFixed(6)) })
     })
 
-    map.current.on('load', () => {
+    function addPreviewLayers() {
+      if (map.current.getSource('preview-zone')) return
       map.current.addSource('preview-zone', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] }
@@ -80,7 +81,13 @@ export default function GeofenceManager() {
         source: 'preview-zone',
         paint: { 'line-color': '#3b82f6', 'line-width': 2, 'line-dasharray': [2, 1] }
       })
-    })
+    }
+
+    if (map.current.loaded()) {
+      addPreviewLayers()
+    } else {
+      map.current.on('load', addPreviewLayers)
+    }
   }
 
  function generateCirclePolygon(lng, lat, radiusMetres, points = 64) {
