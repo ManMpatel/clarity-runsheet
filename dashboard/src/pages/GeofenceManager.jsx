@@ -10,7 +10,7 @@ export default function GeofenceManager() {
   const [showAdd, setShowAdd] = useState(false)
   const [selected, setSelected] = useState(null)
   const [form, setForm] = useState({
-    name: '', alertOnExit: true, alertOnEntry: false
+    name: '', alertOnExit: true, alertOnEntry: false, radiusMetres: 200
   })
 
   useEffect(() => {
@@ -43,21 +43,25 @@ export default function GeofenceManager() {
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
   }
 
+ function generateCirclePolygon(lng, lat, radiusMetres, points = 64) {
+    const coords = []
+    for (let i = 0; i < points; i++) {
+      const angle = (i / points) * 2 * Math.PI
+      const dx = (radiusMetres / 111320) * Math.cos(angle)
+      const dy = (radiusMetres / (111320 * Math.cos(lat * Math.PI / 180))) * Math.sin(angle)
+      coords.push([lng + dy, lat + dx])
+    }
+    coords.push(coords[0])
+    return { type: 'Polygon', coordinates: [coords] }
+  }
+
   async function handleSave() {
     if (!form.name) return
     try {
-      const geometry = {
-        type: 'Polygon',
-        coordinates: [[
-          [151.19, -33.87],
-          [151.22, -33.87],
-          [151.22, -33.85],
-          [151.19, -33.85],
-          [151.19, -33.87],
-        ]]
-      }
+      const centre = map.current.getCenter()
+      const geometry = generateCirclePolygon(centre.lng, centre.lat, form.radiusMetres)
       const res = await api.post('/api/geofences', {
-        ...form, geometry
+        ...form, geometry, centre: { lng: centre.lng, lat: centre.lat }
       })
       setZones(z => [res.data, ...z])
       setShowAdd(false)
@@ -143,12 +147,29 @@ export default function GeofenceManager() {
                 className='text-gray-400 hover:text-gray-600 text-xl leading-none'>×</button>
             </div>
             <div className='space-y-3'>
+               <p className='text-xs text-gray-500 mb-1'>Pan the map to centre on your zone location first</p>
               <input
                 placeholder='Zone name'
                 value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                onChange={e => setForm(f =>({ ...f, name: e.target.value }))}
                 className='w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
               />
+              <div>
+                <label className='block text-xs text-gray-500 mb-1'>Radius (metres)</label>
+                <input
+                  type='number'
+                  min='50'
+                  max='50000'
+                  value={form.radiusMetres}
+                  onChange={e => setForm(f => ({ ...f, radiusMetres: parseInt(e.target.value) || 200 }))}
+                  className='w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+                />
+                <p className='text-xs text-gray-400 mt-1'>
+                  {form.radiusMetres >= 1000
+                    ? `${(form.radiusMetres / 1000).toFixed(1)} km radius`
+                    : `${form.radiusMetres} metres radius`}
+                </p>
+              </div>
               <label className='flex items-center gap-3 cursor-pointer'>
                 <input
                   type='checkbox'
@@ -195,6 +216,13 @@ export default function GeofenceManager() {
                 className='text-gray-400 hover:text-gray-600 text-xl leading-none'>×</button>
             </div>
             <div className='space-y-2'>
+              {selected.radiusMetres && (
+                <DetailRow label='Radius' value={
+                  selected.radiusMetres >= 1000
+                    ? `${(selected.radiusMetres / 1000).toFixed(1)} km`
+                    : `${selected.radiusMetres} m`
+                } />
+              )}
               <DetailRow label='Exit alert'  value={selected.alertOnExit  ? 'Yes' : 'No'} />
               <DetailRow label='Entry alert' value={selected.alertOnEntry ? 'Yes' : 'No'} />
               <DetailRow label='Status'      value={selected.active ? 'Active' : 'Inactive'} />
