@@ -57,7 +57,7 @@ export default function SettingsLayout() {
 
   function handleLogout() {
     logout()
-    navigate('/login')
+    setDone(true)
   }
 
   const sharedProps = { me, setMe, company, setCompany, vehicles, setVehicles, users, setUsers, slots, loading }

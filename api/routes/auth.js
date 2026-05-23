@@ -177,32 +177,7 @@ router.get('/me', requireAuth, async (req, res) => {
   }
 })
 
-router.get('/verify-email', async (req, res) => {
-  try {
-    const { token } = req.query
-    if (!token) return res.status(400).json({ error: 'Token required' })
 
-    const users = await getCollection('users')
-    const user = await users.findOne({
-      emailVerifyToken: token,
-      emailVerifyExpiry: { $gt: new Date() },
-    })
-
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid or expired verification link' })
-    }
-
-    await users.updateOne(
-      { _id: user._id },
-      { $set: { emailVerified: true, emailVerifyToken: null, emailVerifyExpiry: null } }
-    )
-
-    return res.json({ success: true, message: 'Email verified. You can now log in.' })
-  } catch (err) {
-    console.error('[Auth] Verify email error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
 
 
 router.post('/resend-verification', requireAuth, async (req, res) => {
@@ -256,5 +231,56 @@ router.put('/password', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Server error' })
   }
 })
+
+
+router.get('/verify-email', async (req, res) => {
+  try {
+    const { token } = req.query
+    if (!token) return res.status(400).json({ error: 'Token required' })
+
+    const users    = await getCollection('users')
+    const user     = await users.findOne({ emailVerifyToken: token })
+
+    if (!user) return res.status(400).json({ error: 'Invalid or expired link' })
+    if (new Date() > new Date(user.emailVerifyExpiry)) {
+      return res.status(400).json({ error: 'Link expired — request a new one' })
+    }
+
+    await users.updateOne({ _id: user._id }, {
+      $set:   { emailVerified: true, updatedAt: new Date() },
+      $unset: { emailVerifyToken: '', emailVerifyExpiry: '' }
+    })
+
+    const companies = await getCollection('companies')
+    const { ObjectId } = require('mongodb')
+    const company = await companies.findOne({ _id: new ObjectId(user.companyId.toString()) })
+
+    const authToken = jwt.sign(
+      {
+        userId:           user._id.toString(),
+        companyId:        user.companyId.toString(),
+        role:             user.role,
+        subscriptionTier: user.subscriptionTier || 'entry',
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    )
+
+    return res.json({
+      token: authToken,
+      onboardingComplete: company?.onboardingComplete || false,
+      user: {
+        id:    user._id,
+        name:  user.name,
+        email: user.email,
+        role:  user.role,
+      }
+    })
+  } catch (err) {
+    console.error('[Auth] Verify email error:', err.message)
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 
 module.exports = router

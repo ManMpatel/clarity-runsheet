@@ -1,67 +1,90 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useAuthStore } from '../store/authStore'
 import api from '../lib/api'
 
 export default function VerifyEmail() {
-  const [searchParams] = useSearchParams()
-  const [status, setStatus] = useState('loading')
-  const [message, setMessage] = useState('')
+  const [params]    = useSearchParams()
+  const navigate    = useNavigate()
+  const setAuth     = useAuthStore(s => s.setAuth)
+  const token       = params.get('token')
 
-  useEffect(() => {
-    const token = searchParams.get('token')
-    if (!token) {
+  const [status, setStatus] = useState('waiting')
+  const [error, setError]   = useState('')
+
+  async function confirm() {
+    setStatus('loading')
+    try {
+      const res = await api.get(`/api/auth/verify-email?token=${token}`)
+      setAuth(res.data.token, res.data.user)
+      setStatus('success')
+      setTimeout(() => {
+        navigate(res.data.onboardingComplete ? '/dashboard' : '/onboarding')
+      }, 1500)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Verification failed')
       setStatus('error')
-      setMessage('No verification token found.')
-      return
     }
+  }
 
-    api.get(`/api/auth/verify-email?token=${token}`)
-      .then(() => {
-        setStatus('success')
-        setMessage('Your email has been verified. You can now log in.')
-      })
-      .catch(err => {
-        setStatus('error')
-        setMessage(err.response?.data?.error || 'Verification failed.')
-      })
-  }, [])
+  if (!token) return (
+    <div className='min-h-screen bg-gray-50 flex items-center justify-center'>
+      <p className='text-sm text-red-500'>Invalid verification link.</p>
+    </div>
+  )
 
   return (
-    <div className='min-h-screen bg-gray-50 flex items-center justify-center px-4'>
-      <div className='bg-white rounded-xl border border-gray-200 p-8 max-w-md w-full text-center'>
-        <h1 className='text-2xl font-bold text-blue-600 mb-6'>Clarity Fleet</h1>
+    <div className='min-h-screen bg-gray-50 flex flex-col'>
+      <div className='h-14 flex items-center px-8 border-b border-gray-200 bg-white'>
+        <span className='text-base font-bold text-blue-600'>Clarity Fleet</span>
+      </div>
 
-        {status === 'loading' && (
-          <p className='text-gray-500'>Verifying your email...</p>
-        )}
+      <div className='flex-1 flex items-center justify-center px-4'>
+        <div className='w-full max-w-sm text-center'>
 
-        {status === 'success' && (
-          <>
-            <div className='text-4xl mb-4'>✓</div>
-            <h2 className='text-lg font-semibold text-gray-900 mb-2'>Email verified</h2>
-            <p className='text-sm text-gray-500 mb-6'>{message}</p>
-            <Link
-              to='/login'
-              className='block w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition'
-            >
-              Go to login
-            </Link>
-          </>
-        )}
+          {status === 'waiting' && (
+            <>
+              <div className='text-5xl mb-4'>✉️</div>
+              <h1 className='text-2xl font-bold text-gray-900 mb-2'>Confirm your email</h1>
+              <p className='text-sm text-gray-500 mb-8'>
+                Click the button below to verify your email address and access your dashboard.
+              </p>
+              <button onClick={confirm}
+                className='w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition shadow-sm'>
+                Confirm my email →
+              </button>
+            </>
+          )}
 
-        {status === 'error' && (
-          <>
-            <div className='text-4xl mb-4'>✕</div>
-            <h2 className='text-lg font-semibold text-gray-900 mb-2'>Verification failed</h2>
-            <p className='text-sm text-gray-500 mb-6'>{message}</p>
-            <Link
-              to='/signup'
-              className='block w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg transition'
-            >
-              Back to signup
-            </Link>
-          </>
-        )}
+          {status === 'loading' && (
+            <>
+              <div className='text-5xl mb-4'>⏳</div>
+              <h1 className='text-2xl font-bold text-gray-900 mb-2'>Verifying...</h1>
+              <p className='text-sm text-gray-500'>Just a moment</p>
+            </>
+          )}
+
+          {status === 'success' && (
+            <>
+              <div className='text-5xl mb-4'>✅</div>
+              <h1 className='text-2xl font-bold text-gray-900 mb-2'>Email confirmed!</h1>
+              <p className='text-sm text-gray-500'>Taking you to your dashboard...</p>
+            </>
+          )}
+
+          {status === 'error' && (
+            <>
+              <div className='text-5xl mb-4'>❌</div>
+              <h1 className='text-2xl font-bold text-gray-900 mb-2'>Link expired</h1>
+              <p className='text-sm text-gray-500 mb-6'>{error}</p>
+              <button onClick={() => navigate('/login')}
+                className='w-full h-11 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition'>
+                Back to login
+              </button>
+            </>
+          )}
+
+        </div>
       </div>
     </div>
   )

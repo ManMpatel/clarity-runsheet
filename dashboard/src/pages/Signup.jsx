@@ -9,6 +9,8 @@ export default function Signup() {
   const [error, setError]   = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
+  const [done, setDone] = useState(false)
+  const [submittedEmail, setSubmittedEmail] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -33,13 +35,41 @@ export default function Signup() {
         password:      form.password,
         driverConsent: form.driverConsent || false,
       })
-      navigate('/login?verified=pending')
+      setSubmittedEmail(form.email)
+      setDone(true)
     } catch (err) {
       setError(err.response?.data?.error || 'Signup failed')
     } finally {
       setLoading(false)
     }
   }
+
+  if (done) return (
+    <div className='min-h-screen bg-gray-50 flex flex-col'>
+      <div className='h-14 flex items-center px-8 border-b border-gray-200 bg-white'>
+        <span className='text-base font-bold text-blue-600'>Clarity Fleet</span>
+      </div>
+      <div className='flex-1 flex items-center justify-center px-4'>
+        <div className='w-full max-w-sm text-center'>
+          <div className='text-5xl mb-4'>📬</div>
+          <h1 className='text-2xl font-bold text-gray-900 mb-2'>Check your inbox</h1>
+          <p className='text-sm text-gray-500 mb-1'>We sent a verification link to</p>
+          <p className='text-sm font-semibold text-gray-800 mb-6'>{submittedEmail}</p>
+          <div className='bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left space-y-3 mb-6'>
+            <p className='text-sm text-gray-600'>1. Open the email from <strong>Clarity Fleet</strong></p>
+            <p className='text-sm text-gray-600'>2. Click <strong>"Confirm my email"</strong></p>
+            <p className='text-sm text-gray-600'>3. You'll be taken straight to your dashboard</p>
+          </div>
+          <p className='text-xs text-gray-400'>
+            Didn't get it? Check your spam folder or{' '}
+            <button onClick={() => setDone(false)} className='text-blue-600 hover:underline'>
+              try again
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className='min-h-screen bg-gray-50 flex items-center justify-center px-4'>
