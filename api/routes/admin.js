@@ -188,4 +188,31 @@ router.get('/devices', requireSuperAdmin, async (req, res) => {
   }
 })
 
+
+router.get('/companies/:id/devices', requireSuperAdmin, async (req, res) => {
+  try {
+    const devices = await getCollection('devices')
+    const list = await devices
+      .find({ registeredByCompanyId: req.params.id })
+      .sort({ registeredAt: -1 })
+      .toArray()
+    return res.json(list)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.get('/companies/:id/vehicles', requireSuperAdmin, async (req, res) => {
+  try {
+    const vehicles = await getCollection('vehicles')
+    const list = await vehicles
+      .find({ companyId: req.params.id, active: true })
+      .sort({ createdAt: -1 })
+      .toArray()
+    return res.json(list)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router
