@@ -37,7 +37,8 @@ export default function AdminLogin() {
         code,
       })
       localStorage.setItem('adminToken', res.data.token)
-      window.location.href = '/admin/dashboard'
+      window.location.href = '/admin'
+
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code')
     } finally {
