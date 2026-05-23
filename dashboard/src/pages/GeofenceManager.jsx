@@ -14,7 +14,7 @@ export default function GeofenceManager() {
     name: '', alertOnExit: true, alertOnEntry: false, radiusMetres: 200
   })
   const [mapCenter, setMapCenter] = useState({ lng: 151.2093, lat: -33.8688 })
-  const [showAdd, setShowAdd] = useState(false)
+  
 
   useEffect(() => {
     async function load() {
