@@ -57,18 +57,7 @@ export default function App() {
         }
         
       >
-        <Route
-        path='/admin'
-        element={
-          <SuperAdminRoute>
-            <AdminShell />
-          </SuperAdminRoute>
-        }
-      >
-        <Route index element={<AdminPanel />} />
-        <Route path='tickets' element={<AdminPanel />} />
-        <Route path='devices' element={<AdminPanel />} />
-      </Route>
+        
         <Route index element={<Navigate to='/dashboard' replace />} />
         <Route path='dashboard'        element={<Dashboard />} />
         <Route path='live-map'         element={<LiveMap />} />
@@ -86,7 +75,13 @@ export default function App() {
         <Route path='garage/my-devices' element={<MyDevices />} />
         <Route path='/admin/login' element={<AdminLogin />} />
         <Route path='billing'          element={<Billing />} />
-        
+
+      </Route>
+
+      <Route path='/admin' element={<SuperAdminRoute><AdminShell /></SuperAdminRoute>}>
+        <Route index element={<AdminPanel />} />
+        <Route path='tickets' element={<AdminPanel />} />
+        <Route path='devices' element={<AdminPanel />} />
       </Route>
     </Routes>
   )
