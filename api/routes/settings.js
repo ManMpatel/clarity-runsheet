@@ -29,7 +29,7 @@ router.put('/company', requireAuth, requireCompany,
 
     const result = await collection.findOneAndUpdate(
       { _id: new ObjectId(req.companyId) },
-      { name, phone, address, timezone, abn, website, updatedAt: new Date() } },
+      { $set: { name, phone, address, timezone, abn, website, updatedAt: new Date() } },
       { returnDocument: 'after' }
     )
 
