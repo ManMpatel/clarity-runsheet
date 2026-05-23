@@ -24,12 +24,12 @@ router.get('/company', requireAuth, requireCompany, async (req, res) => {
 router.put('/company', requireAuth, requireCompany,
   requireRole('companyAdmin', 'superAdmin'), async (req, res) => {
   try {
-    const { name, phone, address, timezone } = req.body
+    const { name, phone, address, timezone, abn, website } = req.body
     const collection = await getCollection('companies')
 
     const result = await collection.findOneAndUpdate(
       { _id: new ObjectId(req.companyId) },
-      { $set: { name, phone, address, timezone, updatedAt: new Date() } },
+      { name, phone, address, timezone, abn, website, updatedAt: new Date() } },
       { returnDocument: 'after' }
     )
 

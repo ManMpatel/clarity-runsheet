@@ -204,4 +204,57 @@ router.get('/verify-email', async (req, res) => {
   }
 })
 
+
+router.post('/resend-verification', requireAuth, async (req, res) => {
+  try {
+    const crypto = require('crypto')
+    const { sendEmailVerification } = require('../services/resend')
+    const users = await getCollection('users')
+    const user = await users.findOne({ _id: require('mongodb').ObjectId.createFromHexString(req.user.userId) })
+    if (!user) return res.status(404).json({ error: 'User not found' })
+    if (user.emailVerified) return res.status(400).json({ error: 'Email already verified' })
+    const token = crypto.randomBytes(32).toString('hex')
+    await users.updateOne({ _id: user._id }, {
+      $set: { emailVerifyToken: token, emailVerifyExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000) }
+    })
+    sendEmailVerification(user.email, user.name, token)
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.put('/profile', requireAuth, async (req, res) => {
+  try {
+    const { name } = req.body
+    if (!name) return res.status(400).json({ error: 'Name required' })
+    const users = await getCollection('users')
+    const result = await users.findOneAndUpdate(
+      { _id: require('mongodb').ObjectId.createFromHexString(req.user.userId) },
+      { $set: { name, updatedAt: new Date() } },
+      { returnDocument: 'after', projection: { passwordHash: 0 } }
+    )
+    return res.json(result)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.put('/password', requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Both passwords required' })
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
+    const users = await getCollection('users')
+    const user = await users.findOne({ _id: require('mongodb').ObjectId.createFromHexString(req.user.userId) })
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash)
+    if (!valid) return res.status(401).json({ error: 'Current password incorrect' })
+    const passwordHash = await bcrypt.hash(newPassword, 12)
+    await users.updateOne({ _id: user._id }, { $set: { passwordHash, updatedAt: new Date() } })
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router

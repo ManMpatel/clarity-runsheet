@@ -60,7 +60,7 @@ export default function SettingsLayout() {
     navigate('/login')
   }
 
-  const sharedProps = { me, company, setCompany, vehicles, setVehicles, users, setUsers, slots, loading }
+  const sharedProps = { me, setMe, company, setCompany, vehicles, setVehicles, users, setUsers, slots, loading }
 
   return (
     <div className='flex flex-col'>
