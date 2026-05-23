@@ -30,6 +30,8 @@ export default function GeofenceManager() {
   const [form, setForm]           = useState({
     name: '', alertOnExit: true, alertOnEntry: false, radiusMetres: 500
   })
+  const [vehicles, setVehicles]   = useState([])
+  const [selectedVehicles, setSelectedVehicles] = useState([])
 
   useEffect(() => {
     loadZones()
@@ -38,8 +40,12 @@ export default function GeofenceManager() {
 
   async function loadZones() {
     try {
-      const res = await api.get('/api/geofences')
-      setZones(res.data)
+      const [zonesRes, vehiclesRes] = await Promise.all([
+        api.get('/api/geofences'),
+        api.get('/api/vehicles'),
+      ])
+      setZones(zonesRes.data)
+      setVehicles(vehiclesRes.data)
     } catch (err) {
       console.error(err.message)
     } finally {
@@ -156,6 +162,7 @@ export default function GeofenceManager() {
     setCenter({ lng: parseFloat(c.lng.toFixed(6)), lat: parseFloat(c.lat.toFixed(6)) })
     setForm({ name: '', alertOnExit: true, alertOnEntry: false, radiusMetres: 500 })
     setSearchQuery('')
+    setSelectedVehicles([])
     setSelected(null)
     setAdding(true)
   }
@@ -171,7 +178,13 @@ export default function GeofenceManager() {
     setSaving(true)
     try {
       const geometry = generateCirclePolygon(center.lng, center.lat, form.radiusMetres)
-      const res = await api.post('/api/geofences', { ...form, geometry, centre: center })
+      const res = await api.post('/api/geofences', {
+        ...form,
+        geometry,
+        centre: center,
+        radiusMetres: form.radiusMetres,
+        vehicleIds: selectedVehicles,
+      })
       setZones(z => [res.data, ...z])
       cancelAdding()
     } catch (err) { console.error(err.message) }
@@ -256,6 +269,41 @@ export default function GeofenceManager() {
               <p className='text-xs font-mono text-gray-700 dark:text-gray-300'>{center.lat}, {center.lng}</p>
             </div>
 
+            {vehicles.length > 0 && (
+              <div>
+                <label className='block text-xs font-medium text-gray-500 mb-2'>
+                  Apply to vehicles
+                  <span className='ml-1 text-gray-400 font-normal'>
+                    ({selectedVehicles.length === 0 ? 'All vehicles' : `${selectedVehicles.length} selected`})
+                  </span>
+                </label>
+                <div className='space-y-1.5 max-h-32 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2'>
+                  <label className='flex items-center gap-2 cursor-pointer'>
+                    <input type='checkbox'
+                      checked={selectedVehicles.length === 0}
+                      onChange={() => setSelectedVehicles([])}
+                      className='w-3.5 h-3.5 accent-blue-600' />
+                    <span className='text-xs text-gray-600 dark:text-gray-300 font-medium'>All vehicles</span>
+                  </label>
+                  {vehicles.map(v => (
+                    <label key={v._id} className='flex items-center gap-2 cursor-pointer'>
+                      <input type='checkbox'
+                        checked={selectedVehicles.includes(v._id)}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setSelectedVehicles(s => [...s, v._id])
+                          } else {
+                            setSelectedVehicles(s => s.filter(id => id !== v._id))
+                          }
+                        }}
+                        className='w-3.5 h-3.5 accent-blue-600' />
+                      <span className='text-xs text-gray-600 dark:text-gray-300'>{v.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className='space-y-2'>
               {[
                 { key: 'alertOnExit',  label: 'Alert when van exits zone' },
@@ -322,9 +370,21 @@ export default function GeofenceManager() {
             </div>
             <div className='space-y-1.5 mb-3'>
               {selected.radiusMetres && <Row label='Radius' value={selected.radiusMetres >= 1000 ? `${(selected.radiusMetres/1000).toFixed(1)} km` : `${selected.radiusMetres} m`} />}
-              <Row label='Exit alert'  value={selected.alertOnExit  ? 'Yes' : 'No'} />
-              <Row label='Entry alert' value={selected.alertOnEntry ? 'Yes' : 'No'} />
-              <Row label='Created' value={new Date(selected.createdAt).toLocaleDateString('en-AU')} />
+            <Row label='Exit alert'  value={selected.alertOnExit  ? 'Yes' : 'No'} />
+            <Row label='Entry alert' value={selected.alertOnEntry ? 'Yes' : 'No'} />
+            <Row label='Applies to' value={
+              !selected.vehicleIds || selected.vehicleIds.length === 0
+                ? 'All vehicles'
+                : `${selected.vehicleIds.length} vehicle${selected.vehicleIds.length > 1 ? 's' : ''}`
+            } />
+            {selected.vehicleIds && selected.vehicleIds.length > 0 && (
+              <div className='mt-1'>
+                {vehicles.filter(v => selected.vehicleIds.includes(v._id)).map(v => (
+                  <p key={v._id} className='text-xs text-blue-600 py-0.5'>• {v.name}</p>
+                ))}
+              </div>
+            )}
+            <Row label='Created' value={new Date(selected.createdAt).toLocaleDateString('en-AU')} />
             </div>
             <button onClick={() => handleDelete(selected._id)}
               className='w-full h-8 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg transition'>

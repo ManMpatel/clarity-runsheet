@@ -29,6 +29,11 @@ async function processGeofences(imei, companyId, vehicleId, record) {
   const point = [record.longitude, record.latitude]
 
   for (const zone of zones) {
+    // If zone has specific vehicles assigned, skip if this vehicle not in list
+    if (zone.vehicleIds && zone.vehicleIds.length > 0) {
+      if (!zone.vehicleIds.includes(vehicleId)) continue
+    }
+
     const inside = pointInPolygon(point, zone.geometry)
     const prevState = await getGeofenceState(imei, zone._id.toString())
     const wasInside = prevState === 'inside'

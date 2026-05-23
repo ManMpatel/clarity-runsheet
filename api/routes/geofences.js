@@ -36,7 +36,7 @@ router.get('/:id', requireAuth, requireCompany, async (req, res) => {
 router.post('/', requireAuth, requireCompany,
   requireRole('companyAdmin', 'fleetManager', 'superAdmin'), async (req, res) => {
   try {
-    const { name, geometry, alertOnExit, alertOnEntry, activeHoursOnly } = req.body
+    const { name, geometry, alertOnExit, alertOnEntry, activeHoursOnly, vehicleIds, centre, radiusMetres } = req.body
     if (!name || !geometry) {
       return res.status(400).json({ error: 'Name and geometry required' })
     }
@@ -50,6 +50,9 @@ router.post('/', requireAuth, requireCompany,
       alertOnEntry:    alertOnEntry ?? false,
       activeHoursOnly: activeHoursOnly ?? false,
       active:          true,
+      vehicleIds:      vehicleIds || [],
+      centre:          centre || null,
+      radiusMetres:    radiusMetres || null,
       createdAt:       new Date(),
     }
 
@@ -63,12 +66,12 @@ router.post('/', requireAuth, requireCompany,
 router.put('/:id', requireAuth, requireCompany,
   requireRole('companyAdmin', 'fleetManager', 'superAdmin'), async (req, res) => {
   try {
-    const { name, geometry, alertOnExit, alertOnEntry, activeHoursOnly, active } = req.body
+    const { name, geometry, alertOnExit, alertOnEntry, activeHoursOnly, active, vehicleIds } = req.body
     const collection = await getCollection('geofences')
 
     const result = await collection.findOneAndUpdate(
       { _id: new ObjectId(req.params.id), ...req.companyFilter },
-      { $set: { name, geometry, alertOnExit, alertOnEntry, activeHoursOnly, active, updatedAt: new Date() } },
+      { $set: { name, geometry, alertOnExit, alertOnEntry, activeHoursOnly, active, vehicleIds: vehicleIds || [], updatedAt: new Date() } },
       { returnDocument: 'after' }
     )
 
