@@ -64,7 +64,7 @@ export default function SettingsLayout() {
 
   return (
     <div className='flex'>
-      <aside className='w-56 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 min-h-[calc(100vh-60px)] flex flex-col'>
+      <aside className='w-56 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 min-h-screen flex flex-col'>
         {me && (
           <div className='p-4 border-b border-gray-200 dark:border-gray-800'>
             <div className='flex items-center gap-2.5'>
