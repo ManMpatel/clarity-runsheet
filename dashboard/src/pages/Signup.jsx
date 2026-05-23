@@ -27,12 +27,13 @@ export default function Signup() {
     setLoading(true)
     try {
       await api.post('/api/auth/signup', {
-        companyName: form.companyName,
-        name:        form.name,
-        email:       form.email,
-        password:    form.password,
+        companyName:   form.companyName,
+        name:          form.name,
+        email:         form.email,
+        password:      form.password,
+        driverConsent: form.driverConsent || false,
       })
-      navigate('/login?registered=true')
+      navigate('/login?verified=pending')
     } catch (err) {
       setError(err.response?.data?.error || 'Signup failed')
     } finally {

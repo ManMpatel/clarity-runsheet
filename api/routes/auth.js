@@ -63,9 +63,13 @@ router.post('/login', async (req, res) => {
 
 router.post('/signup', async (req, res) => {
   try {
-    const { companyName, name, email, password } = req.body
+    const { companyName, name, email, password, driverConsent } = req.body
     if (!companyName || !name || !email || !password) {
       return res.status(400).json({ error: 'All fields required' })
+    }
+
+    if (!driverConsent) {
+      return res.status(400).json({ error: 'Driver consent is required' })
     }
 
     if (password.length < 8) {
@@ -103,6 +107,8 @@ router.post('/signup', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12)
     const verifyToken = crypto.randomBytes(32).toString('hex')
 
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip
+
     const user = {
       companyId,
       name,
@@ -113,7 +119,12 @@ router.post('/signup', async (req, res) => {
       emailVerified:    false,
       emailVerifyToken: verifyToken,
       emailVerifyExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      createdAt:        new Date(),
+      driverConsent: {
+        given:     true,
+        givenAt:   new Date(),
+        ipAddress: clientIp,
+      },
+      createdAt: new Date(),
     }
 
     await users.insertOne(user)
