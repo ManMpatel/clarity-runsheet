@@ -25,6 +25,25 @@ import AdminPanel from './pages/AdminPanel'
 import VerifyEmail from './pages/VerifyEmail'
 import AdminTickets from './pages/admin/AdminTickets'
 import AdminDevices from './pages/admin/AdminDevices'
+import LockedFeature from './pages/LockedFeature'
+import { useEffect, useState } from 'react'
+import api from './lib/api'
+
+function TierGate({ tier, children }) {
+  const [access, setAccess] = useState(null)
+
+  useEffect(() => {
+    api.get('/api/vehicles').then(res => {
+      const v = res.data
+      if (tier === 'mid') setAccess(v.some(x => x.tier === 'mid' || x.tier === 'top'))
+      if (tier === 'top') setAccess(v.some(x => x.tier === 'top'))
+    }).catch(() => setAccess(false))
+  }, [tier])
+
+  if (access === null) return null
+  if (!access) return <LockedFeature plan={tier === 'mid' ? 'Mid' : 'Top'} />
+  return children
+}
 
 function ProtectedRoute({ children }) {
   const token = useAuthStore(s => s.token)
@@ -65,14 +84,14 @@ export default function App() {
         <Route path='live-map'         element={<LiveMap />} />
         <Route path='garage/imei-check' element={<IMEICheck />} />
         <Route path='trips'            element={<TripsHistory />} />
-        <Route path='driver-behaviour' element={<DriverBehaviour />} />
-        <Route path='vehicle-health'   element={<VehicleHealth />} />
-        <Route path='maintenance'      element={<Maintenance />} />
-        <Route path='geofences'        element={<GeofenceManager />} />
+        <Route path='driver-behaviour' element={<TierGate tier='mid'><DriverBehaviour /></TierGate>} />
+        <Route path='vehicle-health'   element={<TierGate tier='top'><VehicleHealth /></TierGate>} />
+        <Route path='maintenance'      element={<TierGate tier='mid'><Maintenance /></TierGate>} />
+        <Route path='geofences'        element={<TierGate tier='mid'><GeofenceManager /></TierGate>} />
         <Route path='garage/register-device' element={<RegisterDevice />} />
         <Route path='alerts'           element={<Alerts />} />
-        <Route path='reports'          element={<Reports />} />
-        <Route path='fbt'              element={<FbtLogbook />} />
+        <Route path='reports'          element={<TierGate tier='top'><Reports /></TierGate>} />
+        <Route path='fbt'              element={<TierGate tier='mid'><FbtLogbook /></TierGate>} />
         <Route path='settings'         element={<Settings />} />
         <Route path='garage/my-devices' element={<MyDevices />} />
         <Route path='/admin/login' element={<AdminLogin />} />
