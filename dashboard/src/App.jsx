@@ -30,10 +30,8 @@ function ProtectedRoute({ children }) {
 }
 
 function SuperAdminRoute({ children }) {
-  const token = useAuthStore(s => s.token)
-  const role  = useAuthStore(s => s.role)
-  if (!token) return <Navigate to='/login' replace />
-  if (role !== 'superAdmin') return <Navigate to='/dashboard' replace />
+  const adminToken = localStorage.getItem('adminToken')
+  if (!adminToken) return <Navigate to='/admin/login' replace />
   return children
 }
 
