@@ -9,7 +9,17 @@ router.get('/companies', requireSuperAdmin, async (req, res) => {
   try {
     const collection = await getCollection('companies')
     const companies = await collection.find({}).sort({ createdAt: -1 }).toArray()
-    return res.json(companies)
+
+    const users = await getCollection('users')
+    const enriched = await Promise.all(companies.map(async (c) => {
+      const admin = await users.findOne(
+        { companyId: c._id.toString(), role: 'companyAdmin' },
+        { projection: { email: 1, name: 1, mobile: 1 } }
+      )
+      return { ...c, email: admin?.email || null, adminName: admin?.name || null, phone: admin?.mobile || null }
+    }))
+
+    return res.json(enriched)
   } catch (err) {
     return res.status(500).json({ error: 'Server error' })
   }
