@@ -1,0 +1,62 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to clarity-api
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 209.38.83.138
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd ~/clarity/api
+            git pull origin main
+            npm install --production
+            pm2 restart clarity-api
+
+  deploy-tcp:
+    name: Deploy TCP Listener
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to clarity-tcp
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 170.64.148.64
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd ~/clarity/tcp-listener
+            git pull origin main
+            npm install --production
+            pm2 restart clarity-tcp
+
+  deploy-worker:
+    name: Deploy Worker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to clarity-worker
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 134.199.144.238
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd ~/clarity/worker
+            git pull origin main
+            npm install --production
+            pm2 restart clarity-worker
+            
