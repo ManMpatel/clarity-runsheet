@@ -12,16 +12,14 @@ const contractorLinks = [
   { to: '/alerts',           label: 'Alerts' },
   { to: '/reports',          label: 'Reports' },
   { to: '/fbt',              label: 'FBT Logbook' },
-  { to: '/billing',          label: 'Billing & Plans' },
-  { to: '/settings',         label: 'Settings' },
+  { to: '/settings', label: 'Settings' },
 ]
 
 const garageLinks = [
   { to: '/garage/imei-check',     label: 'IMEI Pre-Check' },
   { to: '/garage/register-device', label: 'Register Device' },
   { to: '/garage/my-devices',     label: 'My Devices' },
-  { to: '/billing',               label: 'Billing & Plans' },
-  { to: '/settings',              label: 'Settings' },
+  { to: '/settings', label: 'Settings' },
 ]
 
 export default function Sidebar() {
