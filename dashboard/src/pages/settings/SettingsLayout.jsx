@@ -63,7 +63,11 @@ export default function SettingsLayout() {
   const sharedProps = { me, company, setCompany, vehicles, setVehicles, users, setUsers, slots, loading }
 
   return (
-    <div className='flex'>
+    <div className='flex flex-col'>
+      <div className='h-[60px] border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center px-6'>
+        <span className='text-base font-bold text-blue-600'>Settings</span>
+      </div>
+      <div className='flex flex-1'>
       <aside className='w-56 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 min-h-screen flex flex-col'>
         {me && (
           <div className='p-4 border-b border-gray-200 dark:border-gray-800'>
@@ -117,6 +121,7 @@ export default function SettingsLayout() {
         {section === 'upgrade'    && <UpgradeSection    {...sharedProps} />}
         {section === 'appearance' && <AppearanceSection {...sharedProps} />}
       </main>
+    </div>
     </div>
   )
 }
