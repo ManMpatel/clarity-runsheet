@@ -24,6 +24,35 @@ jobs:
             npm install --production
             pm2 restart clarity-api
 
+      - name: Wait for API to start
+        run: sleep 15
+
+      - name: Health check API
+        id: healthcheck
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://api.clarity-software.com.au/health)
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed with status $STATUS"
+            exit 1
+          fi
+          echo "Health check passed"
+
+      - name: Rollback API if health check failed
+        if: failure() && steps.healthcheck.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 209.38.83.138
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd ~/clarity/api
+            git revert HEAD --no-edit
+            git push origin main
+            npm install --production
+            pm2 restart clarity-api
+            echo "ROLLBACK COMPLETE — reverted to previous commit"
+
   deploy-tcp:
     name: Deploy TCP Listener
     runs-on: ubuntu-latest
@@ -42,6 +71,38 @@ jobs:
             npm install --production
             pm2 restart clarity-tcp
 
+      - name: Wait for TCP to start
+        run: sleep 10
+
+      - name: Check TCP process is running
+        uses: appleboy/ssh-action@v1.0.3
+        id: tcpcheck
+        with:
+          host: 170.64.148.64
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            STATUS=$(pm2 jlist | python3 -c "import sys,json; procs=json.load(sys.stdin); p=[x for x in procs if x['name']=='clarity-tcp']; print(p[0]['pm2_env']['status'] if p else 'not found')")
+            echo "TCP status: $STATUS"
+            if [ "$STATUS" != "online" ]; then
+              echo "TCP listener is not online"
+              exit 1
+            fi
+
+      - name: Rollback TCP if check failed
+        if: failure() && steps.tcpcheck.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 170.64.148.64
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd ~/clarity/tcp-listener
+            git revert HEAD --no-edit
+            npm install --production
+            pm2 restart clarity-tcp
+            echo "ROLLBACK COMPLETE"
+
   deploy-worker:
     name: Deploy Worker
     runs-on: ubuntu-latest
@@ -59,4 +120,36 @@ jobs:
             git pull origin main
             npm install --production
             pm2 restart clarity-worker
+
+      - name: Wait for worker to start
+        run: sleep 10
+
+      - name: Check worker process is running
+        uses: appleboy/ssh-action@v1.0.3
+        id: workercheck
+        with:
+          host: 134.199.144.238
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            STATUS=$(pm2 jlist | python3 -c "import sys,json; procs=json.load(sys.stdin); p=[x for x in procs if x['name']=='clarity-worker']; print(p[0]['pm2_env']['status'] if p else 'not found')")
+            echo "Worker status: $STATUS"
+            if [ "$STATUS" != "online" ]; then
+              echo "Worker is not online"
+              exit 1
+            fi
+
+      - name: Rollback worker if check failed
+        if: failure() && steps.workercheck.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 134.199.144.238
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            cd ~/clarity/worker
+            git revert HEAD --no-edit
+            npm install --production
+            pm2 restart clarity-worker
+            echo "ROLLBACK COMPLETE"
             
