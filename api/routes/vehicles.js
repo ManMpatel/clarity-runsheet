@@ -170,4 +170,35 @@ async function countUsedSlots(companyId, tier, excludeVehicleId) {
   })
   return count
 }
+
+
+router.get('/status', requireAuth, requireCompany, async (req, res) => {
+  try {
+    const vehicles = await getCollection('vehicles')
+    const telemetry = await getCollection('telemetry_events')
+    const fleet = await vehicles.find(req.companyFilter).toArray()
+
+    const status = await Promise.all(fleet.map(async (v) => {
+      const latest = await telemetry.findOne(
+        { 'metadata.vehicleId': v._id.toString() },
+        { sort: { timestamp: -1 } }
+      )
+      const lastSeen = latest?.timestamp || null
+      const ageMs = lastSeen ? Date.now() - new Date(lastSeen).getTime() : null
+
+      let state = 'offline'
+      if (ageMs !== null) {
+        if (ageMs < 2 * 60 * 1000)  state = 'online'
+        else if (ageMs < 15 * 60 * 1000) state = 'idle'
+      }
+
+      return { vehicleId: v._id.toString(), lastSeen, state }
+    }))
+
+    return res.json(status)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router
