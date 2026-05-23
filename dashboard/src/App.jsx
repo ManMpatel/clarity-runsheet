@@ -22,6 +22,8 @@ import FbtLogbook from './pages/FbtLogbook'
 import Settings from './pages/Settings'
 import Billing from './pages/Billing'
 import AdminPanel from './pages/AdminPanel'
+import AdminTickets from './pages/admin/AdminTickets'
+import AdminDevices from './pages/admin/AdminDevices'
 
 function ProtectedRoute({ children }) {
   const token = useAuthStore(s => s.token)
@@ -77,10 +79,12 @@ export default function App() {
       </Route>
 
       <Route path='/admin' element={<SuperAdminRoute><AdminShell /></SuperAdminRoute>}>
-        <Route index element={<AdminPanel />} />
-        <Route path='tickets' element={<AdminPanel />} />
-        <Route path='devices' element={<AdminPanel />} />
-      </Route>
+      <Route index element={<AdminPanel />} />
+      <Route path='tickets' element={<AdminTickets />} />
+      <Route path='devices' element={<AdminDevices />} />
+    </Route>
     </Routes>
   )
 }
+
+
