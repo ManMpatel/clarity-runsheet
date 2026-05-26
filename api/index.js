@@ -23,8 +23,8 @@ const supportRoutes = require('./routes/support')
 const adminAuthRoutes   = require('./routes/admin-auth')
 const imeiRoutes = require('./routes/imei')
 
-const passport       = require('passport')
-const googleRoutes   = require('./routes/auth-google')
+
+
 
 const app  = express()
 const PORT = process.env.PORT || 3000
@@ -33,12 +33,9 @@ app.use(cors({ origin: process.env.DASHBOARD_URL || 'http://localhost:5173' }))
 app.use(express.json())
 app.use(rateLimiter)
 
-const passport = require('passport')
 app.use(passport.initialize())
 app.use('/api/auth',        authRoutes)
 app.use('/api/auth/google', googleAuthRoutes)
-app.use('/api/auth/google', googleRoutes)
-app.use(passport.initialize())
 app.use('/api/vehicles',    vehicleRoutes)
 app.use('/api/telemetry',   telemetryRoutes)
 app.use('/api/trips',       tripRoutes)
