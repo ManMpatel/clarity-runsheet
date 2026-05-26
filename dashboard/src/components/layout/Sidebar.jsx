@@ -46,12 +46,6 @@ const GARAGE_LINKS = [
   { to: '/settings',               label: 'Settings',        icon: CogIcon },
 ]
 
-const GARAGE_EXTRA_LINKS = [
-  { to: '/garage/imei-check',      label: 'IMEI Pre-Check',  icon: QrcodeIcon },
-  { to: '/garage/register-device', label: 'Register Device', icon: LightningBoltIcon },
-  { to: '/garage/my-devices',      label: 'My Devices',      icon: DeviceMobileIcon },
-]
-
 function NavItem({ to, label, icon: Icon }) {
   return (
     <NavLink to={to}
@@ -106,7 +100,6 @@ function SectionLabel({ label }) {
 
 export default function Sidebar() {
   const role = useAuthStore(s => s.role)
-  const accountType = useAuthStore(s => s.accountType)
   const [hasMid, setHasMid] = useState(false)
   const [hasTop, setHasTop] = useState(false)
 
@@ -168,12 +161,6 @@ export default function Sidebar() {
             : <LockedItem key={l.to} label={l.label} plan='Top' />
         )}
 
-        {accountType === 'garage_owner' && (
-          <>
-            <SectionLabel label='GARAGE TOOLS' />
-            {GARAGE_EXTRA_LINKS.map(l => <NavItem key={l.to} {...l} />)}
-          </>
-        )}
         {/* Bottom */}
         <div className='mx-6 mt-5 mb-2 h-px bg-gray-100 dark:bg-gray-800' />
         <NavItem to='/settings' label='Settings' />
