@@ -2,49 +2,67 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 import { useEffect, useState } from 'react'
 import api from '../../lib/api'
+import {
+  ChartBarIcon,
+  MapIcon,
+  ClipboardListIcon,
+  BellIcon,
+  TruckIcon,
+  ShieldCheckIcon,
+  BookOpenIcon,
+  WrenchIcon,
+  HeartIcon,
+  DocumentReportIcon,
+  CogIcon,
+  QrcodeIcon,
+  LightningBoltIcon,
+  DeviceMobileIcon,
+  CreditCardIcon,
+} from '@heroicons/react/outline'
 
 const CORE_LINKS = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/live-map',  label: 'Live Map' },
-  { to: '/trips',     label: 'Trips & History' },
-  { to: '/alerts',    label: 'Alerts' },
+  { to: '/dashboard', label: 'Dashboard',      icon: ChartBarIcon },
+  { to: '/live-map',  label: 'Live Map',        icon: MapIcon },
+  { to: '/trips',     label: 'Trips & History', icon: ClipboardListIcon },
+  { to: '/alerts',    label: 'Alerts',          icon: BellIcon },
 ]
 
 const MID_LINKS = [
-  { to: '/driver-behaviour', label: 'Driver Behaviour' },
-  { to: '/geofences',        label: 'Geofence Manager' },
-  { to: '/fbt',              label: 'FBT Logbook' },
-  { to: '/maintenance',      label: 'Maintenance' },
+  { to: '/driver-behaviour', label: 'Driver Behaviour',  icon: TruckIcon },
+  { to: '/geofences',        label: 'Geofence Manager',  icon: ShieldCheckIcon },
+  { to: '/fbt',              label: 'FBT Logbook',       icon: BookOpenIcon },
+  { to: '/maintenance',      label: 'Maintenance',       icon: WrenchIcon },
 ]
 
 const TOP_LINKS = [
-  { to: '/vehicle-health', label: 'Vehicle Health' },
-  { to: '/reports',        label: 'Reports' },
+  { to: '/vehicle-health', label: 'Vehicle Health', icon: HeartIcon },
+  { to: '/reports',        label: 'Reports',         icon: DocumentReportIcon },
 ]
 
 const GARAGE_LINKS = [
-  { to: '/garage/imei-check',      label: 'IMEI Pre-Check' },
-  { to: '/garage/register-device', label: 'Register Device' },
-  { to: '/garage/my-devices',      label: 'My Devices' },
-  { to: '/settings',               label: 'Settings' },
+  { to: '/garage/imei-check',      label: 'IMEI Pre-Check',  icon: QrcodeIcon },
+  { to: '/garage/register-device', label: 'Register Device', icon: LightningBoltIcon },
+  { to: '/garage/my-devices',      label: 'My Devices',      icon: DeviceMobileIcon },
+  { to: '/settings',               label: 'Settings',        icon: CogIcon },
 ]
 
-function NavItem({ to, label }) {
+function NavItem({ to, label, icon: Icon }) {
   return (
     <NavLink to={to}
       className={({ isActive }) =>
-        `flex items-center px-6 py-2.5 text-sm font-medium border-l-4 transition-colors ${
+        `flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
           isActive
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 text-blue-600'
-            : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+            ? 'bg-blue-50 dark:bg-blue-950 text-blue-600'
+            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
         }`
       }>
+      {Icon && <Icon className='w-[18px] h-[18px] flex-shrink-0' />}
       {label}
     </NavLink>
   )
 }
 
-function LockedItem({ label, plan }) {
+function LockedItem({ label, plan, icon: Icon }) {
   const navigate = useNavigate()
   const [tip, setTip] = useState(false)
 
@@ -54,8 +72,9 @@ function LockedItem({ label, plan }) {
         onClick={() => navigate('/settings')}
         onMouseEnter={() => setTip(true)}
         onMouseLeave={() => setTip(false)}
-        className='w-full flex items-center justify-between px-6 py-2.5 text-sm font-medium border-l-4 border-transparent text-gray-300 dark:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors'>
-        <span>{label}</span>
+        className='w-full flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 dark:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors'>
+        {Icon && <Icon className='w-[18px] h-[18px] flex-shrink-0' />}
+        <span className='flex-1 text-left'>{label}</span>
         <span className='text-xs'>🔒</span>
       </button>
       {tip && (
