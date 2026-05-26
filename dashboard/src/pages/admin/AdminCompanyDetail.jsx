@@ -81,11 +81,23 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
             {company.phone && <p className='text-xs text-gray-500'>{company.phone}</p>}
           </div>
           <div className='flex flex-col items-end gap-1'>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-              isGarage ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-            }`}>
-              {isGarage ? 'Garage Owner' : 'Contractor'}
-            </span>
+            <select
+              value={company.accountType || 'contractor'}
+              onChange={async (e) => {
+                const accountType = e.target.value
+                try {
+                  await api.put(`/api/admin/companies/${company._id}/account-type`, { accountType })
+                  window.location.reload()
+                } catch (err) {
+                  alert('Failed to update account type')
+                }
+              }}
+              className='text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-lg border-0 focus:ring-2 focus:ring-blue-300 cursor-pointer'
+            >
+              <option value='contractor'>Contractor</option>
+              <option value='garage_owner'>Garage Owner</option>
+              <option value='individual'>Individual</option>
+            </select>
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
               company.subscriptionTier === 'locked'
                 ? 'bg-gray-100 text-gray-500'

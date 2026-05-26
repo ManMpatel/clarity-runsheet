@@ -27,6 +27,27 @@ export default function AdminPanel() {
     load()
   }, [])
 
+  async function handleRevoke(companyId) {
+  if (!confirm('Revoke access for this company?')) return
+  try {
+    await api.post(`/api/admin/companies/${companyId}/revoke`)
+    setCompanies(cs => cs.map(c => c._id === companyId ? { ...c, active: false } : c))
+  } catch (err) {
+    alert('Failed to revoke')
+  }
+}
+
+async function handleDelete(companyId) {
+  if (!confirm('Permanently delete this company and all their data? This cannot be undone.')) return
+  try {
+    await api.delete(`/api/admin/companies/${companyId}`)
+    setCompanies(cs => cs.filter(c => c._id !== companyId))
+    setSelected(null)
+  } catch (err) {
+    alert('Failed to delete')
+  }
+}
+
   async function selectCompany(company) {
     setSelected(company)
     setSlots(null)
@@ -140,7 +161,20 @@ export default function AdminPanel() {
                     )}
                   </div>
                 </div>
+                <div className='flex gap-2 mt-2'>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleRevoke(c._id) }}
+                  className='text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition'>
+                  Revoke
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(c._id) }}
+                  className='text-xs px-2 py-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition'>
+                  Delete
+                </button>
+              </div>
               </button>
+              
             ))}
           </div>
         </div>
