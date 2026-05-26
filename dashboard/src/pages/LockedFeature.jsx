@@ -1,7 +1,13 @@
 import { useNavigate } from 'react-router-dom'
+import { useAuthStore } from '../store/authStore'
 
 export default function LockedFeature({ plan = 'Mid' }) {
   const navigate = useNavigate()
+  const subscriptionTier = useAuthStore(s => s.subscriptionTier)
+
+  const tierRank = { locked: 0, entry: 1, mid: 2, top: 3 }
+  const requiredRank = plan === 'Top' ? 3 : 2
+  if (tierRank[subscriptionTier] >= requiredRank) return null
 
   return (
     <div className='flex flex-col items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-950 px-6'>
