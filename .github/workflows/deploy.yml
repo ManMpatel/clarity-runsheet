@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Deploy to clarity-api
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@master
         with:
           host: 209.38.83.138
           username: root
@@ -40,7 +40,7 @@ jobs:
 
       - name: Rollback API if health check failed
         if: failure() && steps.healthcheck.outcome == 'failure'
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: 209.38.83.138
           username: root
