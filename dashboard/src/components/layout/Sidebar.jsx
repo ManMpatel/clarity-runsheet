@@ -103,8 +103,12 @@ export default function Sidebar() {
   const [hasMid, setHasMid] = useState(false)
   const [hasTop, setHasTop] = useState(false)
 
+  const subscriptionTier = useAuthStore(s => s.subscriptionTier)
+
   useEffect(() => {
     if (role === 'garageOwner') return
+    if (subscriptionTier === 'top') { setHasMid(true); setHasTop(true); return }
+    if (subscriptionTier === 'mid') { setHasMid(true); setHasTop(false); return }
     api.get('/api/vehicles')
       .then(res => {
         const v = res.data
@@ -112,7 +116,7 @@ export default function Sidebar() {
         setHasTop(v.some(x => x.tier === 'top'))
       })
       .catch(() => {})
-  }, [role])
+  }, [role, subscriptionTier])
 
   if (role === 'garageOwner') {
     return (
