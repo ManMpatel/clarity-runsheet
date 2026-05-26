@@ -32,14 +32,17 @@ import api from './lib/api'
 
 function TierGate({ tier, children }) {
   const [access, setAccess] = useState(null)
+  const subscriptionTier = useAuthStore(s => s.subscriptionTier)
 
   useEffect(() => {
+    if (subscriptionTier === 'top') { setAccess(true); return }
+    if (subscriptionTier === 'mid' && tier === 'mid') { setAccess(true); return }
     api.get('/api/vehicles').then(res => {
       const v = res.data
       if (tier === 'mid') setAccess(v.some(x => x.tier === 'mid' || x.tier === 'top'))
       if (tier === 'top') setAccess(v.some(x => x.tier === 'top'))
     }).catch(() => setAccess(false))
-  }, [tier])
+  }, [tier, subscriptionTier])
 
   if (access === null) return null
   if (!access) return <LockedFeature plan={tier === 'mid' ? 'Mid' : 'Top'} />
