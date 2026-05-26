@@ -37,6 +37,7 @@ router.post('/login', async (req, res) => {
         companyId:        user.companyId.toString(),
         role:             user.role,
         subscriptionTier: user.subscriptionTier || 'entry',
+        accountType:      company?.accountType || 'contractor',
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
@@ -152,6 +153,7 @@ router.post('/refresh', requireAuth, async (req, res) => {
         companyId:        user.companyId.toString(),
         role:             user.role,
         subscriptionTier: user.subscriptionTier || 'entry',
+        accountType:      company?.accountType || 'contractor',
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }

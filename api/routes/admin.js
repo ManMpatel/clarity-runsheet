@@ -139,7 +139,53 @@ router.put('/companies/:id/slots', requireSuperAdmin, async (req, res) => {
   }
 })
 
+router.put('/companies/:id/account-type', requireSuperAdmin, async (req, res) => {
+  try {
+    const { accountType } = req.body
+    if (!['individual','contractor','garage_owner'].includes(accountType)) {
+      return res.status(400).json({ error: 'Invalid account type' })
+    }
+    const { ObjectId } = require('mongodb')
+    const companies = await getCollection('companies')
+    await companies.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { accountType, updatedAt: new Date() } }
+    )
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
 
+router.put('/companies/:id/revoke', requireSuperAdmin, async (req, res) => {
+  try {
+    const { ObjectId } = require('mongodb')
+    const companies = await getCollection('companies')
+    await companies.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { active: false, updatedAt: new Date() } }
+    )
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
+  try {
+    const { ObjectId } = require('mongodb')
+    const id = req.params.id
+    const companies  = await getCollection('companies')
+    const users      = await getCollection('users')
+    const vehicles   = await getCollection('vehicles')
+    await companies.deleteOne({ _id: new ObjectId(id) })
+    await users.deleteMany({ companyId: id })
+    await vehicles.deleteMany({ companyId: id })
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
 
 router.get('/upgrade-requests', requireSuperAdmin, async (req, res) => {
   try {

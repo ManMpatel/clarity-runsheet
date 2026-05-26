@@ -9,6 +9,7 @@ export const useAuthStore = create(
       companyId:          null,
       role:               null,
       subscriptionTier:   null,
+      accountType:        null,
       onboardingComplete: false,
 
       login(token, user, onboardingComplete) {
@@ -19,6 +20,7 @@ export const useAuthStore = create(
           companyId:          payload.companyId,
           role:               payload.role,
           subscriptionTier:   payload.subscriptionTier,
+          accountType:        payload.accountType || 'contractor',
           onboardingComplete: onboardingComplete || false,
         })
       },
