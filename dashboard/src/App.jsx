@@ -22,6 +22,7 @@ import FbtLogbook from './pages/FbtLogbook'
 import Settings from './pages/Settings'
 import Billing from './pages/Billing'
 import AdminPanel from './pages/AdminPanel'
+import GoogleAuthSuccess from './pages/GoogleAuthSuccess'
 import VerifyEmail from './pages/VerifyEmail'
 import AdminTickets from './pages/admin/AdminTickets'
 import AdminDevices from './pages/admin/AdminDevices'
@@ -60,8 +61,9 @@ function SuperAdminRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path='/login'         element={<Login />} />
-      <Route path='/signup'        element={<Signup />} />
+      <Route path='/login'                    element={<Login />} />
+      <Route path='/signup'                   element={<Signup />} />
+      <Route path='/auth/google/success'      element={<GoogleAuthSuccess />} />
       <Route path='/verify-email'  element={<VerifyEmail />} />
       <Route path='/admin/login'   element={<AdminLogin />} />
       <Route path='/onboarding' element={

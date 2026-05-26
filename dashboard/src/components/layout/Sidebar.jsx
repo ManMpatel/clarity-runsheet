@@ -5,20 +5,20 @@ import api from '../../lib/api'
 import {
   ChartBarIcon,
   MapIcon,
-  ClipboardListIcon,
+  ClipboardDocumentListIcon as ClipboardListIcon,
   BellIcon,
   TruckIcon,
   ShieldCheckIcon,
   BookOpenIcon,
   WrenchIcon,
   HeartIcon,
-  DocumentReportIcon,
-  CogIcon,
-  QrcodeIcon,
-  LightningBoltIcon,
-  DeviceMobileIcon,
+  DocumentChartBarIcon as DocumentReportIcon,
+  Cog6ToothIcon as CogIcon,
+  QrCodeIcon as QrcodeIcon,
+  BoltIcon as LightningBoltIcon,
+  DevicePhoneMobileIcon as DeviceMobileIcon,
   CreditCardIcon,
-} from '@heroicons/react/outline'
+} from '@heroicons/react/24/outline'
 
 const CORE_LINKS = [
   { to: '/dashboard', label: 'Dashboard',      icon: ChartBarIcon },
