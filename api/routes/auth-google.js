@@ -20,17 +20,15 @@ passport.use(new GoogleStrategy(
       const users     = await getCollection('users')
       const companies = await getCollection('companies')
 
-      // check if user already exists
       let user = await users.findOne({ email })
 
       if (!user) {
-        // create company
         const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
         const existingCompany = await companies.findOne({ slug })
         const finalSlug = existingCompany ? `${slug}-${Date.now()}` : slug
 
         const companyResult = await companies.insertOne({
-          name:             name,
+          name,
           slug:             finalSlug,
           subscriptionTier: 'locked',
           slots: { entrySlots: 0, midSlots: 0, topSlots: 0 },
@@ -59,19 +57,16 @@ passport.use(new GoogleStrategy(
   }
 ))
 
-// redirect user to Google
 router.get('/', passport.authenticate('google', {
   scope: ['profile', 'email'],
   session: false,
 }))
 
-// Google calls this back after login
 router.get('/callback',
   passport.authenticate('google', { session: false, failureRedirect: '/login?error=google' }),
   async (req, res) => {
     try {
       const user = req.user
-
       const companies = await getCollection('companies')
       const { ObjectId } = require('mongodb')
       const company = await companies.findOne({
@@ -92,7 +87,6 @@ router.get('/callback',
       const onboarding = company?.onboardingComplete ? 'true' : 'false'
       const dashboard  = process.env.DASHBOARD_URL || 'http://localhost:5173'
 
-      // redirect to frontend with token in URL
       res.redirect(`${dashboard}/auth/google/success?token=${token}&onboarding=${onboarding}`)
     } catch (err) {
       console.error('[Google Auth] Callback error:', err.message)
