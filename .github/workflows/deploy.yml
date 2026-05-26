@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Deploy to clarity-tcp
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1
         with:
           host: 170.64.148.64
           username: root
