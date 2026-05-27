@@ -84,8 +84,8 @@ export default function App() {
         }
       >
         <Route index element={<AdminPanel />} />
-        <Route path='tickets' element={<AdminPanel />} />
-        <Route path='devices' element={<AdminPanel />} />
+        <Route path='tickets' element={<AdminTickets />} />
+        <Route path='devices' element={<AdminDevices />} />
       </Route>
 
       <Route
