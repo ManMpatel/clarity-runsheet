@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import axios from 'axios'
+import { useAuthStore } from '../store/authStore'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
@@ -36,7 +37,7 @@ export default function AdminLogin() {
         tempToken,
         code,
       })
-      localStorage.setItem('adminToken', res.data.token)
+      useAuthStore.getState().login(res.data.token, { email }, false)
       window.location.href = '/admin'
 
     } catch (err) {
