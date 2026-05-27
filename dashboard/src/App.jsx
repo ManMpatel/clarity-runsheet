@@ -64,16 +64,30 @@ function SuperAdminRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path='/login'                    element={<Login />} />
-      <Route path='/signup'                   element={<Signup />} />
-      <Route path='/auth/google/success'      element={<GoogleAuthSuccess />} />
-      <Route path='/verify-email'  element={<VerifyEmail />} />
-      <Route path='/admin/login'   element={<AdminLogin />} />
+      <Route path='/login'               element={<Login />} />
+      <Route path='/signup'              element={<Signup />} />
+      <Route path='/auth/google/success' element={<GoogleAuthSuccess />} />
+      <Route path='/verify-email'        element={<VerifyEmail />} />
+      <Route path='/admin/login'         element={<AdminLogin />} />
       <Route path='/onboarding' element={
         <ProtectedRoute>
           <Onboarding />
         </ProtectedRoute>
       } />
+
+      <Route
+        path='/admin'
+        element={
+          <SuperAdminRoute>
+            <AdminShell />
+          </SuperAdminRoute>
+        }
+      >
+        <Route index element={<AdminPanel />} />
+        <Route path='tickets' element={<AdminPanel />} />
+        <Route path='devices' element={<AdminPanel />} />
+      </Route>
+
       <Route
         path='/'
         element={
@@ -81,36 +95,25 @@ export default function App() {
             <AppShell />
           </ProtectedRoute>
         }
-        
       >
-        
         <Route index element={<Navigate to='/dashboard' replace />} />
-        <Route path='dashboard'        element={<Dashboard />} />
-        <Route path='live-map'         element={<LiveMap />} />
-        <Route path='garage/imei-check' element={<IMEICheck />} />
-        <Route path='trips'            element={<TripsHistory />} />
-        <Route path='driver-behaviour' element={<TierGate tier='mid'><DriverBehaviour /></TierGate>} />
-        <Route path='vehicle-health'   element={<TierGate tier='top'><VehicleHealth /></TierGate>} />
-        <Route path='maintenance'      element={<TierGate tier='mid'><Maintenance /></TierGate>} />
-        <Route path='geofences'        element={<TierGate tier='mid'><GeofenceManager /></TierGate>} />
+        <Route path='dashboard'              element={<Dashboard />} />
+        <Route path='live-map'               element={<LiveMap />} />
+        <Route path='garage/imei-check'      element={<IMEICheck />} />
+        <Route path='trips'                  element={<TripsHistory />} />
+        <Route path='driver-behaviour'       element={<TierGate tier='mid'><DriverBehaviour /></TierGate>} />
+        <Route path='vehicle-health'         element={<TierGate tier='top'><VehicleHealth /></TierGate>} />
+        <Route path='maintenance'            element={<TierGate tier='mid'><Maintenance /></TierGate>} />
+        <Route path='geofences'              element={<TierGate tier='mid'><GeofenceManager /></TierGate>} />
         <Route path='garage/register-device' element={<RegisterDevice />} />
-        <Route path='alerts'           element={<Alerts />} />
-        <Route path='reports'          element={<TierGate tier='top'><Reports /></TierGate>} />
-        <Route path='fbt'              element={<TierGate tier='mid'><FbtLogbook /></TierGate>} />
-        <Route path='settings'         element={<Settings />} />
-        <Route path='garage/my-devices' element={<MyDevices />} />
-        <Route path='/admin/login' element={<AdminLogin />} />
-        <Route path='billing'          element={<Billing />} />
-
+        <Route path='alerts'                 element={<Alerts />} />
+        <Route path='reports'                element={<TierGate tier='top'><Reports /></TierGate>} />
+        <Route path='fbt'                    element={<TierGate tier='mid'><FbtLogbook /></TierGate>} />
+        <Route path='settings'               element={<Settings />} />
+        <Route path='garage/my-devices'      element={<MyDevices />} />
+        <Route path='billing'                element={<Billing />} />
       </Route>
 
-      <Route path='/admin' element={<SuperAdminRoute><AdminShell /></SuperAdminRoute>}>
-      <Route index element={<AdminPanel />} />
-      <Route path='tickets' element={<AdminTickets />} />
-      <Route path='devices' element={<AdminDevices />} />
-    </Route>
     </Routes>
   )
 }
-
-
