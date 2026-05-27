@@ -287,4 +287,14 @@ router.get('/companies/:id/users', requireSuperAdmin, async (req, res) => {
   }
 })
 
+router.get('/devices', requireSuperAdmin, async (req, res) => {
+  try {
+    const devices = await getCollection('devices')
+    const list = await devices.find({}).sort({ registeredAt: -1 }).toArray()
+    return res.json(list)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router

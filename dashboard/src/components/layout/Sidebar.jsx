@@ -43,6 +43,7 @@ const GARAGE_LINKS = [
   { to: '/garage/imei-check',      label: 'IMEI Pre-Check',  icon: QrcodeIcon },
   { to: '/garage/register-device', label: 'Register Device', icon: LightningBoltIcon },
   { to: '/garage/my-devices',      label: 'My Devices',      icon: DeviceMobileIcon },
+  { to: '/garage/earnings',        label: 'My Earnings',     icon: CreditCardIcon },
   { to: '/settings',               label: 'Settings',        icon: CogIcon },
 ]
 
@@ -50,6 +51,7 @@ const GARAGE_EXTRA_LINKS = [
   { to: '/garage/imei-check',      label: 'IMEI Pre-Check',  icon: QrcodeIcon },
   { to: '/garage/register-device', label: 'Register Device', icon: LightningBoltIcon },
   { to: '/garage/my-devices',      label: 'My Devices',      icon: DeviceMobileIcon },
+  { to: '/garage/earnings',        label: 'My Earnings',     icon: CreditCardIcon },
 ]
 
 function NavItem({ to, label, icon: Icon }) {

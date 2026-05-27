@@ -29,6 +29,8 @@ import AdminDevices from './pages/admin/AdminDevices'
 import LockedFeature from './pages/LockedFeature'
 import { useEffect, useState } from 'react'
 import api from './lib/api'
+import GarageEarnings    from './pages/garage/GarageEarnings'
+import AdminCommissions  from './pages/admin/AdminCommissions'
 
 function TierGate({ tier, children }) {
   const [access, setAccess] = useState(null)
@@ -86,6 +88,7 @@ export default function App() {
         <Route index element={<AdminPanel />} />
         <Route path='tickets' element={<AdminTickets />} />
         <Route path='devices' element={<AdminDevices />} />
+        <Route path='commissions' element={<AdminCommissions />} />
       </Route>
 
       <Route
@@ -111,6 +114,7 @@ export default function App() {
         <Route path='fbt'                    element={<TierGate tier='mid'><FbtLogbook /></TierGate>} />
         <Route path='settings'               element={<Settings />} />
         <Route path='garage/my-devices'      element={<MyDevices />} />
+        <Route path='garage/earnings' element={<GarageEarnings />} />
         <Route path='billing'                element={<Billing />} />
       </Route>
 

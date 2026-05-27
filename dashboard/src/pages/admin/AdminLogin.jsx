@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuthStore } from '../store/authStore'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 export default function AdminLogin() {
+  const navigate              = useNavigate()
   const [step, setStep]       = useState('password')
   const [email, setEmail]     = useState('')
   const [password, setPassword] = useState('')
@@ -38,7 +40,7 @@ export default function AdminLogin() {
         code,
       })
       useAuthStore.getState().login(res.data.token, { email }, false)
-      window.location.href = '/admin'
+      navigate('/admin') 
 
     } catch (err) {
       setError(err.response?.data?.error || 'Invalid code')

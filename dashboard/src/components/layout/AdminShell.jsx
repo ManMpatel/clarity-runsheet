@@ -2,9 +2,10 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore'
 
 const links = [
-  { to: '/admin',           label: 'Companies',       exact: true },
-  { to: '/admin/tickets',   label: 'Support Tickets' },
-  { to: '/admin/devices',   label: 'IMEI Overview' },
+  { to: '/admin',             label: 'Companies',       exact: true },
+  { to: '/admin/tickets',     label: 'Support Tickets' },
+  { to: '/admin/devices',     label: 'IMEI Overview' },
+  { to: '/admin/commissions', label: 'Commissions' },
 ]
 
 export default function AdminShell() {
