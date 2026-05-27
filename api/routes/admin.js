@@ -271,4 +271,20 @@ router.get('/companies/:id/vehicles', requireSuperAdmin, async (req, res) => {
   }
 })
 
+router.get('/companies/:id/users', requireSuperAdmin, async (req, res) => {
+  try {
+    const users = await getCollection('users')
+    const list = await users
+      .find(
+        { companyId: req.params.id },
+        { projection: { passwordHash: 0 } }
+      )
+      .sort({ createdAt: -1 })
+      .toArray()
+    return res.json(list)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router
