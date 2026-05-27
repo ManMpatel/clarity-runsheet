@@ -65,10 +65,10 @@ router.post('/ticket', async (req, res) => {
 })
 
 // GET /api/support/tickets — super admin only, view all tickets
-router.get('/tickets', async (req, res) => {
+const { requireSuperAdmin } = require('../middleware/superAdmin')
+
+router.get('/tickets', requireSuperAdmin, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization
-    if (!authHeader) return res.status(401).json({ error: 'Unauthorized' })
 
     const collection = await getCollection('support_tickets')
     const tickets = await collection
