@@ -25,6 +25,11 @@ function parseCodec8E(buffer) {
     offset = record.nextOffset
   }
 
+  const trailingCount = buffer.readUInt8(offset)
+  if (trailingCount !== recordCount) {
+    throw new Error(`Codec8E record count mismatch: expected ${recordCount} got ${trailingCount}`)
+  }
+
   return records
 }
 

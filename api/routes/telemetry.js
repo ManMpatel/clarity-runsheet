@@ -2,13 +2,13 @@ const express = require('express')
 const { getCollection } = require('../db/mongo')
 const { requireAuth } = require('../middleware/auth')
 const { requireCompany } = require('../middleware/requireCompany')
+const { getClient } = require('../db/redis')
 
 const router = express.Router()
 
 router.get('/live', requireAuth, requireCompany, async (req, res) => {
   try {
-    const Redis = require('ioredis')
-    const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379')
+    const redis = getClient()
     const vehicles = await getCollection('vehicles')
     const fleet = await vehicles
       .find({ ...req.companyFilter, active: true })
@@ -21,7 +21,6 @@ router.get('/live', requireAuth, requireCompany, async (req, res) => {
         return { vehicle: v, state }
       })
     )
-    await redis.quit()
     return res.json(states)
   } catch (err) {
     return res.status(500).json({ error: 'Server error' })

@@ -25,7 +25,7 @@ async function processTripDetection(imei, companyId, vehicleId, record) {
   if (ignition || speed > 0) {
     await updateActiveTrip(redis, tripKey, activeTrip, record)
   } else {
-    const secondsSinceMove = (Date.now() - activeTrip.lastMovement) / 1000
+    const secondsSinceMove = (new Date(record.timestamp).getTime() - activeTrip.lastMovement) / 1000
     if (secondsSinceMove >= TRIP_END_SECONDS) {
       await endTrip(redis, tripKey, activeTrip, record, vehicleId, companyId)
     }
@@ -46,7 +46,7 @@ async function startTrip(redis, tripKey, imei, companyId, vehicleId, record) {
       type:        'Point',
       coordinates: [record.longitude, record.latitude],
     },
-    lastMovement:   Date.now(),
+    lastMovement:   new Date(record.timestamp).getTime(),
     maxSpeed:       record.speed || 0,
     distanceMetres: 0,
     prevLat:        record.latitude,
@@ -69,7 +69,7 @@ async function updateActiveTrip(redis, tripKey, activeTrip, record) {
       type:        'Point',
       coordinates: [record.longitude, record.latitude],
     },
-    lastMovement:   Date.now(),
+    lastMovement:   new Date(record.timestamp).getTime(),
     maxSpeed:       Math.max(activeTrip.maxSpeed, record.speed || 0),
     distanceMetres: activeTrip.distanceMetres + dist,
     prevLat:        record.latitude,

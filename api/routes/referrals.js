@@ -6,7 +6,7 @@ const { requireSuperAdmin } = require('../middleware/superAdmin')
 const router = express.Router()
 
 const TIER_RATES = { entry: 18, mid: 25, top: 45 }
-const COMMISSION = 0.20
+const COMMISSION = 0.10
 
 // GET /api/referrals/summary — garage owner sees their earnings
 router.get('/summary', requireAuth, async (req, res) => {
