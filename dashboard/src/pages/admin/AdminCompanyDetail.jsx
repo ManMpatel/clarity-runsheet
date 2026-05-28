@@ -334,18 +334,22 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
         {tab === 'details' && (
           <div className='space-y-3'>
             {[
+              { label: 'Email',   value: company.email,   icon: '📧' },
               { label: 'Phone',    value: company.phone },
               { label: 'Address',  value: company.address },
               { label: 'Website',  value: company.website },
               { label: 'ABN',      value: company.abn },
               { label: 'Timezone', value: company.timezone },
             ].map((row, i) => (
-              <div key={i} className='flex items-start justify-between px-3 py-2.5 bg-gray-50 rounded-lg'>
-                <p className='text-xs text-gray-500 w-20 shrink-0'>{row.label}</p>
-                <p className='text-sm text-gray-800 text-right break-all'>
-                  {row.value || <span className='text-gray-300'>Not set</span>}
+              <div key={i} className='flex items-start gap-3 px-3 py-2.5 bg-gray-50 rounded-lg'>
+              <span className='text-sm mt-0.5'>{row.icon}</span>
+              <div>
+                <p className='text-xs text-gray-400'>{row.label}</p>
+                <p className='text-sm font-medium text-gray-800'>
+                  {row.value || <span className='text-gray-300 font-normal'>Not set</span>}
                 </p>
               </div>
+            </div>
             ))}
           </div>
         )}
