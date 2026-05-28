@@ -108,7 +108,10 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
           <div>
             <p className='text-base font-semibold text-gray-900'>{company.name}</p>
             <p className='text-xs text-gray-400 mt-0.5'>{company.email || 'No email'}</p>
-            {company.phone && <p className='text-xs text-gray-400'>{company.phone}</p>}
+            {company.phone   && <p className='text-xs text-gray-400'>{company.phone}</p>}
+            {company.address && <p className='text-xs text-gray-400'>{company.address}</p>}
+            {company.website && <p className='text-xs text-gray-400'>{company.website}</p>}
+            {company.abn     && <p className='text-xs text-gray-400'>ABN: {company.abn}</p>}
           </div>
           <div className='flex items-center gap-2'>
             <select
