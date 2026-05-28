@@ -16,7 +16,7 @@ router.get('/companies', requireSuperAdmin, async (req, res) => {
         { companyId: c._id.toString(), role: 'companyAdmin' },
         { projection: { email: 1, name: 1, mobile: 1 } }
       )
-      return { ...c, email: admin?.email || null, adminName: admin?.name || null, phone: admin?.mobile || null }
+      return { ...c, adminEmail: admin?.email || null, adminName: admin?.name || null }
     }))
 
     return res.json(enriched)
