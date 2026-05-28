@@ -97,7 +97,7 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
     finally { setRevoking(false) }
   }
 
-  const tabs = ['overview', isGarage ? 'devices' : 'vehicles', 'users']
+  const tabs = ['overview', isGarage ? 'devices' : 'vehicles', 'users', 'details']
 
   return (
     <div className='bg-white rounded-xl border border-gray-200 overflow-hidden'>
@@ -327,6 +327,26 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Details Tab */}
+        {tab === 'details' && (
+          <div className='space-y-3'>
+            {[
+              { label: 'Phone',    value: company.phone },
+              { label: 'Address',  value: company.address },
+              { label: 'Website',  value: company.website },
+              { label: 'ABN',      value: company.abn },
+              { label: 'Timezone', value: company.timezone },
+            ].map((row, i) => (
+              <div key={i} className='flex items-start justify-between px-3 py-2.5 bg-gray-50 rounded-lg'>
+                <p className='text-xs text-gray-500 w-20 shrink-0'>{row.label}</p>
+                <p className='text-sm text-gray-800 text-right break-all'>
+                  {row.value || <span className='text-gray-300'>Not set</span>}
+                </p>
+              </div>
+            ))}
           </div>
         )}
 
