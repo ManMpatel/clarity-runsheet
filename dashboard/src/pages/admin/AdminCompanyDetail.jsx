@@ -354,3 +354,4 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
     </div>
   )
 }
+
