@@ -23,8 +23,11 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       const isAdminRoute = err.config?.url?.includes('/api/admin/')
       if (isAdminRoute) {
-        localStorage.removeItem('adminToken')
-        window.location.href = '/admin/login'
+        const adminToken = localStorage.getItem('adminToken')
+        if (adminToken) {
+          localStorage.removeItem('adminToken')
+          window.location.href = '/admin/login'
+        }
       } else {
         useAuthStore.getState().logout()
         window.location.href = '/login'
