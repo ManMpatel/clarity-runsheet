@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import { ActivityIndicator, View } from 'react-native'
+import { ActivityIndicator, View, Text } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { Ionicons } from '@expo/vector-icons'
 import { useAuthStore } from '../stores/authStore'
+
 
 import LoginScreen    from '../screens/auth/LoginScreen'
 import SignupScreen   from '../screens/auth/SignupScreen'
@@ -19,11 +19,25 @@ const Tab   = createBottomTabNavigator()
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ color }) => {
+          const icons = {
+            Map:      '🗺️',
+            Trips:    '🚐',
+            Alerts:   '🔔',
+            Score:    '🛡️',
+            Settings: '⚙️',
+          }
+          return (
+            <Text style={{ fontSize: 18 }}>
+              {icons[route.name]}
+            </Text>
+          )
+        },
         tabBarActiveTintColor:   '#2563eb',
         tabBarInactiveTintColor: '#9ca3af',
         headerShown: false,
-      }}
+      })}
     >
       <Tab.Screen name='Map'      component={HomeScreen} />
       <Tab.Screen name='Trips'    component={TripsScreen} />
@@ -49,14 +63,7 @@ export default function RootNavigator() {
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {user ? (
-        <Stack.Screen name='Main'   component={MainTabs} />
-      ) : (
-        <>
-          <Stack.Screen name='Login'  component={LoginScreen} />
-          <Stack.Screen name='Signup' component={SignupScreen} />
-        </>
-      )}
+        <Stack.Screen name='Main' component={MainTabs} />
     </Stack.Navigator>
-  )
+    )
 }

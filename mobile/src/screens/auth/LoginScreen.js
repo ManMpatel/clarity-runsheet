@@ -65,14 +65,14 @@ export default function LoginScreen({ navigation }) {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.link}
           onPress={() => navigation.navigate('Signup')}
         >
           <Text style={styles.linkText}>
             Don't have an account? Sign up
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </KeyboardAvoidingView>
   )
