@@ -2,14 +2,14 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 
 export default function SignupScreen({ navigation }) {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Create Account</Text>
       <Text style={styles.sub}>Individual vehicle tracking</Text>
       <Text style={styles.note}>Signup coming soon</Text>
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
         <Text style={styles.link}>Back to sign in</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   )
 }
 
