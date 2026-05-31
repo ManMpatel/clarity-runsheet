@@ -61,4 +61,43 @@ router.put('/read-all', requireAuth, requireCompany, async (req, res) => {
   }
 })
 
+// GET /api/alerts/preferences
+router.get('/preferences', requireAuth, requireCompany, async (req, res) => {
+  try {
+    const collection = await getCollection('alert_rules')
+    const rules = await collection.find({ companyId: req.companyId }).toArray()
+    return res.json(rules)
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+// POST /api/alerts/preferences
+router.post('/preferences', requireAuth, requireCompany, async (req, res) => {
+  try {
+    const { speeding, afterHours, speedLimit, voltageThreshold, smsNumber } = req.body
+    const collection = await getCollection('alert_rules')
+
+    const rules = [
+      { type: 'speeding',    active: !!speeding,    speedLimit: speedLimit || 110 },
+      { type: 'afterHours',  active: !!afterHours },
+      { type: 'engineFault', active: true },
+      { type: 'lowBattery',  active: true, voltageThreshold: voltageThreshold || 11.5 },
+      { type: 'towing',      active: true },
+    ]
+
+    for (const rule of rules) {
+      await collection.updateOne(
+        { companyId: req.companyId, type: rule.type },
+        { $set: { ...rule, companyId: req.companyId, smsNumber: smsNumber || null, updatedAt: new Date() } },
+        { upsert: true }
+      )
+    }
+
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router

@@ -9,6 +9,8 @@ import UsersSection      from './UsersSection'
 import PlanSection       from './PlanSection'
 import UpgradeSection    from './UpgradeSection'
 import AppearanceSection from './AppearanceSection'
+import AlertsSection from './AlertsSection'
+
 
 const NAV = [
   { id: 'profile',    label: 'Profile',    icon: '👤' },
@@ -18,6 +20,7 @@ const NAV = [
   { id: 'plan',       label: 'My Plan',    icon: '📊' },
   { id: 'upgrade',    label: 'Upgrade',    icon: '⬆️' },
   { id: 'appearance', label: 'Appearance', icon: '🎨' },
+  { id: 'alerts', label: 'Alerts', icon: '🔔' },
 ]
 
 export default function SettingsLayout() {
@@ -120,6 +123,8 @@ export default function SettingsLayout() {
         {section === 'plan'       && <PlanSection       {...sharedProps} />}
         {section === 'upgrade'    && <UpgradeSection    {...sharedProps} />}
         {section === 'appearance' && <AppearanceSection {...sharedProps} />}
+        {section === 'alerts' && <AlertsSection />}
+
       </main>
     </div>
     </div>
