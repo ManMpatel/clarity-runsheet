@@ -3,6 +3,7 @@ import { useAuthStore } from '../../store/authStore'
 import { useEffect, useState } from 'react'
 import api from '../../lib/api'
 import {
+  UsersIcon,
   ChartBarIcon,
   MapIcon,
   ClipboardIcon as ClipboardListIcon,
@@ -23,6 +24,7 @@ import {
 const CORE_LINKS = [
   { to: '/dashboard', label: 'Dashboard',      icon: ChartBarIcon },
   { to: '/live-map',  label: 'Live Map',        icon: MapIcon },
+  { to: '/drivers',   label: 'Drivers',         icon: UsersIcon },
   { to: '/trips',     label: 'Trips & History', icon: ClipboardListIcon },
   { to: '/alerts',    label: 'Alerts',          icon: BellIcon },
 ]

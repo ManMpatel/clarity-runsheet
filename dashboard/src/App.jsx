@@ -31,6 +31,8 @@ import { useEffect, useState } from 'react'
 import api from './lib/api'
 import GarageEarnings    from './pages/garage/GarageEarnings'
 import AdminCommissions  from './pages/admin/AdminCommissions'
+import Drivers from './pages/Drivers'
+
 
 function TierGate({ tier, children }) {
   const [access, setAccess] = useState(null)
@@ -104,6 +106,7 @@ export default function App() {
         <Route path='live-map'               element={<LiveMap />} />
         <Route path='garage/imei-check'      element={<IMEICheck />} />
         <Route path='trips'                  element={<TripsHistory />} />
+        <Route path='drivers' element={<Drivers />} />
         <Route path='driver-behaviour'       element={<TierGate tier='mid'><DriverBehaviour /></TierGate>} />
         <Route path='vehicle-health'         element={<TierGate tier='top'><VehicleHealth /></TierGate>} />
         <Route path='maintenance'            element={<TierGate tier='mid'><Maintenance /></TierGate>} />
