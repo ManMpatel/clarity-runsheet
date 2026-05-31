@@ -65,7 +65,7 @@ router.get('/:id/history', requireAuth, requireCompany, async (req, res) => {
 router.post('/', requireAuth, requireCompany,
   requireRole('companyAdmin', 'superAdmin'), async (req, res) => {
   try {
-    const { name, email, mobile, licenceNumber, vehicleId } = req.body
+    const { name, email, mobile, licenceNumber, licenceExpiry, vehicleId } = req.body
     if (!name || !mobile || !email) {
       return res.status(400).json({ error: 'Name, email and mobile required' })
     }
@@ -77,6 +77,7 @@ router.post('/', requireAuth, requireCompany,
       email:         email.toLowerCase(),
       mobile,
       licenceNumber: licenceNumber || null,
+      licenceExpiry: licenceExpiry ? new Date(licenceExpiry) : null,
       vehicleId:     vehicleId || null,
       active:        true,
       createdAt:     new Date(),
@@ -92,12 +93,12 @@ router.post('/', requireAuth, requireCompany,
 router.put('/:id', requireAuth, requireCompany,
   requireRole('companyAdmin', 'superAdmin'), async (req, res) => {
   try {
-    const { name, email, mobile, licenceNumber, vehicleId, active } = req.body
+    const { name, email, mobile, licenceNumber, licenceExpiry, vehicleId, active } = req.body
     const collection = await getCollection('drivers')
 
     const result = await collection.findOneAndUpdate(
       { _id: new ObjectId(req.params.id), ...req.companyFilter },
-      { $set: { name, email, mobile, licenceNumber, vehicleId, active, updatedAt: new Date() } },
+      { $set: { name, email, mobile, licenceNumber, licenceExpiry: licenceExpiry ? new Date(licenceExpiry) : null, vehicleId, active, updatedAt: new Date() } },
       { returnDocument: 'after' }
     )
 

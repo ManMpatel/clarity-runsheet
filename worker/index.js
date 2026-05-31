@@ -17,8 +17,10 @@ async function start() {
   
   const { startSafetyScoreCron }    = require('./cron/safety-scores')
   const { startMaintenanceCron }    = require('./cron/maintenance-flags')
+  const { startLicenceExpiryCron }  = require('./cron/licence-expiry')
   startSafetyScoreCron()
   startMaintenanceCron()
+  startLicenceExpiryCron()
   const redis = getClient()
   console.log('[Worker] Started — polling queue')
   poll(redis)
