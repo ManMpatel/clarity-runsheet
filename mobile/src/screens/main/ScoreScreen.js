@@ -1,12 +1,12 @@
 import { View, Text, StyleSheet } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+
 
 export default function ScoreScreen() {
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Text style={styles.title}>Driver Score</Text>
       <Text style={styles.sub}>Your safety score will appear here</Text>
-    </SafeAreaView>
+    </View>
   )
 }
 

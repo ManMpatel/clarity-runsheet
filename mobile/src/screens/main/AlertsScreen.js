@@ -1,12 +1,12 @@
 import { View, Text, StyleSheet } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+
 
 export default function AlertsScreen() {
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Text style={styles.title}>Alerts</Text>
       <Text style={styles.sub}>Your alerts will appear here</Text>
-    </SafeAreaView>
+    </View>
   )
 }
 

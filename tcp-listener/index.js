@@ -17,10 +17,13 @@ const server = net.createServer((socket) => {
   socket.on('data', async (chunk) => {
     try {
       if (!imei) {
+        console.log(`[TCP] Raw IMEI packet from ${socket.remoteAddress}: ${chunk.toString('hex')}`)
         imei = parseImei(chunk)
         if (imei) {
           console.log(`[TCP] Device identified: ${imei}`)
           socket.write(Buffer.from([0x01]))
+        } else {
+          console.warn(`[TCP] IMEI parse failed — buffer length: ${chunk.length}`)
         }
         return
       }

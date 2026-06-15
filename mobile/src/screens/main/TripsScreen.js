@@ -1,12 +1,12 @@
 import { View, Text, StyleSheet } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+
 
 export default function TripsScreen() {
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Text style={styles.title}>Trips</Text>
       <Text style={styles.sub}>Trip history will appear here</Text>
-    </SafeAreaView>
+    </View>
   )
 }
 

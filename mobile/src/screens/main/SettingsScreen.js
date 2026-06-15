@@ -5,7 +5,7 @@ export default function SettingsScreen() {
   const { user, logout } = useAuthStore()
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <Text style={styles.title}>Settings</Text>
       {user && (
         <Text style={styles.email}>{user.email}</Text>
@@ -13,7 +13,7 @@ export default function SettingsScreen() {
       <TouchableOpacity style={styles.btn} onPress={logout}>
         <Text style={styles.btnText}>Sign out</Text>
       </TouchableOpacity>
-    </SafeAreaView>
+    </View>
   )
 }
 
