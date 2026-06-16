@@ -30,7 +30,7 @@ export default function AdminPanel() {
   async function handleRevoke(companyId) {
   if (!confirm('Revoke access for this company?')) return
   try {
-    await api.post(`/api/admin/companies/${companyId}/revoke`)
+    await api.put(`/api/admin/companies/${companyId}/revoke`)
     setCompanies(cs => cs.map(c => c._id === companyId ? { ...c, active: false } : c))
   } catch (err) {
     alert('Failed to revoke')
@@ -46,6 +46,11 @@ async function handleDelete(companyId) {
   } catch (err) {
     alert('Failed to delete')
   }
+}
+
+function handleRevokedInDetail(companyId) {
+  setCompanies(cs => cs.map(c => c._id === companyId ? { ...c, active: false } : c))
+  setSelected(s => s && s._id === companyId ? { ...s, active: false } : s)
 }
 
   async function selectCompany(company) {
@@ -159,6 +164,11 @@ async function handleDelete(companyId) {
                         Garage
                       </span>
                     )}
+                    {c.active === false && (
+                      <span className='text-xs px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700'>
+                        Revoked
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className='flex gap-2 mt-2'>
@@ -185,6 +195,7 @@ async function handleDelete(companyId) {
               company={selected}
               slots={slots}
               onSaveSlots={handleSaveSlots}
+              onRevoked={handleRevokedInDetail}
             />
           ) : selected && !slots ? (
             <div className='bg-white rounded-xl border border-gray-200 p-6'>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '../../lib/api'
 
-export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
+export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevoked }) {
   const [tab, setTab]           = useState('overview')
   const [devices, setDevices]   = useState([])
   const [vehicles, setVehicles] = useState([])
@@ -93,7 +93,11 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
     setRevoking(true)
     try {
       await api.put(`/api/admin/companies/${company._id}/revoke`)
-    } catch (err) { console.error(err.message) }
+      onRevoked?.(company._id)
+    } catch (err) {
+      console.error(err.message)
+      alert('Failed to revoke')
+    }
     finally { setRevoking(false) }
   }
 
@@ -106,7 +110,14 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots }) {
       <div className='px-5 py-4 border-b border-gray-200'>
         <div className='flex items-start justify-between'>
           <div>
-            <p className='text-base font-semibold text-gray-900'>{company.name}</p>
+            <div className='flex items-center gap-2'>
+              <p className='text-base font-semibold text-gray-900'>{company.name}</p>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                company.active === false ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+              }`}>
+                {company.active === false ? 'Revoked' : 'Active'}
+              </span>
+            </div>
             <p className='text-xs text-gray-400 mt-0.5'>{company.email || 'No email'}</p>
             {company.phone && <p className='text-xs text-gray-400'>{company.phone}</p>}
           </div>
