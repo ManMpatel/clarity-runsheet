@@ -173,6 +173,7 @@ async function countUsedSlots(companyId, tier, excludeVehicleId) {
 
 
 router.get('/status', requireAuth, requireCompany, async (req, res) => {
+  return res.json({ TESTMARKER: 'abc123', time: Date.now() })
   try {
     const vehicles = await getCollection('vehicles')
     const telemetry = await getCollection('telemetry_events')
