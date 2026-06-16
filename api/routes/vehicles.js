@@ -197,6 +197,7 @@ router.get('/status', requireAuth, requireCompany, async (req, res) => {
 
     return res.json(status)
   } catch (err) {
+    console.error('[Vehicles] Status error:', err.message)
     return res.status(500).json({ error: 'Server error' })
   }
 })
