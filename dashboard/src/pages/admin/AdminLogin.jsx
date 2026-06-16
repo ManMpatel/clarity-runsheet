@@ -39,7 +39,7 @@ export default function AdminLogin() {
         tempToken,
         code,
       })
-      useAuthStore.getState().login(res.data.token, { email }, false)
+      localStorage.setItem('adminToken', res.data.token)
       navigate('/admin') 
 
     } catch (err) {
