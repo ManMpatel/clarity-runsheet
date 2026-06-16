@@ -202,3 +202,8 @@ router.get('/status', requireAuth, requireCompany, async (req, res) => {
 })
 
 module.exports = router
+
+
+
+
+
