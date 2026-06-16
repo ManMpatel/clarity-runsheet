@@ -32,7 +32,7 @@ router.get('/', requireAuth, requireCompany, async (req, res) => {
   }
 })
 
-router.get('/:id([0-9a-fA-F]{24})', requireAuth, requireCompany, async (req, res) => {
+router.get('/:id', requireAuth, requireCompany, async (req, res) => {
   try {
     const collection = await getCollection('trips')
     const trip = await collection.findOne({
