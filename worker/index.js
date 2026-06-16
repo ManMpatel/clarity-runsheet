@@ -80,6 +80,8 @@ async function processPayload(payload) {
       broadcastAlert(companyId, event)
     }
   }
+
+  console.log(`[Worker] Processed IMEI ${imei} — lat ${doc.location.coordinates[1]}, lon ${doc.location.coordinates[0]}, speed ${doc.speed}`)
 }
 
 async function lookupVehicle(imei) {
