@@ -201,3 +201,7 @@ async function countUsedSlots(companyId, tier, excludeVehicleId) {
 }
 
 module.exports = router
+
+
+
+
