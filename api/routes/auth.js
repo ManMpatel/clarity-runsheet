@@ -31,6 +31,9 @@ router.post('/login', async (req, res) => {
       return res.status(403).json({ error: 'Please verify your email before logging in. Check your inbox.' })
     }
 
+    const companies = await getCollection('companies')
+    const company = await companies.findOne({ _id: require('mongodb').ObjectId.createFromHexString(user.companyId.toString()) })
+
     const token = jwt.sign(
       {
         userId:           user._id.toString(),
@@ -42,9 +45,6 @@ router.post('/login', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     )
-
-    const companies = await getCollection('companies')
-    const company = await companies.findOne({ _id: require('mongodb').ObjectId.createFromHexString(user.companyId.toString()) })
 
     return res.json({
       token,
