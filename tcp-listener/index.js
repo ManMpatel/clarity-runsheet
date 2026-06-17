@@ -5,6 +5,7 @@ const { parseCodec8 } = require('./parser/codec8')
 const { parseCodec8E } = require('./parser/codec8e')
 const { verifyCRC } = require('./parser/crc16')
 const { pushToQueue, setCurrentVanState } = require('./queue/redis')
+const socketRegistry = require('./registry/sockets')
 
 const PORT = process.env.TCP_PORT || 5027
 
@@ -21,6 +22,7 @@ const server = net.createServer((socket) => {
         imei = parseImei(chunk)
         if (imei) {
           console.log(`[TCP] Device identified: ${imei}`)
+          socketRegistry.register(imei, socket)
           socket.write(Buffer.from([0x01]))
         } else {
           console.warn(`[TCP] IMEI parse failed — buffer length: ${chunk.length}`)
@@ -68,6 +70,7 @@ const server = net.createServer((socket) => {
 
   socket.on('close', () => {
     console.log(`[TCP] Disconnected: ${imei || socket.remoteAddress}`)
+    if (imei) socketRegistry.unregister(imei, socket)
     stitcher.reset()
   })
 
