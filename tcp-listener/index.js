@@ -6,6 +6,7 @@ const { parseCodec8E } = require('./parser/codec8e')
 const { verifyCRC } = require('./parser/crc16')
 const { pushToQueue, setCurrentVanState } = require('./queue/redis')
 const socketRegistry = require('./registry/sockets')
+const { startCommandListener } = require('./queue/commands')
 
 const PORT = process.env.TCP_PORT || 5027
 
@@ -88,6 +89,7 @@ function parseImei(buffer) {
 
 server.listen(PORT, () => {
   console.log(`[TCP] Listener running on port ${PORT}`)
+  startCommandListener()
 })
 
 server.on('error', (err) => {
