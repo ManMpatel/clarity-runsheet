@@ -17,7 +17,7 @@ function StatusDot({ state, lastSeen }) {
   )
 }
 
-function KebabMenu({ onEdit, onDelete }) {
+function KebabMenu({ onEdit, onDelete, onCut, onRestore }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -34,10 +34,18 @@ function KebabMenu({ onEdit, onDelete }) {
         ⋮
       </button>
       {open && (
-        <div className='absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[100px]'>
+        <div className='absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[140px]'>
           <button onClick={() => { onEdit(); setOpen(false) }}
             className='w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'>
             ✏️ Edit
+          </button>
+          <button onClick={() => { onCut(); setOpen(false) }}
+            className='w-full text-left px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20'>
+            🔒 Cut Fuel
+          </button>
+          <button onClick={() => { onRestore(); setOpen(false) }}
+            className='w-full text-left px-3 py-2 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'>
+            🔓 Restore
           </button>
           <button onClick={() => { onDelete(); setOpen(false) }}
             className='w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'>
@@ -86,6 +94,25 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
       setToast({ message: 'Vehicle removed', type: 'success' })
     } catch (err) {
       setToast({ message: 'Failed to remove', type: 'error' })
+    }
+  }
+
+  async function cutVehicle(id) {
+    if (!confirm('This will cut fuel/ignition on this vehicle. Are you sure?')) return
+    try {
+      await api.post(`/api/vehicles/${id}/cut`)
+      setToast({ message: 'Cut command sent', type: 'success' })
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Failed to send cut command', type: 'error' })
+    }
+  }
+
+  async function restoreVehicle(id) {
+    try {
+      await api.post(`/api/vehicles/${id}/restore`)
+      setToast({ message: 'Restore command sent', type: 'success' })
+    } catch (err) {
+      setToast({ message: err.response?.data?.error || 'Failed to send restore command', type: 'error' })
     }
   }
 
@@ -170,6 +197,8 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
                 <KebabMenu
                   onEdit={() => setEditing(v)}
                   onDelete={() => deleteVehicle(v._id)}
+                  onCut={() => cutVehicle(v._id)}
+                  onRestore={() => restoreVehicle(v._id)}
                 />
               </div>
             </div>
