@@ -3,6 +3,7 @@ const { ObjectId } = require('mongodb')
 const { getCollection } = require('../db/mongo')
 const { requireAuth, requireRole } = require('../middleware/auth')
 const { requireCompany } = require('../middleware/requireCompany')
+const { getClient } = require('../db/redis')
 
 const router = express.Router()
 
@@ -199,6 +200,74 @@ async function countUsedSlots(companyId, tier, excludeVehicleId) {
   })
   return count
 }
+
+router.post('/:id/cut', requireAuth, requireCompany,
+  requireRole('companyAdmin', 'superAdmin'), async (req, res) => {
+  try {
+    const collection = await getCollection('vehicles')
+    const vehicle = await collection.findOne({
+      _id: new ObjectId(req.params.id),
+      ...req.companyFilter,
+    })
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' })
+    if (!vehicle.imei) return res.status(400).json({ error: 'Vehicle has no IMEI registered' })
+
+    const redis = getClient()
+    const stateRaw = await redis.get(`van:state:${vehicle.imei}`)
+    if (!stateRaw) {
+      return res.status(409).json({ error: 'No recent telemetry — cannot confirm vehicle is stationary' })
+    }
+
+    const state = JSON.parse(stateRaw)
+    const ageMs = Date.now() - state.updatedAt
+    if (ageMs > 2 * 60 * 1000) {
+      return res.status(409).json({ error: 'Last telemetry too old to confirm current state', ageMs })
+    }
+    if (state.speed > 1) {
+      return res.status(409).json({ error: 'Vehicle is moving — cannot cut while in motion', speed: state.speed })
+    }
+
+    await redis.publish('device:commands', JSON.stringify({ imei: vehicle.imei, action: 'cut' }))
+
+    await collection.updateOne(
+      { _id: vehicle._id },
+      { $push: { immobiliseHistory: {
+        action: 'cut', triggeredBy: req.user.userId, at: new Date()
+      } } }
+    )
+
+    return res.json({ success: true, message: 'Cut command sent' })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.post('/:id/restore', requireAuth, requireCompany,
+  requireRole('companyAdmin', 'superAdmin'), async (req, res) => {
+  try {
+    const collection = await getCollection('vehicles')
+    const vehicle = await collection.findOne({
+      _id: new ObjectId(req.params.id),
+      ...req.companyFilter,
+    })
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found' })
+    if (!vehicle.imei) return res.status(400).json({ error: 'Vehicle has no IMEI registered' })
+
+    const redis = getClient()
+    await redis.publish('device:commands', JSON.stringify({ imei: vehicle.imei, action: 'restore' }))
+
+    await collection.updateOne(
+      { _id: vehicle._id },
+      { $push: { immobiliseHistory: {
+        action: 'restore', triggeredBy: req.user.userId, at: new Date()
+      } } }
+    )
+
+    return res.json({ success: true, message: 'Restore command sent' })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
 
 module.exports = router
 
