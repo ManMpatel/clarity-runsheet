@@ -231,9 +231,12 @@ router.post('/:id/cut', requireAuth, requireCompany,
 
     await collection.updateOne(
       { _id: vehicle._id },
-      { $push: { immobiliseHistory: {
-        action: 'cut', triggeredBy: req.user.userId, at: new Date()
-      } } }
+      {
+        $set: { immobilised: true },
+        $push: { immobiliseHistory: {
+          action: 'cut', triggeredBy: req.user.userId, at: new Date()
+        } }
+      }
     )
 
     return res.json({ success: true, message: 'Cut command sent' })
@@ -258,9 +261,12 @@ router.post('/:id/restore', requireAuth, requireCompany,
 
     await collection.updateOne(
       { _id: vehicle._id },
-      { $push: { immobiliseHistory: {
-        action: 'restore', triggeredBy: req.user.userId, at: new Date()
-      } } }
+      {
+        $set: { immobilised: false },
+        $push: { immobiliseHistory: {
+          action: 'restore', triggeredBy: req.user.userId, at: new Date()
+        } }
+      }
     )
 
     return res.json({ success: true, message: 'Restore command sent' })

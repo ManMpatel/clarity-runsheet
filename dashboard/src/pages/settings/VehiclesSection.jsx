@@ -17,7 +17,7 @@ function StatusDot({ state, lastSeen }) {
   )
 }
 
-function KebabMenu({ onEdit, onDelete, onCut, onRestore }) {
+function KebabMenu({ onEdit, onDelete }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
@@ -29,25 +29,17 @@ function KebabMenu({ onEdit, onDelete, onCut, onRestore }) {
 
   return (
     <div className='relative' ref={ref}>
-      <button onClick={() => setOpen(!open)}
+      <button onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
         className='w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400'>
         ⋮
       </button>
       {open && (
-        <div className='absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[140px]'>
-          <button onClick={() => { onEdit(); setOpen(false) }}
+        <div className='absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 min-w-[100px]'>
+          <button onClick={(e) => { e.stopPropagation(); onEdit(); setOpen(false) }}
             className='w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'>
             ✏️ Edit
           </button>
-          <button onClick={() => { onCut(); setOpen(false) }}
-            className='w-full text-left px-3 py-2 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20'>
-            🔒 Cut Fuel
-          </button>
-          <button onClick={() => { onRestore(); setOpen(false) }}
-            className='w-full text-left px-3 py-2 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'>
-            🔓 Restore
-          </button>
-          <button onClick={() => { onDelete(); setOpen(false) }}
+          <button onClick={(e) => { e.stopPropagation(); onDelete(); setOpen(false) }}
             className='w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'>
             🗑️ Delete
           </button>
@@ -57,9 +49,70 @@ function KebabMenu({ onEdit, onDelete, onCut, onRestore }) {
   )
 }
 
+function EngineToggle({ immobilised, onCut, onRestore }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); immobilised ? onRestore() : onCut() }}
+      className={`relative w-14 h-7 rounded-full transition-colors ${immobilised ? 'bg-red-500' : 'bg-green-500'}`}>
+      <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${immobilised ? 'translate-x-7' : ''}`} />
+    </button>
+  )
+}
+
+function VehicleDrawer({ vehicle, status, onClose, onCut, onRestore }) {
+  if (!vehicle) return null
+  const s = status || { state: 'offline', lastSeen: null }
+
+  return (
+    <>
+      <div className='fixed inset-0 bg-black/30 z-20' onClick={onClose} />
+      <div className='fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-gray-900 shadow-2xl z-30 p-6 overflow-y-auto'>
+        <div className='flex items-center justify-between mb-6'>
+          <h2 className='text-xl font-bold text-gray-900 dark:text-white'>{vehicle.name}</h2>
+          <button onClick={onClose} className='text-gray-400 hover:text-gray-600 text-2xl leading-none'>&times;</button>
+        </div>
+
+        <div className='space-y-4 mb-6'>
+          <div className='flex justify-between text-sm'>
+            <span className='text-gray-500'>Status</span>
+            <StatusDot state={s.state} lastSeen={s.lastSeen} />
+          </div>
+          <div className='flex justify-between text-sm'>
+            <span className='text-gray-500'>Rego</span>
+            <span className='text-gray-900 dark:text-white'>{vehicle.registration || '—'}</span>
+          </div>
+          <div className='flex justify-between text-sm'>
+            <span className='text-gray-500'>IMEI</span>
+            <span className='text-gray-900 dark:text-white'>{vehicle.imei}</span>
+          </div>
+          <div className='flex justify-between text-sm'>
+            <span className='text-gray-500'>Plan</span>
+            <span className='text-gray-900 dark:text-white capitalize'>{vehicle.tier || 'entry'}</span>
+          </div>
+        </div>
+
+        <div className='border-t border-gray-100 dark:border-gray-800 pt-5'>
+          <div className='flex items-center justify-between'>
+            <div>
+              <p className='text-sm font-semibold text-gray-900 dark:text-white'>Engine power</p>
+              <p className='text-xs text-gray-400'>{vehicle.immobilised ? 'Fuel currently cut' : 'Running normally'}</p>
+            </div>
+            <EngineToggle
+              immobilised={vehicle.immobilised}
+              onCut={() => onCut(vehicle._id)}
+              onRestore={() => onRestore(vehicle._id)}
+            />
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function VehiclesSection({ vehicles, setVehicles, loading }) {
   const [showAdd, setShowAdd]   = useState(false)
   const [editing, setEditing]   = useState(null)
+  const [selected, setSelected] = useState(null)
   const [form, setForm]         = useState({ name: '', imei: '', registration: '', make: '', model: '', year: '' })
   const [status, setStatus]     = useState({})
   const [toast, setToast]       = useState(null)
@@ -97,10 +150,16 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
     }
   }
 
+  function updateImmobilised(id, immobilised) {
+    setVehicles(v => v.map(x => x._id === id ? { ...x, immobilised } : x))
+    setSelected(s => s && s._id === id ? { ...s, immobilised } : s)
+  }
+
   async function cutVehicle(id) {
     if (!confirm('This will cut fuel/ignition on this vehicle. Are you sure?')) return
     try {
       await api.post(`/api/vehicles/${id}/cut`)
+      updateImmobilised(id, true)
       setToast({ message: 'Cut command sent', type: 'success' })
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Failed to send cut command', type: 'error' })
@@ -110,6 +169,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
   async function restoreVehicle(id) {
     try {
       await api.post(`/api/vehicles/${id}/restore`)
+      updateImmobilised(id, false)
       setToast({ message: 'Restore command sent', type: 'success' })
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Failed to send restore command', type: 'error' })
@@ -178,7 +238,8 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
         ) : vehicles.map((v, i) => {
           const s = status[v._id] || { state: 'offline', lastSeen: null }
           return (
-            <div key={i} className='px-5 py-3.5 flex items-center justify-between'>
+            <div key={i} onClick={() => setSelected(v)}
+              className='px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50'>
               <div className='flex-1 min-w-0'>
                 <p className='text-sm font-medium text-gray-900 dark:text-white'>{v.name}</p>
                 <p className='text-xs text-gray-400 mt-0.5'>
@@ -197,14 +258,20 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
                 <KebabMenu
                   onEdit={() => setEditing(v)}
                   onDelete={() => deleteVehicle(v._id)}
-                  onCut={() => cutVehicle(v._id)}
-                  onRestore={() => restoreVehicle(v._id)}
                 />
               </div>
             </div>
           )
         })}
       </div>
+
+      <VehicleDrawer
+        vehicle={selected}
+        status={selected ? status[selected._id] : null}
+        onClose={() => setSelected(null)}
+        onCut={cutVehicle}
+        onRestore={restoreVehicle}
+      />
     </div>
   )
 }
