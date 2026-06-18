@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
 import { MaterialIcons } from '@expo/vector-icons'
 import { useAuthStore } from '../../stores/authStore'
 import { colors, radius, spacing } from '../../lib/theme'
@@ -9,7 +9,16 @@ const MENU_ITEMS = [
   { label: 'Company',     icon: 'business',       screen: 'Company' },
   { label: 'Vehicles',    icon: 'local-shipping',  screen: 'Vehicles' },
   { label: 'Drivers',     icon: 'badge',           screen: 'Drivers' },
+  { label: 'Users',       icon: 'group',           screen: 'Users' },
   { label: 'Maintenance', icon: 'build',           screen: 'Maintenance' },
+  { label: 'Geofence Manager', icon: 'location-on', screen: 'Geofence' },
+  { label: 'Vehicle Health', icon: 'health-and-safety', screen: 'VehicleHealth' },
+  { label: 'Dashcam',        icon: 'videocam',          screen: 'Dashcam' },
+  { label: 'My Plan',        icon: 'card-membership',   screen: 'MyPlan' },
+  { label: 'Reports',        icon: 'bar-chart',         screen: 'Reports' },
+  { label: 'Upgrade',        icon: 'upgrade',           screen: 'Upgrade' },
+  { label: 'Billing',        icon: 'payments',          screen: 'Billing' },
+  { label: 'FBT Logbook', icon: 'description',     screen: 'FbtLogbook' },
 ]
 
 export default function SettingsScreen({ navigation }) {
@@ -17,7 +26,7 @@ export default function SettingsScreen({ navigation }) {
   const { user, logout } = useAuthStore()
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
+    <ScrollView style={styles.page} contentContainerStyle={[styles.container, { paddingTop: insets.top + 24 }]}>
       {user && (
         <View style={styles.emailCard}>
           <View style={styles.avatar}>
@@ -45,12 +54,13 @@ export default function SettingsScreen({ navigation }) {
         <MaterialIcons name='logout' size={18} color={colors.error} />
         <Text style={styles.signOutText}>Sign out</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingHorizontal: spacing.margin },
+  page: { flex: 1, backgroundColor: colors.background },
+  container: { paddingHorizontal: spacing.margin, paddingBottom: 40 },
   emailCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: colors.surface, borderRadius: radius.lg,

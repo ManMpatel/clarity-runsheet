@@ -5,12 +5,11 @@ import api from '../../lib/api'
 import { buildMapHtml } from '../../lib/mapHtml'
 import { colors, radius, spacing } from '../../lib/theme'
 import VehicleCard from '../../components/VehicleCard'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import TopBar from '../../components/TopBar'
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN
 
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets()
   const [vehicles, setVehicles]     = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
@@ -68,7 +67,9 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.updatedPill, { top: insets.top + 8 }]}>
+      <TopBar />
+      <View style={styles.mapArea}>
+      <View style={styles.updatedPill}>
         <View style={styles.pillInner}>
           <Text style={styles.updatedText}>Updated {secondsAgo} sec ago</Text>
         </View>
@@ -85,17 +86,19 @@ export default function HomeScreen() {
           <VehicleCard vehicle={selected} onClose={() => setSelected(null)} />
         </View>
       )}
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container:   { flex: 1 },
+  mapArea:     { flex: 1 },
   webview:     { flex: 1 },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   errorTitle:  { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 6 },
   errorSub:    { fontSize: 13, color: '#9ca3af', textAlign: 'center', paddingHorizontal: 24 },
-  updatedPill: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+  updatedPill: { position: 'absolute', top: 12, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
   pillInner: {
     backgroundColor: 'rgba(255,255,255,0.92)', paddingHorizontal: 12, paddingVertical: 6,
     borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border,

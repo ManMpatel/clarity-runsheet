@@ -3,10 +3,9 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-nativ
 import { MaterialIcons } from '@expo/vector-icons'
 import api from '../../lib/api'
 import { colors, radius, spacing } from '../../lib/theme'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import TopBar from '../../components/TopBar'
 
 export default function TripsScreen() {
-  const insets = useSafeAreaInsets()
   const [trips, setTrips]     = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
@@ -54,7 +53,8 @@ export default function TripsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <TopBar />
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>Showing {trips.length} trips</Text>
       </View>
       <FlatList
@@ -100,7 +100,7 @@ export default function TripsScreen() {
 
 const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: colors.background },
-  header:      { paddingHorizontal: spacing.margin, paddingBottom: 8 },
+  header:      { paddingHorizontal: spacing.margin, paddingTop: 12, paddingBottom: 8 },
   headerTitle: { fontSize: 13, color: colors.textSecondary, fontWeight: '600' },
   list:        { paddingHorizontal: spacing.margin, paddingBottom: spacing.lg },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },

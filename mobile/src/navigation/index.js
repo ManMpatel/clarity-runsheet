@@ -18,6 +18,15 @@ import MaintenanceScreen from '../screens/main/MaintenanceScreen'
 import ProfileScreen     from '../screens/main/ProfileScreen'
 import CompanyScreen     from '../screens/main/CompanyScreen'
 import VehiclesScreen    from '../screens/main/VehiclesScreen'
+import UsersScreen       from '../screens/main/UsersScreen'
+import FbtLogbookScreen  from '../screens/main/FbtLogbookScreen'
+import GeofenceScreen      from '../screens/main/GeofenceScreen'
+import VehicleHealthScreen from '../screens/main/VehicleHealthScreen'
+import DashcamScreen       from '../screens/main/DashcamScreen'
+import MyPlanScreen        from '../screens/main/MyPlanScreen'
+import ReportsScreen       from '../screens/main/ReportsScreen'
+import UpgradeScreen       from '../screens/main/UpgradeScreen'
+import BillingScreen       from '../screens/main/BillingScreen'
 
 const Stack = createNativeStackNavigator()
 const Tab   = createBottomTabNavigator()
@@ -58,7 +67,16 @@ function SettingsStack() {
       <Stack.Screen name='Company' component={CompanyScreen} options={{ title: 'Company' }} />
       <Stack.Screen name='Vehicles' component={VehiclesScreen} options={{ title: 'Vehicles' }} />
       <Stack.Screen name='Drivers' component={DriversScreen} options={{ title: 'Drivers' }} />
+      <Stack.Screen name='Users' component={UsersScreen} options={{ title: 'Users' }} />
       <Stack.Screen name='Maintenance' component={MaintenanceScreen} options={{ title: 'Maintenance' }} />
+      <Stack.Screen name='FbtLogbook' component={FbtLogbookScreen} options={{ title: 'FBT Logbook' }} />
+      <Stack.Screen name='Geofence' component={GeofenceScreen} options={{ title: 'Geofence Manager' }} />
+      <Stack.Screen name='VehicleHealth' component={VehicleHealthScreen} options={{ title: 'Vehicle Health' }} />
+      <Stack.Screen name='Dashcam' component={DashcamScreen} options={{ title: 'Dashcam' }} />
+      <Stack.Screen name='MyPlan' component={MyPlanScreen} options={{ title: 'My Plan' }} />
+      <Stack.Screen name='Reports' component={ReportsScreen} options={{ title: 'Reports' }} />
+      <Stack.Screen name='Upgrade' component={UpgradeScreen} options={{ title: 'Upgrade' }} />
+      <Stack.Screen name='Billing' component={BillingScreen} options={{ title: 'Billing' }} />
     </Stack.Navigator>
   )
 }

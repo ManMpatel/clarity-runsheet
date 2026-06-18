@@ -2,10 +2,9 @@ import { useEffect, useState } from 'react'
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native'
 import api from '../../lib/api'
 import { colors, radius, spacing } from '../../lib/theme'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import TopBar from '../../components/TopBar'
 
 export default function ScoreScreen() {
-  const insets = useSafeAreaInsets()
   const [drivers, setDrivers] = useState([])
   const [scores, setScores]   = useState({})
   const [loading, setLoading] = useState(true)
@@ -61,7 +60,8 @@ export default function ScoreScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <TopBar />
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>Driver Scores</Text>
         <Text style={styles.headerSub}>Real-time performance metrics across the fleet.</Text>
       </View>
@@ -98,7 +98,7 @@ export default function ScoreScreen() {
 
 const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: colors.background },
-  header:      { paddingHorizontal: spacing.margin, paddingBottom: 12 },
+  header:      { paddingHorizontal: spacing.margin, paddingTop: 12, paddingBottom: 12 },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
   headerSub:   { fontSize: 14, color: colors.textSecondary },
   list:        { paddingHorizontal: spacing.margin, paddingBottom: spacing.lg },

@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity }
 import { MaterialIcons } from '@expo/vector-icons'
 import api from '../../lib/api'
 import { colors, radius, spacing } from '../../lib/theme'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import TopBar from '../../components/TopBar'
 
 const SEVERITY_COLORS= { critical: '#dc2626', warning: '#d97706', info: colors.primary }
 const TYPE_LABELS = {
@@ -13,7 +13,6 @@ const TYPE_LABELS = {
 }
 
 export default function AlertsScreen() {
-  const insets = useSafeAreaInsets()
   const [alerts, setAlerts]   = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
@@ -70,7 +69,8 @@ export default function AlertsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <TopBar />
+      <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Alerts</Text>
           {unreadCount > 0 && <Text style={styles.headerSub}>{unreadCount} new</Text>}
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   container:   { flex: 1, backgroundColor: colors.background },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-    paddingHorizontal: spacing.margin, paddingBottom: 12,
+    paddingHorizontal: spacing.margin, paddingTop: 12, paddingBottom: 12,
   },
   headerTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
   headerSub:   { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
