@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, KeyboardAvoidingView, Platform, Alert
+  StyleSheet, KeyboardAvoidingView, Platform, Alert, Linking
 } from 'react-native'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -62,6 +62,15 @@ export default function LoginScreen({ navigation }) {
         >
           <Text style={styles.btnText}>
             {loading ? 'Signing in...' : 'Sign in'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.link}
+          onPress={() => Linking.openURL('https://track.clarity-software.com.au/forgot-password')}
+        >
+          <Text style={styles.linkText}>
+            Forgot password?
           </Text>
         </TouchableOpacity>
 

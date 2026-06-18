@@ -87,6 +87,35 @@ module.exports = {
   sendSupportAutoReply,
   sendSupportAdminNotification,
   sendEmailVerification,
+  sendPasswordReset,
+}
+
+async function sendPasswordReset(to, name, token) {
+  const url = `${process.env.DASHBOARD_URL}/reset-password?token=${token}`
+  try {
+    await client.emails.send({
+      from:    'Clarity Fleet <noreply@clarity-software.com.au>',
+      to,
+      subject: 'Reset your Clarity Fleet password',
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #3b82f6;">Clarity Fleet</h2>
+          <p>Hi ${name},</p>
+          <p>We received a request to reset your password. Click below to set a new one.</p>
+          <div style="margin: 32px 0;">
+            <a href="${url}" style="background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+              Reset my password
+            </a>
+          </div>
+          <p style="color: #6b7280; font-size: 13px;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+          <p style="color: #6b7280; font-size: 12px;">Or copy this link: ${url}</p>
+        </div>
+      `,
+    })
+    console.log(`[Resend] Password reset email sent to ${to}`)
+  } catch (err) {
+    console.error('[Resend] Password reset email failed:', err.message)
+  }
 }
 
 

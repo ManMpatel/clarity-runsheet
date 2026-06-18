@@ -235,6 +235,57 @@ router.put('/password', requireAuth, async (req, res) => {
 })
 
 
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body
+    if (!email) return res.status(400).json({ error: 'Email required' })
+
+    const users = await getCollection('users')
+    const user  = await users.findOne({ email: email.toLowerCase() })
+
+    if (user) {
+      const { sendPasswordReset } = require('../services/resend')
+      const token = crypto.randomBytes(32).toString('hex')
+      await users.updateOne({ _id: user._id }, {
+        $set: { resetToken: token, resetTokenExpiry: new Date(Date.now() + 60 * 60 * 1000) }
+      })
+      sendPasswordReset(user.email, user.name, token)
+    }
+
+    return res.json({ message: 'If that email exists, a reset link has been sent.' })
+  } catch (err) {
+    console.error('[Auth] Forgot password error:', err.message)
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body
+    if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password required' })
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' })
+
+    const users = await getCollection('users')
+    const user  = await users.findOne({ resetToken: token })
+
+    if (!user) return res.status(400).json({ error: 'Invalid or expired link' })
+    if (new Date() > new Date(user.resetTokenExpiry)) {
+      return res.status(400).json({ error: 'Link expired — request a new one' })
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12)
+    await users.updateOne({ _id: user._id }, {
+      $set:   { passwordHash, updatedAt: new Date() },
+      $unset: { resetToken: '', resetTokenExpiry: '' }
+    })
+
+    return res.json({ success: true })
+  } catch (err) {
+    console.error('[Auth] Reset password error:', err.message)
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 router.get('/verify-email', async (req, res) => {
   try {
     const { token } = req.query
