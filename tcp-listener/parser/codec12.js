@@ -41,4 +41,16 @@ function encodeRelayCommand(state, speedThreshold = 0) {
   return encodeCommand(`setdigout ${value} ? ${speedThreshold}`)
 }
 
-module.exports = { encodeCommand, encodeRelayCommand }
+// Decodes an inbound Codec 12 response packet (device -> server).
+// Returns the response text, or null if this isn't actually a response
+// (type byte should be 0x06 — 0x05 would mean somehow we received a
+// command instead, which shouldn't happen on this side).
+function decodeResponse(packet) {
+  const type = packet[10]
+  if (type !== 0x06) return null
+
+  const responseSize = packet.readUInt32BE(11)
+  return packet.slice(15, 15 + responseSize).toString('ascii')
+}
+
+module.exports = { encodeCommand, encodeRelayCommand, decodeResponse }

@@ -1,7 +1,7 @@
 import axios from 'axios'
 import * as SecureStore from 'expo-secure-store'
 
-const API_URL = 'http://localhost:3000'
+const API_URL = 'https://api.clarity-software.com.au'
 
 const api = axios.create({
   baseURL: API_URL,

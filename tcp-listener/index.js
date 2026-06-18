@@ -6,7 +6,8 @@ const { parseCodec8E } = require('./parser/codec8e')
 const { verifyCRC } = require('./parser/crc16')
 const { pushToQueue, setCurrentVanState } = require('./queue/redis')
 const socketRegistry = require('./registry/sockets')
-const { startCommandListener } = require('./queue/commands')
+const { startCommandListener, recordResponse } = require('./queue/commands')
+const { decodeResponse } = require('./parser/codec12')
 
 const PORT = process.env.TCP_PORT || 5027
 
@@ -46,6 +47,13 @@ const server = net.createServer((socket) => {
           records = parseCodec8(packet)
         } else if (codecId === 0x8E) {
           records = parseCodec8E(packet)
+        } else if (codecId === 0x0C) {
+          const responseText = decodeResponse(packet)
+          if (responseText) {
+            console.log(`[Command] Response from ${imei}: ${responseText}`)
+            await recordResponse(imei, responseText)
+          }
+          continue
         } else {
           console.warn(`[TCP] Unknown codec ${codecId} for IMEI ${imei}`)
           continue

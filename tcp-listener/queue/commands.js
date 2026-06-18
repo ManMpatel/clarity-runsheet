@@ -8,6 +8,7 @@
 const Redis = require('ioredis')
 const socketRegistry = require('../registry/sockets')
 const { encodeRelayCommand } = require('../parser/codec12')
+const { getClient } = require('./redis')
 
 const CHANNEL = 'device:commands'
 
@@ -61,4 +62,12 @@ function handleCommand(message) {
   console.log(`[Command] Sent ${action} to ${imei}`)
 }
 
-module.exports = { startCommandListener, handleCommand, CHANNEL }
+// Stores the device's reply to a command, briefly, so the API can check
+// whether a cut/restore actually got acknowledged shortly after sending it.
+async function recordResponse(imei, responseText) {
+  const redis = getClient()
+  const payload = JSON.stringify({ response: responseText, receivedAt: Date.now() })
+  await redis.set(`device:lastResponse:${imei}`, payload, 'EX', 60)
+}
+
+module.exports = { startCommandListener, handleCommand, recordResponse, CHANNEL }
