@@ -35,7 +35,10 @@ export function buildMapHtml(token, vehicles) {
         if (v.latitude && v.longitude) {
           const el = document.createElement('div')
           el.className = 'van-marker'
-          el.style.background = v.speed > 0 ? '#14b8a6' : v.ignition ? '#f59e0b' : '#9ca3af'
+          el.style.background = v.speed > 0 ? '#0d9488' : v.ignition ? '#d97706' : '#9ca3af'
+          el.addEventListener('click', () => {
+            window.ReactNativeWebView.postMessage(JSON.stringify(v))
+          })
           new mapboxgl.Marker(el)
             .setLngLat([v.longitude, v.latitude])
             .addTo(map)

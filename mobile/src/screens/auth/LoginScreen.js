@@ -4,10 +4,12 @@ import {
   StyleSheet, KeyboardAvoidingView, Platform, Alert, Linking
 } from 'react-native'
 import { useAuthStore } from '../../stores/authStore'
+import { colors, radius, spacing } from '../../lib/theme'
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
+  const [showPw, setShowPw]     = useState(false)
   const [loading, setLoading]   = useState(false)
   const login = useAuthStore(s => s.login)
 
@@ -28,59 +30,66 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.page}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.inner}>
-        <Text style={styles.logo}>Clarity Fleet</Text>
-        <Text style={styles.sub}>Fleet management platform</Text>
+      <View style={styles.card}>
+        <View style={styles.header}>
+          <View style={styles.logoBadge}>
+            <Text style={styles.logoBadgeText}>CF</Text>
+          </View>
+          <Text style={styles.title}>Sign In</Text>
+          <Text style={styles.subtitle}>Access your fleet dashboard</Text>
+        </View>
 
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>Email Address</Text>
         <TextInput
           style={styles.input}
           value={email}
           onChangeText={setEmail}
-          placeholder='name@company.com.au'
+          placeholder='driver@clarityfleet.com.au'
+          placeholderTextColor={colors.placeholder}
           keyboardType='email-address'
           autoCapitalize='none'
           autoCorrect={false}
         />
 
         <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          placeholder='Your password'
-          secureTextEntry
-        />
+        <View style={styles.passwordRow}>
+          <TextInput
+            style={styles.passwordInput}
+            value={password}
+            onChangeText={setPassword}
+            placeholder='••••••••'
+            placeholderTextColor={colors.placeholder}
+            secureTextEntry={!showPw}
+          />
+          <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPw(!showPw)}>
+            <Text style={styles.eyeText}>{showPw ? 'Hide' : 'Show'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.forgotLink}
+          onPress={() => Linking.openURL('https://track.clarity-software.com.au/forgot-password')}
+        >
+          <Text style={styles.forgotText}>Forgot password?</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.btn, loading && styles.btnDisabled]}
           onPress={handleLogin}
           disabled={loading}
         >
-          <Text style={styles.btnText}>
-            {loading ? 'Signing in...' : 'Sign in'}
-          </Text>
+          <Text style={styles.btnText}>{loading ? 'Signing in...' : 'Sign in'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.link}
-          onPress={() => Linking.openURL('https://track.clarity-software.com.au/forgot-password')}
-        >
-          <Text style={styles.linkText}>
-            Forgot password?
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.link}
+          style={styles.signupRow}
           onPress={() => navigation.navigate('Signup')}
         >
-          <Text style={styles.linkText}>
-            Don't have an account? Sign up
-          </Text>
+          <Text style={styles.signupText}>Don't have an account? </Text>
+          <Text style={styles.signupLink}>Sign up</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -88,17 +97,130 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#fff' },
-  inner:      { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
-  logo:       { fontSize: 28, fontWeight: 'bold', color: '#2563eb', marginBottom: 4 },
-  sub:        { fontSize: 14, color: '#6b7280', marginBottom: 40 },
-  label:      { fontSize: 13, fontWeight: '500', color: '#374151', marginBottom: 4 },
-  input:      { height: 44, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8,
-                paddingHorizontal: 12, fontSize: 14, color: '#111827', marginBottom: 14 },
-  btn:        { height: 44, backgroundColor: '#2563eb', borderRadius: 8,
-                alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  btnDisabled:{ backgroundColor: '#93c5fd' },
-  btnText:    { color: '#fff', fontSize: 15, fontWeight: '600' },
-  link:       { alignItems: 'center', marginTop: 20 },
-  linkText:   { fontSize: 13, color: '#2563eb' },
+  page: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.margin,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  logoBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  logoBadgeText: {
+    color: colors.onPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  label: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    marginBottom: 6,
+    marginLeft: 2,
+  },
+  input: {
+    height: 52,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+    marginBottom: spacing.md,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    marginBottom: 4,
+  },
+  passwordInput: {
+    flex: 1,
+    height: 52,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  eyeBtn: {
+    paddingHorizontal: 14,
+  },
+  eyeText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  forgotLink: {
+    alignSelf: 'flex-end',
+    paddingVertical: 8,
+    marginBottom: spacing.sm,
+  },
+  forgotText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  btn: {
+    height: 56,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  btnText: {
+    color: colors.onPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  signupRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+  },
+  signupText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  signupLink: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: '600',
+  },
 })

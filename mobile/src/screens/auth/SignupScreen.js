@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Switch } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native'
+import { MaterialIcons } from '@expo/vector-icons'
 import api from '../../lib/api'
+import { colors, radius, spacing } from '../../lib/theme'
 
 export default function SignupScreen({ navigation }) {
   const [companyName, setCompanyName] = useState('')
@@ -15,7 +17,6 @@ export default function SignupScreen({ navigation }) {
 
   async function handleSubmit() {
     setError('')
-
     if (!companyName || !name || !email || !password) {
       setError('All fields are required')
       return
@@ -47,7 +48,9 @@ export default function SignupScreen({ navigation }) {
   if (done) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emoji}>📬</Text>
+        <View style={styles.successIcon}>
+          <MaterialIcons name='mark-email-read' size={32} color={colors.primary} />
+        </View>
         <Text style={styles.doneTitle}>Check your inbox</Text>
         <Text style={styles.doneSub}>We sent a verification link to {email}</Text>
         <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
@@ -58,60 +61,74 @@ export default function SignupScreen({ navigation }) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Create your account</Text>
-      <Text style={styles.subtitle}>Start tracking your fleet in minutes</Text>
+    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+      <Text style={styles.title}>Your details</Text>
+      <Text style={styles.subtitle}>Create your Clarity Fleet account</Text>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <View style={styles.card}>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Text style={styles.label}>Company name</Text>
-      <TextInput style={styles.input} value={companyName} onChangeText={setCompanyName} placeholder='Your business name' autoCapitalize='words' />
+        <Text style={styles.label}>Company Name</Text>
+        <TextInput style={styles.input} value={companyName} onChangeText={setCompanyName} placeholder='e.g. Acme Logistics' placeholderTextColor={colors.placeholder} autoCapitalize='words' />
 
-      <Text style={styles.label}>Your name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder='Full name' autoCapitalize='words' />
+        <Text style={styles.label}>Your Name</Text>
+        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder='John Doe' placeholderTextColor={colors.placeholder} autoCapitalize='words' />
 
-      <Text style={styles.label}>Email</Text>
-      <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder='you@business.com' autoCapitalize='none' keyboardType='email-address' />
+        <Text style={styles.label}>Email Address</Text>
+        <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder='john.doe@acmelogistics.com' placeholderTextColor={colors.placeholder} autoCapitalize='none' keyboardType='email-address' />
 
-      <Text style={styles.label}>Password</Text>
-      <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder='At least 8 characters' secureTextEntry />
+        <Text style={styles.label}>Password</Text>
+        <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder='At least 8 characters' placeholderTextColor={colors.placeholder} secureTextEntry />
 
-      <Text style={styles.label}>Confirm password</Text>
-      <TextInput style={styles.input} value={confirmPassword} onChangeText={setConfirmPassword} placeholder='Re-enter password' secureTextEntry />
+        <Text style={styles.label}>Confirm Password</Text>
+        <TextInput style={styles.input} value={confirmPassword} onChangeText={setConfirmPassword} placeholder='Re-enter password' placeholderTextColor={colors.placeholder} secureTextEntry />
 
-      <View style={styles.consentRow}>
-        <Switch value={driverConsent} onValueChange={setDriverConsent} />
-        <Text style={styles.consentText}>I confirm I have consent to track vehicles and drivers in my fleet</Text>
+        <TouchableOpacity style={styles.consentRow} onPress={() => setDriverConsent(!driverConsent)}>
+          <View style={[styles.checkbox, driverConsent && styles.checkboxChecked]}>
+            {driverConsent && <MaterialIcons name='check' size={14} color={colors.onPrimary} />}
+          </View>
+          <Text style={styles.consentText}>I confirm all drivers have been informed their vehicle is tracked</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
+          {loading ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Create account</Text>}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.navigate('Login')}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? <ActivityIndicator color='#fff' /> : <Text style={styles.buttonText}>Create account</Text>}
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.loginLink}>Already have an account? Log in</Text>
-      </TouchableOpacity>
     </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#fff' },
-  content:      { padding: 24, paddingTop: 60 },
-  title:        { fontSize: 24, fontWeight: 'bold', color: '#111827', marginBottom: 4 },
-  subtitle:     { fontSize: 14, color: '#6b7280', marginBottom: 24 },
-  error:        { color: '#dc2626', fontSize: 13, marginBottom: 16 },
-  label:        { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 14 },
-  input:        { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111827' },
-  consentRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 20, marginBottom: 8 },
-  consentText:  { flex: 1, marginLeft: 10, fontSize: 12, color: '#4b5563' },
-  button:       { backgroundColor: '#2563eb', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
-  buttonText:   { color: '#fff', fontSize: 15, fontWeight: '600' },
-  loginLink:    { textAlign: 'center', color: '#2563eb', fontSize: 13, marginTop: 18 },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#fff' },
-  emoji:        { fontSize: 48, marginBottom: 16 },
-  doneTitle:    { fontSize: 20, fontWeight: 'bold', color: '#111827', marginBottom: 8 },
-  doneSub:      { fontSize: 14, color: '#6b7280', textAlign: 'center', marginBottom: 24 },
-  linkButton:   { paddingVertical: 10 },
-  linkText:     { color: '#2563eb', fontSize: 14, fontWeight: '600' },
+  page:    { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.margin, paddingTop: 60 },
+  title:    { fontSize: 24, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
+  subtitle: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 6, marginBottom: spacing.lg },
+  card: {
+    backgroundColor: colors.surface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.border, padding: spacing.lg,
+  },
+  error:  { color: colors.error, fontSize: 13, marginBottom: spacing.sm },
+  label:  { fontSize: 13, fontWeight: '600', color: colors.textPrimary, marginBottom: 6, marginTop: spacing.sm },
+  input:  { height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface },
+  consentRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.lg, marginBottom: spacing.sm },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 4, borderWidth: 1.5, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm, marginTop: 1,
+  },
+  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
+  consentText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+  button: { height: 52, backgroundColor: colors.primary, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md },
+  buttonText: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
+  cancelButton: { height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
+  cancelText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.margin, backgroundColor: colors.background },
+  successIcon: { width: 64, height: 64, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  doneTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
+  doneSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg },
+  linkButton: { paddingVertical: 10 },
+  linkText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
 })
