@@ -13,22 +13,24 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+    "supportsTablet": true,
+    "bundleIdentifier": "au.com.claritysoftware.fleet"
+  },
+  "android": {
+    "adaptiveIcon": {
+      "foregroundImage": "./assets/adaptive-icon.png",
+      "backgroundColor": "#ffffff"
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "package": "com.manmpatel.mobile"
-    },
+    "edgeToEdgeEnabled": true,
+    "package": "au.com.claritysoftware.fleet"
+  },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
-    ],
+    "expo-secure-store",
+    "@react-native-google-signin/google-signin"
+  ],
     "extra": {
       "eas": {
         "projectId": "4f46da0b-01ed-491e-9f9e-9faeadd451fc"
