@@ -81,7 +81,10 @@ async function processPayload(payload) {
     }
   }
 
-  console.log(`[Worker] Processed IMEI ${imei} — lat ${doc.location.coordinates[1]}, lon ${doc.location.coordinates[0]}, speed ${doc.speed}`)
+  const ignStatus = doc.ignition ? 'ON 🟢' : 'OFF 🔴'
+  const speedStatus = doc.speed > 0 ? `${doc.speed} km/h 🚗` : '0 km/h (stopped)'
+  const voltage = doc.externalVoltage ? `${doc.externalVoltage}V` : '--'
+  console.log(`[Worker] IMEI ${imei} | IGN: ${ignStatus} | Speed: ${speedStatus} | Voltage: ${voltage}`)
 }
 
 async function lookupVehicle(imei) {
