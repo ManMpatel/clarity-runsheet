@@ -52,7 +52,7 @@ function KebabMenu({ onEdit, onDelete }) {
 function EngineToggle({ immobilised, onCut, onRestore }) {
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); immobilised ? onCut() : onRestore() }}
+      onClick={(e) => { e.stopPropagation(); immobilised ? onRestore() : onCut() }}
       className={`relative w-14 h-7 rounded-full transition-colors ${immobilised ? 'bg-green-500' : 'bg-red-500'}`}>
       <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${immobilised ? '' : 'translate-x-7'}`} />
     </button>
