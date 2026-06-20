@@ -23,13 +23,15 @@ function normaliseRecord(imei, companyId, vehicleId, record) {
     satellites: record.satellites,
     speed:      record.speed,
     priority:   record.priority,
-    ignition:   io.ignition     ?? null,
+    ignition:   io.ignition ?? (io.ignitionOnCounter > 0 ? true : null),
     movement:   io.movementSensor ?? null,
     odometer:   io.totalOdometer
                   ? Math.round(io.totalOdometer * METRES_TO_KM)
                   : null,
     externalVoltage: io.externalVoltage
                   ? (io.externalVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2)
+                  : io.batteryVoltage
+                  ? (io.batteryVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2)
                   : null,
     batteryVoltage: io.batteryVoltage
                   ? (io.batteryVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2)
