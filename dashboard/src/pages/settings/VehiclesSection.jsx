@@ -52,9 +52,9 @@ function KebabMenu({ onEdit, onDelete }) {
 function EngineToggle({ immobilised, onCut, onRestore }) {
   return (
     <button
-      onClick={(e) => { e.stopPropagation(); immobilised ? onRestore() : onCut() }}
-      className={`relative w-14 h-7 rounded-full transition-colors ${immobilised ? 'bg-red-500' : 'bg-green-500'}`}>
-      <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${immobilised ? 'translate-x-7' : ''}`} />
+      onClick={(e) => { e.stopPropagation(); immobilised ? onCut() : onRestore() }}
+      className={`relative w-14 h-7 rounded-full transition-colors ${immobilised ? 'bg-green-500' : 'bg-red-500'}`}>
+      <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${immobilised ? '' : 'translate-x-7'}`} />
     </button>
   )
 }
@@ -95,7 +95,7 @@ function VehicleDrawer({ vehicle, status, onClose, onCut, onRestore }) {
           <div className='flex items-center justify-between'>
             <div>
               <p className='text-sm font-semibold text-gray-900 dark:text-white'>Engine power</p>
-              <p className='text-xs text-gray-400'>{vehicle.immobilised ? 'Fuel currently cut' : 'Running normally'}</p>
+              <p className='text-xs text-gray-400'>{vehicle.immobilised ? 'Running normally' : 'Fuel currently cut'}</p>
             </div>
             <EngineToggle
               immobilised={vehicle.immobilised}
