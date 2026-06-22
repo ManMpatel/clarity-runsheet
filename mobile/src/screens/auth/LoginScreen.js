@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, Alert, Linking
@@ -11,7 +12,14 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState('')
   const [showPw, setShowPw]     = useState(false)
   const [loading, setLoading]   = useState(false)
-  const login = useAuthStore(s => s.login)
+  const login       = useAuthStore(s => s.login)
+  const googleLogin = useAuthStore(s => s.googleLogin)
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    })
+  }, [])
 
   async function handleLogin() {
     if (!email || !password) {
@@ -23,6 +31,23 @@ export default function LoginScreen({ navigation }) {
       await login(email.toLowerCase().trim(), password)
     } catch (err) {
       Alert.alert('Login failed', err.response?.data?.error || 'Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGoogleLogin() {
+    setLoading(true)
+    try {
+      await GoogleSignin.hasPlayServices()
+      const userInfo = await GoogleSignin.signIn()
+      const idToken  = userInfo.data?.idToken
+      if (!idToken) throw new Error('No ID token received')
+      await googleLogin(idToken)
+    } catch (err) {
+      if (err.code !== statusCodes.SIGN_IN_CANCELLED) {
+        Alert.alert('Google Sign-In failed', err.message || 'Something went wrong')
+      }
     } finally {
       setLoading(false)
     }
@@ -82,6 +107,20 @@ export default function LoginScreen({ navigation }) {
           disabled={loading}
         >
           <Text style={styles.btnText}>{loading ? 'Signing in...' : 'Sign in'}</Text>
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <TouchableOpacity
+          style={styles.googleBtn}
+          onPress={handleGoogleLogin}
+          disabled={loading}
+        >
+          <Text style={styles.googleBtnText}>Continue with Google</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -223,4 +262,17 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
   },
+  dividerRow: {
+    flexDirection: 'row', alignItems: 'center',
+    marginVertical: spacing.md,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { marginHorizontal: 12, fontSize: 13, color: colors.textSecondary },
+  googleBtn: {
+    height: 56, borderRadius: radius.md,
+    borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: spacing.md, backgroundColor: colors.surface,
+  },
+  googleBtnText: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
 })

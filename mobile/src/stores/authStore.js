@@ -30,6 +30,15 @@ export const useAuthStore = create((set) => ({
     return user
   },
 
+  googleLogin: async (idToken) => {
+    const res = await api.post('/api/auth/google/mobile', { idToken })
+    const { token, user } = res.data
+    await SecureStore.setItemAsync('token', token)
+    await SecureStore.setItemAsync('user', JSON.stringify(user))
+    set({ user, token })
+    return user
+  },
+
   logout: async () => {
     await SecureStore.deleteItemAsync('token')
     await SecureStore.deleteItemAsync('user')

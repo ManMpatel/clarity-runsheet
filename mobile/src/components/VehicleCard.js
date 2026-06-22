@@ -4,6 +4,16 @@ import { MaterialIcons } from '@expo/vector-icons'
 import api from '../lib/api'
 import { colors, radius, spacing } from '../lib/theme'
 
+function sinceLabel(ts) {
+  if (!ts) return null
+  const mins = Math.round((Date.now() - ts) / 60000)
+  if (mins < 1)  return '< 1 min'
+  if (mins < 60) return `${mins} min`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
+}
+
 export default function VehicleCard({ vehicle, onClose }) {
   const [cutting, setCutting] = useState(false)
   const [immobilised, setImmobilised] = useState(vehicle.immobilised || false)
@@ -42,6 +52,9 @@ export default function VehicleCard({ vehicle, onClose }) {
         </TouchableOpacity>
       </View>
 
+      {vehicle.address ? (
+        <Text style={styles.address}>📍 {vehicle.address}</Text>
+      ) : null}
       <View style={styles.statsRow}>
         <View style={styles.statBox}>
           <Text style={styles.statLabel}>SPEED</Text>
@@ -50,9 +63,21 @@ export default function VehicleCard({ vehicle, onClose }) {
         <View style={styles.statBox}>
           <Text style={styles.statLabel}>STATUS</Text>
           <Text style={[styles.statValue, { color: isMoving ? colors.success : colors.textPrimary }]}>
-            {isMoving ? 'Moving' : vehicle.ignition ? 'Idling' : 'Offline'}
+            {isMoving ? 'Moving' : vehicle.ignition ? 'Idling' : 'Stopped'}
           </Text>
         </View>
+        {vehicle.todayKm != null && (
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>TODAY</Text>
+            <Text style={styles.statValue}>{vehicle.todayKm} km</Text>
+          </View>
+        )}
+        {vehicle.stateChangedAt ? (
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>SINCE</Text>
+            <Text style={styles.statValue}>{sinceLabel(vehicle.stateChangedAt)}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={[styles.engineRow, isMoving && styles.engineRowDisabled]}>
@@ -82,7 +107,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg,
     padding: spacing.md, paddingBottom: spacing.lg,
   },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.sm },
+  handle:  { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.sm },
+  address: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.sm },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot: { width: 10, height: 10, borderRadius: 5 },

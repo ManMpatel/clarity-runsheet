@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
 import { WebView } from 'react-native-webview'
 import api from '../../lib/api'
 import { buildMapHtml } from '../../lib/mapHtml'
@@ -13,8 +13,9 @@ export default function HomeScreen() {
   const [vehicles, setVehicles]     = useState([])
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
-  const [selected, setSelected]     = useState(null)
-  const [secondsAgo, setSecondsAgo] = useState(0)
+  const [selected, setSelected]         = useState(null)
+  const [secondsAgo, setSecondsAgo]     = useState(0)
+  const [activeFilter, setActiveFilter] = useState('all')
 
   useEffect(() => {
     load()
@@ -28,12 +29,19 @@ export default function HomeScreen() {
       const mapped = (res.data || [])
         .filter(item => item.state && item.state.latitude && item.state.longitude)
         .map(item => ({
-          _id:       item.vehicle._id,
-          name:      item.vehicle.name,
-          latitude:  item.state.latitude,
-          longitude: item.state.longitude,
-          speed:     item.state.speed || 0,
-          ignition:  item.state.ignition || false,
+          _id:             item.vehicle._id,
+          name:            item.vehicle.name,
+          latitude:        item.state.latitude,
+          longitude:       item.state.longitude,
+          speed:           item.state.speed || 0,
+          ignition:        item.state.ignition || false,
+          address:         item.state.address || null,
+          todayKm:         item.state.todayKm ?? null,
+          stateChangedAt:  item.state.stateChangedAt || null,
+          gsmSignal:       item.state.gsmSignal ?? null,
+          odometer:        item.state.odometer ?? null,
+          batteryVoltage:  item.state.batteryVoltage ?? null,
+          externalVoltage: item.state.externalVoltage ?? null,
         }))
       setVehicles(mapped)
       setSecondsAgo(0)
@@ -65,9 +73,20 @@ export default function HomeScreen() {
     )
   }
 
+  const moving    = vehicles.filter(v => v.speed > 0).length
+  const idle      = vehicles.filter(v => v.speed === 0 && v.ignition).length
+  const stopped   = vehicles.filter(v => !v.ignition && v.speed === 0).length
+  const overspeed = vehicles.filter(v => v.speed > 110).length
+
   return (
     <View style={styles.container}>
       <TopBar />
+      <View style={styles.statRow}>
+        <StatTile label='Moving'    value={moving}    color='#14b8a6' active={activeFilter === 'moving'}    onPress={() => setActiveFilter(activeFilter === 'moving'    ? 'all' : 'moving')} />
+        <StatTile label='Idle'      value={idle}      color='#f59e0b' active={activeFilter === 'idle'}      onPress={() => setActiveFilter(activeFilter === 'idle'      ? 'all' : 'idle')} />
+        <StatTile label='Stopped'   value={stopped}   color='#9ca3af' active={activeFilter === 'stopped'}   onPress={() => setActiveFilter(activeFilter === 'stopped'   ? 'all' : 'stopped')} />
+        <StatTile label='Overspeed' value={overspeed} color='#ef4444' active={activeFilter === 'overspeed'} onPress={() => setActiveFilter(activeFilter === 'overspeed' ? 'all' : 'overspeed')} />
+      </View>
       <View style={styles.mapArea}>
       <View style={styles.updatedPill}>
         <View style={styles.pillInner}>
@@ -91,9 +110,28 @@ export default function HomeScreen() {
   )
 }
 
+function StatTile({ label, value, color, active, onPress }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[tileStyles.tile, active && { backgroundColor: color + '18' }]}
+    >
+      <Text style={[tileStyles.value, { color }]}>{value}</Text>
+      <Text style={tileStyles.label}>{label}</Text>
+    </TouchableOpacity>
+  )
+}
+
+const tileStyles = StyleSheet.create({
+  tile:  { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8 },
+  value: { fontSize: 20, fontWeight: '700' },
+  label: { fontSize: 10, color: '#6b7280', marginTop: 1, fontWeight: '500' },
+})
+
 const styles = StyleSheet.create({
-  container:   { flex: 1 },
-  mapArea:     { flex: 1 },
+  container: { flex: 1 },
+  statRow:   { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  mapArea:   { flex: 1 },
   webview:     { flex: 1 },
   center:      { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   errorTitle:  { fontSize: 18, fontWeight: 'bold', color: '#111827', marginBottom: 6 },
