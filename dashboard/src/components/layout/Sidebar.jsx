@@ -111,21 +111,7 @@ function SectionLabel({ label }) {
 export default function Sidebar() {
   const role = useAuthStore(s => s.role)
   const accountType = useAuthStore(s => s.accountType)
-  {/* Mid features */}
-        <SectionLabel label='Mid Plan' />
-        {MID_LINKS.map(l =>
-          hasMid
-            ? <NavItem key={l.to} {...l} />
-            : <LockedItem key={l.to} label={l.label} plan='Mid' />
-        )}
-
-        {/* Top features */}
-        <SectionLabel label='Top Plan' />
-        {TOP_LINKS.map(l =>
-          hasTop
-            ? <NavItem key={l.to} {...l} />
-            : <LockedItem key={l.to} label={l.label} plan='Top' />
-        )}
+  
 
   if (role === 'garageOwner') {
     return (
