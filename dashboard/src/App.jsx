@@ -111,14 +111,14 @@ export default function App() {
         <Route path='garage/imei-check'      element={<IMEICheck />} />
         <Route path='trips'                  element={<TripsHistory />} />
         <Route path='drivers' element={<Drivers />} />
-        <Route path='driver-behaviour'       element={<TierGate tier='mid'><DriverBehaviour /></TierGate>} />
-        <Route path='vehicle-health'         element={<TierGate tier='top'><VehicleHealth /></TierGate>} />
-        <Route path='maintenance'            element={<TierGate tier='mid'><Maintenance /></TierGate>} />
-        <Route path='geofences'              element={<TierGate tier='mid'><GeofenceManager /></TierGate>} />
+        <Route path='driver-behaviour'       element={<DriverBehaviour />} />
+        <Route path='vehicle-health'         element={<VehicleHealth />} />
+        <Route path='maintenance'            element={<Maintenance />} />
+        <Route path='geofences'              element={<GeofenceManager />} />
         <Route path='garage/register-device' element={<RegisterDevice />} />
         <Route path='alerts'                 element={<Alerts />} />
-        <Route path='reports'                element={<TierGate tier='top'><Reports /></TierGate>} />
-        <Route path='fbt'                    element={<TierGate tier='mid'><FbtLogbook /></TierGate>} />
+        <Route path='reports'                element={<Reports />} />
+        <Route path='fbt'                    element={<FbtLogbook />} />
         <Route path='settings'               element={<Settings />} />
         <Route path='garage/my-devices'      element={<MyDevices />} />
         <Route path='garage/earnings' element={<GarageEarnings />} />

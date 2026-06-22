@@ -8,11 +8,12 @@ export default function LiveMap() {
   const map          = useRef(null)
   const markers      = useRef({})
   const [selectedImei, setSelectedImei] = useState(null)
-  const selectedVan = selectedImei ? getAllVans().find(v => v.imei === selectedImei) ?? null : null
-  const [mapReady, setMapReady]       = useState(false)
+  const [mapReady, setMapReady]         = useState(false)
+  const [activeFilter, setActiveFilter] = useState('all')
   const setFleet  = useFleetStore(s => s.setFleet)
   const getAllVans = useFleetStore(s => s.getAllVans)
   const updateVan = useFleetStore(s => s.updateVan)
+  const selectedVan = selectedImei ? getAllVans().find(v => v.imei === selectedImei) ?? null : null
 
   useSocket((vanData) => {
     updateVan(vanData)
@@ -94,18 +95,38 @@ export default function LiveMap() {
   }
 
   const vans = getAllVans()
+  const filteredVans = vans.filter(v => {
+    if (activeFilter === 'all')       return true
+    if (activeFilter === 'moving')    return v.speed > 0
+    if (activeFilter === 'idle')      return v.speed === 0 && v.ignition
+    if (activeFilter === 'stopped')   return !v.ignition && v.speed === 0
+    if (activeFilter === 'overspeed') return v.speed > 110
+    return true
+  })
 
   return (
     <div className='flex h-[calc(100vh-60px)] md:h-screen'>
 
       <div className='hidden md:flex flex-col w-72 bg-white border-r border-gray-200 overflow-y-auto'>
         <div className='p-4 border-b border-gray-200'>
-          <h2 className='text-sm font-semibold text-gray-700'>
+          <h2 className='text-sm font-semibold text-gray-700 mb-3'>
             Fleet — {vans.length} vans
           </h2>
+          <div className='flex flex-wrap gap-1.5'>
+            {['all','moving','idle','stopped','overspeed'].map(f => (
+              <button key={f} onClick={() => setActiveFilter(f)}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize transition ${
+                  activeFilter === f
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}>
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
         <div className='divide-y divide-gray-100'>
-          {vans.map((van, i) => (
+          {filteredVans.map((van, i) => (
             <button
               key={i}
               onClick={() => {
@@ -127,12 +148,20 @@ export default function LiveMap() {
                   : 'bg-gray-400'
               }`} />
               <div className='flex-1 min-w-0'>
-                <p className='text-sm font-medium text-gray-800 truncate'>
-                  {van.name || van.imei}
-                </p>
-                <p className='text-xs text-gray-400'>
-                  {van.speed ?? 0} km/h
-                </p>
+                <div className='flex items-center justify-between'>
+                  <p className='text-sm font-medium text-gray-800 truncate'>
+                    {van.name || van.imei}
+                  </p>
+                  <span className='text-xs text-gray-400 flex-shrink-0 ml-2'>
+                    {van.speed ?? 0} km/h
+                  </span>
+                </div>
+                <div className='flex items-center justify-between mt-0.5'>
+                  <p className='text-xs text-gray-400 truncate'>{van.address || '—'}</p>
+                  {van.todayKm != null && (
+                    <span className='text-xs text-gray-400 flex-shrink-0 ml-2'>{van.todayKm} km</span>
+                  )}
+                </div>
               </div>
             </button>
           ))}
@@ -164,10 +193,15 @@ export default function LiveMap() {
               } />
               <VanStat label='Voltage'  value={`${selectedVan.externalVoltage ?? selectedVan.batteryVoltage ?? '--'} V`} />
               <VanStat label='Odometer' value={`${selectedVan.odometer ?? '--'} km`} />
+              <VanStat label='Today'    value={selectedVan.todayKm != null ? `${selectedVan.todayKm} km` : '--'} />
+              <VanStat label='Signal'   value={selectedVan.gsmSignal != null ? `${selectedVan.gsmSignal}/5` : '--'} />
             </div>
-            {selectedVan.latitude && (
-              <p className='text-xs text-gray-400 mt-3'>
-                {selectedVan.latitude.toFixed(5)}, {selectedVan.longitude.toFixed(5)}
+            {selectedVan.address && (
+              <p className='text-xs text-gray-500 mt-3'>📍 {selectedVan.address}</p>
+            )}
+            {selectedVan.stateChangedAt && (
+              <p className='text-xs text-gray-400 mt-1'>
+                {selectedVan.speed > 0 ? 'Moving' : selectedVan.ignition ? 'Idle' : 'Stopped'} for {sinceLabel(selectedVan.stateChangedAt)}
               </p>
             )}
           </div>
@@ -176,6 +210,16 @@ export default function LiveMap() {
 
     </div>
   )
+}
+
+function sinceLabel(ts) {
+  if (!ts) return null
+  const mins = Math.round((Date.now() - ts) / 60000)
+  if (mins < 1)  return '< 1 min'
+  if (mins < 60) return `${mins} min`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
 }
 
 function VanStat({ label, value }) {

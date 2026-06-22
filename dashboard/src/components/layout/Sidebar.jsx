@@ -111,23 +111,21 @@ function SectionLabel({ label }) {
 export default function Sidebar() {
   const role = useAuthStore(s => s.role)
   const accountType = useAuthStore(s => s.accountType)
-  const [hasMid, setHasMid] = useState(false)
-  const [hasTop, setHasTop] = useState(false)
+  {/* Mid features */}
+        <SectionLabel label='Mid Plan' />
+        {MID_LINKS.map(l =>
+          hasMid
+            ? <NavItem key={l.to} {...l} />
+            : <LockedItem key={l.to} label={l.label} plan='Mid' />
+        )}
 
-  const subscriptionTier = useAuthStore(s => s.subscriptionTier)
-
-  useEffect(() => {
-    if (role === 'garageOwner') return
-    if (subscriptionTier === 'top') { setHasMid(true); setHasTop(true); return }
-    if (subscriptionTier === 'mid') { setHasMid(true); setHasTop(false); return }
-    api.get('/api/vehicles')
-      .then(res => {
-        const v = res.data
-        setHasMid(v.some(x => x.tier === 'mid' || x.tier === 'top'))
-        setHasTop(v.some(x => x.tier === 'top'))
-      })
-      .catch(() => {})
-  }, [role, subscriptionTier])
+        {/* Top features */}
+        <SectionLabel label='Top Plan' />
+        {TOP_LINKS.map(l =>
+          hasTop
+            ? <NavItem key={l.to} {...l} />
+            : <LockedItem key={l.to} label={l.label} plan='Top' />
+        )}
 
   if (role === 'garageOwner') {
     return (

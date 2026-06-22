@@ -35,11 +35,14 @@ export default function Dashboard() {
   }, [])
 
   function buildStats(fleet) {
-    const vans    = fleet.map(f => f.state).filter(Boolean)
-    const moving  = vans.filter(v => v.speed > 0).length
-    const idle    = vans.filter(v => v.speed === 0 && v.ignition).length
-    const stopped = vans.filter(v => !v.ignition).length
-    setStats({ total: fleet.length, moving, idle, stopped })
+    const vans        = fleet.map(f => f.state).filter(Boolean)
+    const now         = Date.now()
+    const moving      = vans.filter(v => v.speed > 0).length
+    const idle        = vans.filter(v => v.speed === 0 && v.ignition).length
+    const stopped     = vans.filter(v => !v.ignition && v.speed === 0).length
+    const overspeed   = vans.filter(v => v.speed > 110).length
+    const unreachable = vans.filter(v => v.updatedAt && (now - v.updatedAt) > 10 * 60 * 1000).length
+    setStats({ total: fleet.length, moving, idle, stopped, overspeed, unreachable })
   }
 
   const vans = getAllVans()
@@ -89,11 +92,13 @@ if (isLocked) {
         </p>
       </div>
 
-      <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
-        <StatCard label='Total Vans'  value={stats?.total   ?? 0} color='blue' />
-        <StatCard label='Moving'      value={stats?.moving  ?? 0} color='teal' />
-        <StatCard label='Idle'        value={stats?.idle    ?? 0} color='amber' />
-        <StatCard label='Stopped'     value={stats?.stopped ?? 0} color='gray' />
+      <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4'>
+        <StatCard label='Total Vans'  value={stats?.total       ?? 0} color='blue' />
+        <StatCard label='Moving'      value={stats?.moving      ?? 0} color='teal' />
+        <StatCard label='Idle'        value={stats?.idle        ?? 0} color='amber' />
+        <StatCard label='Stopped'     value={stats?.stopped     ?? 0} color='gray' />
+        <StatCard label='Overspeed'   value={stats?.overspeed   ?? 0} color='red' />
+        <StatCard label='Unreachable' value={stats?.unreachable ?? 0} color='purple' />
       </div>
 
       <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
@@ -148,10 +153,12 @@ if (isLocked) {
 
 function StatCard({ label, value, color }) {
   const colors = {
-    blue:  'bg-blue-50 text-blue-600',
-    teal:  'bg-teal-50 text-teal-600',
-    amber: 'bg-amber-50 text-amber-600',
-    gray:  'bg-gray-50 text-gray-600',
+    blue:   'bg-blue-50 text-blue-600',
+    teal:   'bg-teal-50 text-teal-600',
+    amber:  'bg-amber-50 text-amber-600',
+    gray:   'bg-gray-50 text-gray-600',
+    red:    'bg-red-50 text-red-600',
+    purple: 'bg-purple-50 text-purple-600',
   }
   return (
     <div className='bg-white rounded-xl border border-gray-200 p-5'>
@@ -182,29 +189,43 @@ function AlertRow({ alert }) {
   )
 }
 
-function VanRow({ van }) {
-  const isMoving  = van.speed > 0
-  const isIdle    = van.speed === 0 && van.ignition
-  const isStopped = !van.ignition
+function sinceLabel(ts) {
+  if (!ts) return null
+  const mins = Math.round((Date.now() - ts) / 60000)
+  if (mins < 1)  return '< 1 min'
+  if (mins < 60) return `${mins} min`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
+}
 
-  const status = isMoving ? 'Moving' : isIdle ? 'Idle' : 'Stopped'
-  const dot    = isMoving
-    ? 'bg-teal-500'
-    : isIdle
-    ? 'bg-amber-500'
-    : 'bg-gray-400'
+function VanRow({ van }) {
+  const isMoving = van.speed > 0
+  const isIdle   = van.speed === 0 && van.ignition
+  const status   = isMoving ? 'Moving' : isIdle ? 'Idle' : 'Stopped'
+  const dot      = isMoving ? 'bg-teal-500' : isIdle ? 'bg-amber-500' : 'bg-gray-400'
+  const since    = sinceLabel(van.stateChangedAt)
 
   return (
-    <div className='flex items-center justify-between py-1.5'>
-      <div className='flex items-center gap-2'>
-        <span className={`w-2 h-2 rounded-full ${dot}`} />
-        <span className='text-sm text-gray-700 font-medium'>
-          {van.name || van.imei}
-        </span>
+    <div className='py-2.5 border-b border-gray-50 last:border-0'>
+      <div className='flex items-center justify-between mb-1'>
+        <div className='flex items-center gap-2'>
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+          <span className='text-sm text-gray-700 font-medium'>{van.name || van.imei}</span>
+        </div>
+        <div className='flex items-center gap-3'>
+          <span className='text-xs text-gray-400'>{van.speed ?? 0} km/h</span>
+          <span className='text-xs font-medium text-gray-500'>{status}</span>
+          {since && <span className='text-xs text-gray-400'>{since}</span>}
+        </div>
       </div>
-      <div className='flex items-center gap-3'>
-        <span className='text-xs text-gray-400'>{van.speed ?? 0} km/h</span>
-        <span className='text-xs text-gray-500'>{status}</span>
+      <div className='flex items-center justify-between ml-4'>
+        <p className='text-xs text-gray-400 truncate max-w-[55%]'>
+          {van.address || '—'}
+        </p>
+        {van.todayKm != null && (
+          <span className='text-xs text-gray-400 flex-shrink-0'>{van.todayKm} km today</span>
+        )}
       </div>
     </div>
   )
