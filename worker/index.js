@@ -7,6 +7,7 @@ const { processDriverEvents } = require('./processors/driver-events')
 const { processGeofences } = require('./processors/geofence')
 const { processAlerts } = require('./processors/alerts')
 const { processTripDetection } = require('./processors/trip-builder')
+const { enrichAndSaveVanState } = require('./processors/enrichment')
 
 const QUEUE_KEY = 'telemetry_queue'
 const POLL_INTERVAL = 100
@@ -61,20 +62,27 @@ async function processPayload(payload) {
   await processAlerts(imei, companyId, vehicleId, doc, geofenceEvents)
   await processTripDetection(imei, companyId, vehicleId, doc)
 
+  const redis    = getClient()
+  const enriched = await enrichAndSaveVanState(redis, imei, companyId, vehicleId, doc)
+
   broadcastVanUpdate(companyId, {
     imei,
     vehicleId,
     companyId,
-    latitude:        doc.location.coordinates[1],
-    longitude:       doc.location.coordinates[0],
-    speed:           doc.speed,
-    angle:           doc.angle,
-    ignition:        doc.ignition,
-    externalVoltage: doc.externalVoltage,
-    batteryVoltage:  doc.batteryVoltage,
-    gsmSignal:       doc.gsmSignal,
-    odometer:        doc.odometer,
-    timestamp:       doc.timestamp,
+    latitude:        enriched.latitude,
+    longitude:       enriched.longitude,
+    speed:           enriched.speed,
+    angle:           enriched.angle,
+    ignition:        enriched.ignition,
+    externalVoltage: enriched.externalVoltage,
+    batteryVoltage:  enriched.batteryVoltage,
+    gsmSignal:       enriched.gsmSignal,
+    odometer:        enriched.odometer,
+    timestamp:       enriched.timestamp,
+    address:         enriched.address,
+    todayKm:         enriched.todayKm,
+    status:          enriched.status,
+    stateChangedAt:  enriched.stateChangedAt,
   })
 
   if (geofenceEvents.length > 0 || driverEvents.length > 0) {
