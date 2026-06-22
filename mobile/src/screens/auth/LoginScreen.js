@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react'
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin'
+let GoogleSignin = null
+let statusCodes  = {}
+try {
+  const mod = require('@react-native-google-signin/google-signin')
+  GoogleSignin = mod.GoogleSignin
+  statusCodes  = mod.statusCodes
+} catch (e) {
+  console.warn('[GoogleSignin] Native module not available in this build')
+}
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, Alert, Linking
@@ -37,6 +45,10 @@ export default function LoginScreen({ navigation }) {
   }
 
   async function handleGoogleLogin() {
+    if (!GoogleSignin) {
+      Alert.alert('Not available', 'Google Sign-In requires a new app build. Use email login for now.')
+      return
+    }
     setLoading(true)
     try {
       await GoogleSignin.hasPlayServices()
