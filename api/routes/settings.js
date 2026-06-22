@@ -118,6 +118,19 @@ router.put('/onboarding-complete', requireAuth, requireCompany, async (req, res)
   }
 })
 
-module.exports = router
+router.put('/push-token', requireAuth, async (req, res) => {
+  try {
+    const { pushToken } = req.body
+    if (!pushToken) return res.status(400).json({ error: 'pushToken required' })
+    const users = await getCollection('users')
+    await users.updateOne(
+      { _id: new (require('mongodb').ObjectId)(req.userId) },
+      { $set: { pushToken, updatedAt: new Date() } }
+    )
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
 
 module.exports = router

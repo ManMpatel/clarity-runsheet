@@ -1,6 +1,7 @@
 const { getCollection } = require('../db/mongo')
 const { setAlertCooldown, checkAlertCooldown } = require('../db/redis')
 const { sendSms } = require('../services/twilio')
+const { sendPush } = require('../services/push')
 
 const AFTER_HOURS_START = 18
 const AFTER_HOURS_END = 6
@@ -178,6 +179,18 @@ async function fireAlert({ type, imei, companyId, vehicleId, message, severity, 
 
   if (severity === 'critical' && rule.smsNumber) {
     await sendSms(rule.smsNumber, `CLARITY FLEET ALERT: ${message}`)
+  }
+
+  try {
+    const users = await getCollection('users')
+    const companyUsers = await users.find(
+      { companyId, pushToken: { $exists: true, $ne: null } },
+      { projection: { pushToken: 1 } }
+    ).toArray()
+    const tokens = companyUsers.map(u => u.pushToken)
+    await sendPush(tokens, 'Clarity Fleet Alert', message, { type, vehicleId })
+  } catch (pushErr) {
+    console.error('[Push] Alert push failed:', pushErr.message)
   }
 
   return alert

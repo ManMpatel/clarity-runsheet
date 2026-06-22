@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { registerForPushNotifications } from '../lib/notifications'
 import * as SecureStore from 'expo-secure-store'
 import api from '../lib/api'
 
@@ -27,6 +28,7 @@ export const useAuthStore = create((set) => ({
     await SecureStore.setItemAsync('token', token)
     await SecureStore.setItemAsync('user', JSON.stringify(user))
     set({ user, token })
+    registerForPushNotifications().catch(console.warn)
     return user
   },
 
@@ -36,6 +38,7 @@ export const useAuthStore = create((set) => ({
     await SecureStore.setItemAsync('token', token)
     await SecureStore.setItemAsync('user', JSON.stringify(user))
     set({ user, token })
+    registerForPushNotifications().catch(console.warn)
     return user
   },
 

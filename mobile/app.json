@@ -28,9 +28,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-    "expo-secure-store",
-    "@react-native-google-signin/google-signin"
-  ],
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin",
+      ["expo-notifications", {
+        "icon": "./assets/icon.png",
+        "color": "#ffffff",
+        "sounds": []
+      }]
+    ],
     "extra": {
       "eas": {
         "projectId": "4f46da0b-01ed-491e-9f9e-9faeadd451fc"
