@@ -83,11 +83,7 @@ async function processPayload(payload) {
     }
   }
 
-  const ignStatus = doc.ignition ? 'ON 🟢' : 'OFF 🔴'
-  const speedStatus = doc.speed > 0 ? `${doc.speed} km/h 🚗` : '0 km/h (stopped)'
-  const voltage = doc.externalVoltage ? `${doc.externalVoltage}V` : '--'
-  console.log(`[Worker] IMEI ${imei} | IGN: ${ignStatus} (raw:${doc.ignition}) | Speed: ${speedStatus} | Voltage: ${voltage} | rawIO keys: ${Object.keys(doc.rawIo || {}).join(',')}`)
-}
+  }
 
 async function lookupVehicle(imei) {
   const { getCollection } = require('./db/mongo')
