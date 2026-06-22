@@ -25,9 +25,13 @@ async function processTripDetection(imei, companyId, vehicleId, record) {
   if (ignition || speed > 0) {
     await updateActiveTrip(redis, tripKey, activeTrip, record)
   } else {
-    const secondsSinceMove = (new Date(record.timestamp).getTime() - activeTrip.lastMovement) / 1000
-    if (secondsSinceMove >= TRIP_END_SECONDS) {
+    if (ignition === false) {
       await endTrip(redis, tripKey, activeTrip, record, vehicleId, companyId)
+    } else {
+      const secondsSinceMove = (new Date(record.timestamp).getTime() - activeTrip.lastMovement) / 1000
+      if (secondsSinceMove >= TRIP_END_SECONDS) {
+        await endTrip(redis, tripKey, activeTrip, record, vehicleId, companyId)
+      }
     }
   }
 }
