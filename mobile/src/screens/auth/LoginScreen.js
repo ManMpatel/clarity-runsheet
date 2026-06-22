@@ -288,3 +288,10 @@ const styles = StyleSheet.create({
   },
   googleBtnText: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
 })
+
+
+
+
+
+
+
