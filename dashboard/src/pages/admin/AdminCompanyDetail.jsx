@@ -15,14 +15,17 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
     midSlots:   slots?.slots?.midSlots   || 0,
     topSlots:   slots?.slots?.topSlots   || 0,
   })
-  const [accountType, setAccountType] = useState(company.accountType || 'contractor')
+  const [accountType,   setAccountType]   = useState(company.accountType || 'contractor')
+  const [billingMode,   setBillingMode]   = useState(company.billingMode || 'stripe')
+  const [customPrice,   setCustomPrice]   = useState(company.customPrice || '')
+  const [savingBilling, setSavingBilling] = useState(false)
 
   const isGarage = company.accountType === 'garageOwner'
 
-  const monthly =
-    (slots?.slots?.entrySlots || 0) * 18 +
-    (slots?.slots?.midSlots   || 0) * 25 +
-    (slots?.slots?.topSlots   || 0) * 45
+  const totalSlots = (slots?.slots?.entrySlots || 0) + (slots?.slots?.midSlots || 0) + (slots?.slots?.topSlots || 0)
+  const monthly    = (company.billingMode === 'becs' && company.customPrice)
+    ? company.customPrice
+    : parseFloat((totalSlots * 14.99).toFixed(2))
 
   const monthsActive = company.createdAt
     ? Math.max(1, Math.floor(
@@ -37,6 +40,8 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
     setUsers([])
     setEditing(false)
     setAccountType(company.accountType || 'contractor')
+    setBillingMode(company.billingMode || 'stripe')
+    setCustomPrice(company.customPrice || '')
     setSlotForm({
       entrySlots: slots?.slots?.entrySlots || 0,
       midSlots:   slots?.slots?.midSlots   || 0,
@@ -79,6 +84,17 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
       setEditing(false)
     } catch (err) { console.error(err.message) }
     finally { setSaving(false) }
+  }
+
+  async function saveBilling(mode, price) {
+    setSavingBilling(true)
+    try {
+      await api.put(`/api/admin/companies/${company._id}/billing`, {
+        billingMode: mode,
+        customPrice: mode === 'becs' ? parseFloat(price) || null : null,
+      })
+    } catch (err) { console.error(err.message) }
+    finally { setSavingBilling(false) }
   }
 
   async function saveAccountType(val) {
@@ -179,6 +195,39 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
                 <p className='text-xs text-gray-500'>Est. total revenue</p>
                 <p className='text-lg font-bold text-gray-900 mt-0.5'>${monthly * monthsActive}</p>
               </div>
+            </div>
+
+            {/* Billing mode */}
+            <div className='bg-gray-50 rounded-lg p-4 space-y-3'>
+              <p className='text-xs font-semibold text-gray-600'>Billing Mode</p>
+              <div className='flex gap-2'>
+                {['stripe', 'becs', 'manual'].map(m => (
+                  <button key={m}
+                    onClick={() => { setBillingMode(m); saveBilling(m, customPrice) }}
+                    className={`flex-1 h-8 text-xs font-medium rounded-lg capitalize transition ${
+                      billingMode === m
+                        ? 'bg-purple-600 text-white'
+                        : 'border border-gray-300 text-gray-600 hover:bg-gray-100'
+                    }`}>
+                    {m === 'stripe' ? 'Stripe (card)' : m === 'becs' ? 'BECS (direct debit)' : 'Manual (off)'}
+                  </button>
+                ))}
+              </div>
+              {billingMode === 'becs' && (
+                <div className='flex items-center gap-2 pt-1'>
+                  <span className='text-xs text-gray-500'>Custom monthly price $</span>
+                  <input
+                    type='number'
+                    min='0'
+                    value={customPrice}
+                    onChange={e => setCustomPrice(e.target.value)}
+                    onBlur={() => saveBilling('becs', customPrice)}
+                    placeholder='0.00'
+                    className='w-28 h-8 px-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500'
+                  />
+                  {savingBilling && <span className='text-xs text-gray-400'>Saving...</span>}
+                </div>
+              )}
             </div>
 
             {/* Slot bars */}

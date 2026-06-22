@@ -297,4 +297,26 @@ router.get('/devices', requireSuperAdmin, async (req, res) => {
   }
 })
 
+router.put('/companies/:id/billing', requireSuperAdmin, async (req, res) => {
+  try {
+    const { billingMode, customPrice } = req.body
+    if (!['stripe', 'becs', 'manual'].includes(billingMode)) {
+      return res.status(400).json({ error: 'Invalid billing mode' })
+    }
+    const { ObjectId } = require('mongodb')
+    const companies = await getCollection('companies')
+    await companies.findOneAndUpdate(
+      { _id: new ObjectId(req.params.id) },
+      { $set: {
+        billingMode,
+        customPrice: customPrice != null ? parseFloat(customPrice) : null,
+        updatedAt:   new Date(),
+      }}
+    )
+    return res.json({ success: true })
+  } catch (err) {
+    return res.status(500).json({ error: 'Server error' })
+  }
+})
+
 module.exports = router
