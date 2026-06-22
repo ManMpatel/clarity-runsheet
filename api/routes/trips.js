@@ -26,7 +26,13 @@ router.get('/', requireAuth, requireCompany, async (req, res) => {
       .limit(parseInt(limit))
       .toArray()
 
-    return res.json({ trips, total, page: parseInt(page) })
+    const vehicles  = await getCollection('vehicles')
+    const vIds      = [...new Set(trips.map(t => t.vehicleId).filter(Boolean))]
+    const vDocs     = await vehicles.find({ _id: { $in: vIds.map(id => new ObjectId(id)) } }).toArray()
+    const vMap      = Object.fromEntries(vDocs.map(v => [v._id.toString(), v.name]))
+    const enriched  = trips.map(t => ({ ...t, vehicleName: vMap[t.vehicleId] || null }))
+
+    return res.json({ trips: enriched, total, page: parseInt(page) })
   } catch (err) {
     return res.status(500).json({ error: 'Server error' })
   }

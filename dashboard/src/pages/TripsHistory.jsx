@@ -4,7 +4,9 @@ import api from '../lib/api'
 export default function TripsHistory() {
   const [trips, setTrips]       = useState([])
   const [loading, setLoading]   = useState(true)
-  const [selected, setSelected] = useState(null)
+  const [selected,       setSelected]       = useState(null)
+  const [replayPoints,   setReplayPoints]   = useState([])
+  const [replayLoading,  setReplayLoading]  = useState(false)
   const [vehicles, setVehicles] = useState([])
   const [filters, setFilters]   = useState({
     vehicleId: '',
@@ -55,6 +57,19 @@ export default function TripsHistory() {
       day: '2-digit', month: 'short',
       hour: '2-digit', minute: '2-digit',
     })
+  }
+
+  async function handleReplay(tripId) {
+    setReplayLoading(true)
+    setReplayPoints([])
+    try {
+      const res = await api.get(`/api/trips/${tripId}/replay`)
+      setReplayPoints(res.data.points || [])
+    } catch (err) {
+      console.error('Replay failed', err.message)
+    } finally {
+      setReplayLoading(false)
+    }
   }
 
   return (
@@ -201,8 +216,12 @@ export default function TripsHistory() {
               <DetailRow label='FBT'      value={selected.classification || 'Unclassified'} />
             </div>
             <div className='flex gap-3 mt-5'>
-              <button className='flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition'>
-                Replay trip
+              <button
+                onClick={() => handleReplay(selected._id)}
+                disabled={replayLoading}
+                className='flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50'
+              >
+                {replayLoading ? 'Loading...' : replayPoints.length > 0 ? `${replayPoints.length} points loaded` : 'Replay trip'}
               </button>
               <button
                 onClick={() => setSelected(null)}
