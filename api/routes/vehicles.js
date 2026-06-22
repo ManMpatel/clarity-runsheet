@@ -20,6 +20,8 @@ router.get('/', requireAuth, requireCompany, async (req, res) => {
   }
 })
 
+
+
 router.get('/status', requireAuth, requireCompany, async (req, res) => {
   try {
     const vehicles = await getCollection('vehicles')
@@ -45,7 +47,7 @@ router.get('/status', requireAuth, requireCompany, async (req, res) => {
 
     return res.json(status)
   } catch (err) {
-    return res.status(500).json({ error: err.message, stack: err.stack })
+    return res.status(500).json({ error: 'Server error' })
   }
 })
 
