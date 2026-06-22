@@ -140,21 +140,9 @@ export default function Sidebar() {
         {/* Core — always visible */}
         {CORE_LINKS.map(l => <NavItem key={l.to} {...l} />)}
 
-        {/* Mid features */}
-        <SectionLabel label='Mid Plan' />
-        {MID_LINKS.map(l =>
-          hasMid
-            ? <NavItem key={l.to} {...l} />
-            : <LockedItem key={l.to} label={l.label} plan='Mid' />
-        )}
-
-        {/* Top features */}
-        <SectionLabel label='Top Plan' />
-        {TOP_LINKS.map(l =>
-          hasTop
-            ? <NavItem key={l.to} {...l} />
-            : <LockedItem key={l.to} label={l.label} plan='Top' />
-        )}
+        {/* Features */}
+        {MID_LINKS.map(l => <NavItem key={l.to} {...l} />)}
+        {TOP_LINKS.map(l => <NavItem key={l.to} {...l} />)}
 
         {accountType === 'garage_owner' && (
           <>
