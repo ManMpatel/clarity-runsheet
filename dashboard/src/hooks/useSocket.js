@@ -1,11 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { io } from 'socket.io-client'
 import { useAuthStore } from '../store/authStore'
 
 let socket = null
 
 export function useSocket(onVanUpdate) {
-  const companyId = useAuthStore(s => s.companyId)
+  const companyId   = useAuthStore(s => s.companyId)
+  const callbackRef = useRef(onVanUpdate)
+
+  useEffect(() => {
+    callbackRef.current = onVanUpdate
+  })
 
   useEffect(() => {
     if (!companyId) return
@@ -17,7 +22,7 @@ export function useSocket(onVanUpdate) {
     })
 
     socket.on('van:update', (data) => {
-      if (onVanUpdate) onVanUpdate(data)
+      if (callbackRef.current) callbackRef.current(data)
     })
 
     return () => {

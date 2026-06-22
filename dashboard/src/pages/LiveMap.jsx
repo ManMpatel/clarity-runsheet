@@ -7,7 +7,8 @@ export default function LiveMap() {
   const mapContainer = useRef(null)
   const map          = useRef(null)
   const markers      = useRef({})
-  const [selectedVan, setSelectedVan] = useState(null)
+  const [selectedImei, setSelectedImei] = useState(null)
+  const selectedVan = selectedImei ? getAllVans().find(v => v.imei === selectedImei) ?? null : null
   const [mapReady, setMapReady]       = useState(false)
   const setFleet  = useFleetStore(s => s.setFleet)
   const getAllVans = useFleetStore(s => s.getAllVans)
@@ -81,7 +82,7 @@ export default function LiveMap() {
       .setLngLat([van.longitude, van.latitude])
       .addTo(map.current)
 
-    el.addEventListener('click', () => setSelectedVan(van))
+    el.addEventListener('click', () => setSelectedImei(van.imei))
     markers.current[van.imei] = marker
   }
 
@@ -108,7 +109,7 @@ export default function LiveMap() {
             <button
               key={i}
               onClick={() => {
-                setSelectedVan(van)
+                setSelectedImei(van.imei)
                 if (map.current && van.latitude && van.longitude) {
                   map.current.flyTo({
                     center: [van.longitude, van.latitude],
@@ -148,7 +149,7 @@ export default function LiveMap() {
                 {selectedVan.name || selectedVan.imei}
               </h3>
               <button
-                onClick={() => setSelectedVan(null)}
+                onClick={() => setSelectedImei(null)}
                 className='text-gray-400 hover:text-gray-600 text-lg leading-none'
               >
                 ×
@@ -161,7 +162,7 @@ export default function LiveMap() {
                 : selectedVan.ignition ? 'Idle'
                 : 'Stopped'
               } />
-              <VanStat label='Voltage'  value={`${selectedVan.externalVoltage ?? '--'} V`} />
+              <VanStat label='Voltage'  value={`${selectedVan.externalVoltage ?? selectedVan.batteryVoltage ?? '--'} V`} />
               <VanStat label='Odometer' value={`${selectedVan.odometer ?? '--'} km`} />
             </div>
             {selectedVan.latitude && (

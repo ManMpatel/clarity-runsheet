@@ -40,17 +40,17 @@ async function startTrip(redis, tripKey, imei, companyId, vehicleId, record) {
     startTime:     record.timestamp,
     startLocation: {
       type:        'Point',
-      coordinates: [record.longitude, record.latitude],
+      coordinates: [record.location.coordinates[0], record.location.coordinates[1]],
     },
     lastLocation: {
       type:        'Point',
-      coordinates: [record.longitude, record.latitude],
+      coordinates: [record.location.coordinates[0], record.location.coordinates[1]],
     },
     lastMovement:   new Date(record.timestamp).getTime(),
     maxSpeed:       record.speed || 0,
     distanceMetres: 0,
-    prevLat:        record.latitude,
-    prevLon:        record.longitude,
+    prevLat:        record.location.coordinates[1],
+    prevLon:        record.location.coordinates[0],
   }
 
   await redis.set(tripKey, JSON.stringify(trip))
@@ -60,20 +60,20 @@ async function startTrip(redis, tripKey, imei, companyId, vehicleId, record) {
 async function updateActiveTrip(redis, tripKey, activeTrip, record) {
   const dist = haversine(
     activeTrip.prevLat, activeTrip.prevLon,
-    record.latitude,    record.longitude
+    record.location.coordinates[1], record.location.coordinates[0]
   )
 
   const updated = {
     ...activeTrip,
     lastLocation: {
       type:        'Point',
-      coordinates: [record.longitude, record.latitude],
+      coordinates: [record.location.coordinates[0], record.location.coordinates[1]],
     },
     lastMovement:   new Date(record.timestamp).getTime(),
     maxSpeed:       Math.max(activeTrip.maxSpeed, record.speed || 0),
     distanceMetres: activeTrip.distanceMetres + dist,
-    prevLat:        record.latitude,
-    prevLon:        record.longitude,
+    prevLat:        record.location.coordinates[1],
+    prevLon:        record.location.coordinates[0],
   }
 
   await redis.set(tripKey, JSON.stringify(updated))
@@ -103,7 +103,7 @@ async function endTrip(redis, tripKey, activeTrip, record, vehicleId, companyId)
     startLocation: activeTrip.startLocation,
     endLocation: {
       type:        'Point',
-      coordinates: [record.longitude, record.latitude],
+      coordinates: [record.location.coordinates[0], record.location.coordinates[1]],
     },
     distanceKm,
     durationMinutes,

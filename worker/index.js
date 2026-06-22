@@ -71,6 +71,8 @@ async function processPayload(payload) {
     angle:           doc.angle,
     ignition:        doc.ignition,
     externalVoltage: doc.externalVoltage,
+    batteryVoltage:  doc.batteryVoltage,
+    gsmSignal:       doc.gsmSignal,
     odometer:        doc.odometer,
     timestamp:       doc.timestamp,
   })
