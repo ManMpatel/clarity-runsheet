@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "306923115510",
+    "project_id": "clarity-fleet",
+    "storage_bucket": "clarity-fleet.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:306923115510:android:7828d96b2023a6b53bedd7",
+        "android_client_info": {
+          "package_name": "au.com.claritysoftware.fleet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBz9fDon4KoF58twoUE6QQzjp5Fh2LPP3Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
