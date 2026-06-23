@@ -23,13 +23,17 @@ const supportRoutes = require('./routes/support')
 const adminAuthRoutes   = require('./routes/admin-auth')
 const imeiRoutes      = require('./routes/imei')
 const referralRoutes  = require('./routes/referrals')
+const billingRoutes   = require('./routes/billing')
 const passport   = require('passport')
 
 const app  = express()
 const PORT = process.env.PORT || 3000
 
 app.use(cors({ origin: process.env.DASHBOARD_URL || 'http://localhost:5173' }))
-app.use(express.json())
+app.use((req, res, next) => {
+  if (req.originalUrl === '/api/billing/webhook') return next()
+  express.json()(req, res, next)
+})
 app.use(rateLimiter)
 
 app.use(passport.initialize())
@@ -51,6 +55,7 @@ app.use('/api/upgrade', upgradeRoutes)
 app.use('/api/support', supportRoutes)
 app.use('/api/imei',      imeiRoutes)
 app.use('/api/referrals', referralRoutes)
+app.use('/api/billing',   billingRoutes)
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
