@@ -17,7 +17,14 @@ export default function LiveMap() {
 
   useSocket((vanData) => {
     updateVan(vanData)
-    if (mapReady) updateMarker(vanData)
+    if (mapReady) {
+      if (!markers.current[vanData.imei]) {
+        const mapboxgl = window._mapboxgl
+        if (mapboxgl) addMarker(mapboxgl, { ...vanData, name: vanData.imei })
+      } else {
+        updateMarker(vanData)
+      }
+    }
   })
 
   useEffect(() => {
@@ -35,6 +42,7 @@ export default function LiveMap() {
   useEffect(() => {
     async function initMap() {
       const mapboxgl = (await import('mapbox-gl')).default
+      window._mapboxgl = mapboxgl
       await import('mapbox-gl/dist/mapbox-gl.css')
 
       mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN
