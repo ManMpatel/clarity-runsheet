@@ -8,8 +8,6 @@ export default function TripsHistory() {
   const [replayPoints,  setReplayPoints]  = useState([])
   const [replayLoading, setReplayLoading] = useState(false)
   const [showReplay,    setShowReplay]    = useState(false)
-  const [replayPoints,   setReplayPoints]   = useState([])
-  const [replayLoading,  setReplayLoading]  = useState(false)
   const [vehicles, setVehicles] = useState([])
   const [filters, setFilters]   = useState({
     vehicleId: '',
