@@ -8,6 +8,7 @@ import VehiclesSection   from './VehiclesSection'
 import UsersSection      from './UsersSection'
 import PlanSection       from './PlanSection'
 import UpgradeSection    from './UpgradeSection'
+import Billing           from '../Billing'
 import AppearanceSection from './AppearanceSection'
 import AlertsSection from './AlertsSection'
 
@@ -26,7 +27,10 @@ const NAV = [
 export default function SettingsLayout() {
   const navigate = useNavigate()
   const logout   = useAuthStore(s => s.logout)
-  const [section, setSection] = useState('profile')
+  const [section, setSection] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('tab') || 'profile'
+  })
   const [loading, setLoading] = useState(true)
   const [me, setMe]           = useState(null)
   const [company, setCompany] = useState(null)
@@ -122,6 +126,7 @@ export default function SettingsLayout() {
         {section === 'users'      && <UsersSection      {...sharedProps} />}
         {section === 'plan'       && <PlanSection       {...sharedProps} />}
         {section === 'upgrade'    && <UpgradeSection    {...sharedProps} />}
+        {section === 'billing'    && <Billing />}
         {section === 'appearance' && <AppearanceSection {...sharedProps} />}
         {section === 'alerts' && <AlertsSection />}
 
