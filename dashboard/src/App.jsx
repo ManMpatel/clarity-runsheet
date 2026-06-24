@@ -36,6 +36,7 @@ import AdminCommissions  from './pages/admin/AdminCommissions'
 import Drivers from './pages/Drivers'
 import Privacy from './pages/Privacy'
 import Terms   from './pages/Terms'
+import DeleteAccount from './pages/DeleteAccount';
 
 
 function TierGate({ tier, children }) {
@@ -127,6 +128,8 @@ export default function App() {
         <Route path='billing'                element={<Billing />} />
         <Route path='/privacy' element={<Privacy />} />
         <Route path='/terms'   element={<Terms />} />
+        <Route path="/delete-account" element={<DeleteAccount />} />
+
       </Route>
 
     </Routes>
