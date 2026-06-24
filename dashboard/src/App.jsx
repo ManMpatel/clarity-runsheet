@@ -35,6 +35,7 @@ import GarageEarnings    from './pages/garage/GarageEarnings'
 import AdminCommissions  from './pages/admin/AdminCommissions'
 import Drivers from './pages/Drivers'
 import Privacy from './pages/Privacy'
+import Terms   from './pages/Terms'
 
 
 function TierGate({ tier, children }) {
@@ -125,6 +126,7 @@ export default function App() {
         <Route path='garage/earnings' element={<GarageEarnings />} />
         <Route path='billing'                element={<Billing />} />
         <Route path='/privacy' element={<Privacy />} />
+        <Route path='/terms'   element={<Terms />} />
       </Route>
 
     </Routes>
