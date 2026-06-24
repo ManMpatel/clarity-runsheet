@@ -47,7 +47,7 @@ export default function SettingsLayout() {
         setCompany(cRes.data)
         setUsers(uRes.data)
         setVehicles(vRes.data)
-        const sRes = await api.get(`/api/admin/companies/${cRes.data._id}/slots`).catch(() => null)
+        const sRes = null // slots fetched via billing status instead
         if (sRes) setSlots(sRes.data)
       } catch (err) {
         console.error(err.message)
