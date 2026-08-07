@@ -64,7 +64,7 @@ router.get('/status', requireAuth, requireCompany, asyncRoute(async (req, res) =
 
 router.get('/:id', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   const [vehicle] = await db.select().from(vehicles)
-    .where(and(eq(vehicles.id, req.params.id), eq(vehicles.companyId, req.companyId!)))
+    .where(and(eq(vehicles.id, (req.params.id as string)), eq(vehicles.companyId, req.companyId!)))
     .limit(1)
   if (!vehicle) return res.fail(null, 'Vehicle not found', 404)
   return res.success(vehicle)
@@ -103,7 +103,7 @@ router.put('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'sup
 
   const [updated] = await db.update(vehicles).set({
     name, registration, make, model, year, driverMobile, active, updatedAt: new Date(),
-  }).where(and(eq(vehicles.id, req.params.id), eq(vehicles.companyId, req.companyId!))).returning()
+  }).where(and(eq(vehicles.id, (req.params.id as string)), eq(vehicles.companyId, req.companyId!))).returning()
 
   if (!updated) return res.fail(null, 'Vehicle not found', 404)
   return res.success(updated)
@@ -111,7 +111,7 @@ router.put('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'sup
 
 router.delete('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
   const [updated] = await db.update(vehicles).set({ active: false, updatedAt: new Date() })
-    .where(and(eq(vehicles.id, req.params.id), eq(vehicles.companyId, req.companyId!))).returning()
+    .where(and(eq(vehicles.id, (req.params.id as string)), eq(vehicles.companyId, req.companyId!))).returning()
 
   if (!updated) return res.fail(null, 'Vehicle not found', 404)
   return res.success({ success: true })
@@ -124,7 +124,7 @@ router.put('/:id/tier', requireAuth, requireCompany, asyncRoute(async (req, res)
   }
 
   const [vehicle] = await db.select().from(vehicles)
-    .where(and(eq(vehicles.id, req.params.id), eq(vehicles.companyId, req.companyId!)))
+    .where(and(eq(vehicles.id, (req.params.id as string)), eq(vehicles.companyId, req.companyId!)))
     .limit(1)
   if (!vehicle) return res.fail(null, 'Vehicle not found', 404)
   if (vehicle.tierChangesRemaining <= 0) {
@@ -170,7 +170,7 @@ router.put('/:id/tier', requireAuth, requireCompany, asyncRoute(async (req, res)
 
 router.post('/:id/cut', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
   const [vehicle] = await db.select().from(vehicles)
-    .where(and(eq(vehicles.id, req.params.id), eq(vehicles.companyId, req.companyId!)))
+    .where(and(eq(vehicles.id, (req.params.id as string)), eq(vehicles.companyId, req.companyId!)))
     .limit(1)
   if (!vehicle) return res.fail(null, 'Vehicle not found', 404)
   if (!vehicle.imei) return res.fail(null, 'Vehicle has no IMEI registered')
@@ -207,7 +207,7 @@ router.post('/:id/cut', requireAuth, requireCompany, requireRole('companyAdmin',
 
 router.post('/:id/restore', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
   const [vehicle] = await db.select().from(vehicles)
-    .where(and(eq(vehicles.id, req.params.id), eq(vehicles.companyId, req.companyId!)))
+    .where(and(eq(vehicles.id, (req.params.id as string)), eq(vehicles.companyId, req.companyId!)))
     .limit(1)
   if (!vehicle) return res.fail(null, 'Vehicle not found', 404)
   if (!vehicle.imei) return res.fail(null, 'Vehicle has no IMEI registered')

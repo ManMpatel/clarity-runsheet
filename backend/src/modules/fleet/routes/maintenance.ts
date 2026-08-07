@@ -51,7 +51,7 @@ router.put('/:id/complete', requireAuth, requireCompany, requireRole('companyAdm
     nextDueDate: nextDueDate || null,
     nextDueOdometer: nextDueOdometer || null,
     updatedAt: new Date(),
-  }).where(and(eq(maintenance.id, req.params.id), eq(maintenance.companyId, req.companyId!))).returning()
+  }).where(and(eq(maintenance.id, (req.params.id as string)), eq(maintenance.companyId, req.companyId!))).returning()
 
   if (!updated) return res.fail(null, 'Record not found', 404)
   return res.success(updated)

@@ -57,7 +57,7 @@ router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
 }))
 
 router.get('/:id', requireAuth, requireCompany, asyncRoute(async (req, res) => {
-  const zone = await fetchZone(req.params.id, req.companyId!)
+  const zone = await fetchZone((req.params.id as string), req.companyId!)
   if (!zone) return res.fail(null, 'Zone not found', 404)
   return res.success(zone)
 }))
@@ -95,7 +95,7 @@ router.put('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'fle
 
   const [updated] = await db.update(geofences).set({
     name, alertOnExit, alertOnEntry, activeHoursOnly, active, updatedAt: new Date(),
-  }).where(and(eq(geofences.id, req.params.id), eq(geofences.companyId, req.companyId!))).returning()
+  }).where(and(eq(geofences.id, (req.params.id as string)), eq(geofences.companyId, req.companyId!))).returning()
 
   if (!updated) return res.fail(null, 'Zone not found', 404)
 
@@ -116,7 +116,7 @@ router.put('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'fle
 
 router.delete('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
   const [zone] = await db.select().from(geofences)
-    .where(and(eq(geofences.id, req.params.id), eq(geofences.companyId, req.companyId!)))
+    .where(and(eq(geofences.id, (req.params.id as string)), eq(geofences.companyId, req.companyId!)))
     .limit(1)
   if (!zone) return res.success({ success: true })
 
@@ -130,7 +130,7 @@ router.get('/:id/events', requireAuth, requireCompany, asyncRoute(async (req, re
 
   const conditions = [
     eq(geofenceEvents.companyId, req.companyId!),
-    eq(geofenceEvents.zoneId, req.params.id),
+    eq(geofenceEvents.zoneId, (req.params.id as string)),
   ]
   if (from && to) {
     conditions.push(gte(geofenceEvents.timestamp, new Date(from)))

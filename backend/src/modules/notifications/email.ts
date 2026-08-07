@@ -84,7 +84,7 @@ async function sendSupportAdminNotification(ticket) {
   }
 }
 
-module.exports = {
+export {
   sendUpgradeNotification,
   sendSupportAutoReply,
   sendSupportAdminNotification,

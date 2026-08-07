@@ -18,7 +18,7 @@ router.post('/request', requireAuth, requireCompany, asyncRoute(async (req, res)
   const [request] = await db.insert(upgradeRequests).values({
     companyId: req.companyId!,
     companyName: company?.name || req.companyId!,
-    requestedBy: req.user!.userId,
+    requestedBy: (req.user!.userId as string),
     entrySlots: parseInt(entrySlots, 10) || 0,
     midSlots: parseInt(midSlots, 10) || 0,
     topSlots: parseInt(topSlots, 10) || 0,

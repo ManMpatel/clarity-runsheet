@@ -3,7 +3,11 @@
 // per the hard constraint. What changed is everything downstream of the dequeue: Mongo lookups
 // and writes replaced with Drizzle/Postgres, the Redis van:state cache replaced by enrichment's
 // vehicle_state upsert, and alert triggers now firing both a socket emit and a push dispatch.
-require('dotenv').config()
+// See api.ts's matching comment: `import 'dotenv/config'` (not `require('dotenv').config()`)
+// because import statements hoist above other code once compiled — must be the first import so
+// env vars are loaded before any module below reads process.env at load time (e.g. db/client.ts's
+// pg Pool constructor).
+import 'dotenv/config'
 import { eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { vehicles } from '../db/schema'

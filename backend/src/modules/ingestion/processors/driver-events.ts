@@ -12,7 +12,7 @@ const GREEN_DRIVING_TYPES: Record<number, 'harshBraking' | 'harshAcceleration' |
 }
 
 export async function processDriverEvents(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry) {
-  const events = []
+  const events: (typeof driverEvents.$inferSelect)[] = []
 
   if (record.crashDetection && record.crashDetection > 0) {
     events.push(await saveCrashEvent(imei, companyId, vehicleId, record))

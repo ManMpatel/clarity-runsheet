@@ -67,7 +67,7 @@ router.put('/users/:id/role', requireAuth, requireCompany,
   const { role } = req.body
 
   const [updated] = await db.update(users).set({ role, updatedAt: new Date() })
-    .where(and(eq(users.id, req.params.id), eq(users.companyId, req.companyId!)))
+    .where(and(eq(users.id, (req.params.id as string)), eq(users.companyId, req.companyId!)))
     .returning()
 
   if (!updated) return res.fail(null, 'User not found', 404)

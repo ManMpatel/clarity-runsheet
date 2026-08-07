@@ -59,7 +59,7 @@ router.put('/:id/classify', requireAuth, requireCompany, asyncRoute(async (req, 
   }
 
   const [trip] = await db.select().from(trips)
-    .where(and(eq(trips.id, req.params.id), eq(trips.companyId, req.companyId!)))
+    .where(and(eq(trips.id, (req.params.id as string)), eq(trips.companyId, req.companyId!)))
     .limit(1)
   if (!trip) return res.fail(null, 'Trip not found', 404)
 
@@ -75,7 +75,7 @@ router.put('/:id/classify', requireAuth, requireCompany, asyncRoute(async (req, 
     classifiedAt: new Date(),
     classifiedBy: req.user!.userId,
     updatedAt: new Date(),
-  }).where(and(eq(trips.id, req.params.id), eq(trips.companyId, req.companyId!))).returning()
+  }).where(and(eq(trips.id, (req.params.id as string)), eq(trips.companyId, req.companyId!))).returning()
 
   return res.success(updated)
 }))

@@ -19,7 +19,7 @@ router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
 
 router.get('/:id', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   const [driver] = await db.select().from(drivers)
-    .where(and(eq(drivers.id, req.params.id), eq(drivers.companyId, req.companyId!)))
+    .where(and(eq(drivers.id, (req.params.id as string)), eq(drivers.companyId, req.companyId!)))
     .limit(1)
   if (!driver) return res.fail(null, 'Driver not found', 404)
   return res.success(driver)
@@ -27,7 +27,7 @@ router.get('/:id', requireAuth, requireCompany, asyncRoute(async (req, res) => {
 
 router.get('/:id/score', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   const history = await db.select().from(safetyScores)
-    .where(and(eq(safetyScores.driverId, req.params.id), eq(safetyScores.companyId, req.companyId!)))
+    .where(and(eq(safetyScores.driverId, (req.params.id as string)), eq(safetyScores.companyId, req.companyId!)))
     .orderBy(desc(safetyScores.weekStart))
     .limit(12)
   return res.success(history)
@@ -37,7 +37,7 @@ router.get('/:id/score', requireAuth, requireCompany, asyncRoute(async (req, res
 // Permanent log of every vehicle assignment change — never deleted
 router.get('/:id/history', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   const history = await db.select().from(driverHistory)
-    .where(and(eq(driverHistory.driverId, req.params.id), eq(driverHistory.companyId, req.companyId!)))
+    .where(and(eq(driverHistory.driverId, (req.params.id as string)), eq(driverHistory.companyId, req.companyId!)))
     .orderBy(desc(driverHistory.startedAt))
   return res.success(history)
 }))
@@ -69,7 +69,7 @@ router.put('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'sup
     name, email, mobile, licenceNumber,
     licenceExpiry: licenceExpiry || null,
     vehicleId, active, updatedAt: new Date(),
-  }).where(and(eq(drivers.id, req.params.id), eq(drivers.companyId, req.companyId!))).returning()
+  }).where(and(eq(drivers.id, (req.params.id as string)), eq(drivers.companyId, req.companyId!))).returning()
 
   if (!updated) return res.fail(null, 'Driver not found', 404)
   return res.success(updated)
@@ -80,7 +80,7 @@ router.put('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'sup
 // When driver changes, old record gets endedAt, new record created
 router.put('/:id/assign-vehicle', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
   const { vehicleId } = req.body
-  const driverId = req.params.id
+  const driverId = (req.params.id as string)
 
   const [driver] = await db.select().from(drivers)
     .where(and(eq(drivers.id, driverId), eq(drivers.companyId, req.companyId!)))

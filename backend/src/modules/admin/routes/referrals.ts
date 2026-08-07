@@ -99,7 +99,7 @@ router.post('/admin/:garageId/settle', requireSuperAdmin, asyncRoute(async (req,
   // settlements.amount is an integer column (whole cents/dollars, per schema) — round the
   // incoming float rather than truncate via a raw Postgres type-cast error.
   const [record] = await db.insert(settlements).values({
-    garageCompanyId: req.params.garageId,
+    garageCompanyId: (req.params.garageId as string),
     amount: Math.round(parseFloat(amount)),
     period,
     note: note || '',

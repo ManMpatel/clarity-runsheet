@@ -40,4 +40,4 @@ async function sendWhatsApp(to, message) {
   }
 }
 
-module.exports = { sendSms, sendWhatsApp }
+export { sendSms, sendWhatsApp }

@@ -1,16 +1,19 @@
-const bcrypt = require('bcryptjs')
-const { MongoClient } = require('mongodb')
-require('dotenv').config({ path: './.env' })
+// Ported from api/scripts/create-admin.js. Seeds the first super-admin account. Targets the
+// merged `users` table (role='superAdmin') instead of a separate super_admins collection — see
+// the schema comment in db/schema/users.ts for why that merge happened.
+import bcrypt from 'bcryptjs'
+import { eq, and } from 'drizzle-orm'
+import 'dotenv/config'
+import { db, pool } from '../src/db/client'
+import { users } from '../src/db/schema'
+
+const ADMIN_EMAIL = 'admin@claritysoftware.au'
 
 async function createAdmin() {
-  const client = new MongoClient(process.env.MONGO_URI)
-
   try {
-    await client.connect()
-    const db = client.db()
-    const admins = db.collection('super_admins')
+    const [existing] = await db.select().from(users)
+      .where(and(eq(users.email, ADMIN_EMAIL), eq(users.role, 'superAdmin'))).limit(1)
 
-    const existing = await admins.findOne({ email: 'admin@claritysoftware.au' })
     if (existing) {
       console.log('Admin already exists — aborting')
       process.exit(0)
@@ -18,21 +21,23 @@ async function createAdmin() {
 
     const passwordHash = await bcrypt.hash('Admin2026!', 12)
 
-    await admins.insertOne({
-      email:       'admin@claritysoftware.au',
+    await db.insert(users).values({
+      email: ADMIN_EMAIL,
+      name: 'Super Admin',
       passwordHash,
-      totpSecret:  null,
-      createdAt:   new Date(),
+      role: 'superAdmin',
+      companyId: null,
+      emailVerified: true,
     })
 
     console.log('Admin account created successfully')
-    console.log('Email:    admin@claritysoftware.au')
+    console.log('Email:    ' + ADMIN_EMAIL)
     console.log('Password: Admin2026!')
-    console.log('Next: call POST /admin/auth/setup-totp to configure Google Authenticator')
-  } catch (err) {
+    console.log('Next: call POST /api/v1/admin/auth/setup-totp to configure Google Authenticator')
+  } catch (err: any) {
     console.error('Error:', err.message)
   } finally {
-    await client.close()
+    await pool.end()
   }
 }
 

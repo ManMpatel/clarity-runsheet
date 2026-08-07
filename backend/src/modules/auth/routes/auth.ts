@@ -137,14 +137,14 @@ router.post('/logout', asyncRoute(async (req, res) => {
 }))
 
 router.get('/me', requireAuth, asyncRoute(async (req, res) => {
-  const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId)).limit(1)
+  const [user] = await db.select().from(users).where(eq(users.id, (req.user!.userId as string))).limit(1)
   if (!user) return res.fail(null, 'User not found', 404)
   const { passwordHash, ...safe } = user
   return res.success(safe)
 }))
 
 router.post('/resend-verification', requireAuth, asyncRoute(async (req, res) => {
-  const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId)).limit(1)
+  const [user] = await db.select().from(users).where(eq(users.id, (req.user!.userId as string))).limit(1)
   if (!user) return res.fail(null, 'User not found', 404)
   if (user.emailVerified) return res.fail(null, 'Email already verified')
 
@@ -163,7 +163,7 @@ router.put('/profile', requireAuth, asyncRoute(async (req, res) => {
   if (!name) return res.fail(null, 'Name required')
 
   const [updated] = await db.update(users).set({ name, updatedAt: new Date() })
-    .where(eq(users.id, req.user!.userId)).returning()
+    .where(eq(users.id, (req.user!.userId as string))).returning()
   const { passwordHash, ...safe } = updated
   return res.success(safe)
 }))
@@ -173,7 +173,7 @@ router.put('/password', requireAuth, asyncRoute(async (req, res) => {
   if (!currentPassword || !newPassword) return res.fail(null, 'Both passwords required')
   if (newPassword.length < 8) return res.fail(null, 'Password must be at least 8 characters')
 
-  const [user] = await db.select().from(users).where(eq(users.id, req.user!.userId)).limit(1)
+  const [user] = await db.select().from(users).where(eq(users.id, (req.user!.userId as string))).limit(1)
   const valid = await verifyPassword(currentPassword, user.passwordHash!)
   if (!valid) return res.fail(null, 'Current password incorrect', 401)
 

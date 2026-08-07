@@ -37,7 +37,7 @@ router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
 
 router.put('/:id/read', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   await db.update(alerts).set({ read: true, readAt: new Date() })
-    .where(and(eq(alerts.id, req.params.id), eq(alerts.companyId, req.companyId!)))
+    .where(and(eq(alerts.id, (req.params.id as string)), eq(alerts.companyId, req.companyId!)))
   return res.success({ success: true })
 }))
 

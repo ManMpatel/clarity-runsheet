@@ -5,12 +5,12 @@
     "moduleResolution": "node",
     "lib": ["ES2022"],
     "outDir": "dist",
-    "rootDir": "src",
     "esModuleInterop": true,
     "allowJs": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": false,
+    "strictNullChecks": true,
     "noImplicitAny": false,
     "forceConsistentCasingInFileNames": true
   },

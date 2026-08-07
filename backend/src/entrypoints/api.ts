@@ -2,7 +2,12 @@
 // response goes through the {success,message,data,errors} envelope, and Postgres/Drizzle
 // replaces the Mongo native driver + api/db/setup.js's ad-hoc index bootstrap (indexes now live
 // in the Drizzle schema + migrations instead of being created imperatively at boot).
-require('dotenv').config()
+// `import 'dotenv/config'` (not `require('dotenv').config()`) deliberately — ES `import`
+// statements hoist above other code once compiled to CJS, so a plain `require()` written first
+// in source would still run AFTER later `import`s like `passport` below, which reads
+// GOOGLE_CLIENT_ID from process.env at module-load time. Being the first import guarantees env
+// vars are loaded before anything else that depends on them at import time.
+import 'dotenv/config'
 import path from 'path'
 import express from 'express'
 import cors from 'cors'

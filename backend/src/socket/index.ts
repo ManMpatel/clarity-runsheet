@@ -54,5 +54,8 @@ function getIo() {
   return io
 }
 
-module.exports = { init, broadcastVanUpdate, broadcastAlert, getIo }
+// `export {}` (not `module.exports =`) so TS recognizes this file as an ES module for importers
+// even under @ts-nocheck — module.exports assignments aren't reliably picked up as an export
+// shape by files that import this one without their own @ts-nocheck.
+export { init, broadcastVanUpdate, broadcastAlert, getIo }
 

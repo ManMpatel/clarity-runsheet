@@ -58,20 +58,20 @@ router.post('/companies', requireSuperAdmin, asyncRoute(async (req, res) => {
 router.put('/companies/:id/tier', requireSuperAdmin, asyncRoute(async (req, res) => {
   const { subscriptionTier } = req.body
   await db.update(companies).set({ subscriptionTier, updatedAt: new Date() })
-    .where(eq(companies.id, req.params.id))
+    .where(eq(companies.id, (req.params.id as string)))
   return res.success({ success: true })
 }))
 
 router.get('/companies/:id/slots', requireSuperAdmin, asyncRoute(async (req, res) => {
-  const [company] = await db.select().from(companies).where(eq(companies.id, req.params.id)).limit(1)
+  const [company] = await db.select().from(companies).where(eq(companies.id, (req.params.id as string))).limit(1)
   if (!company) return res.fail(null, 'Company not found', 404)
 
   const entryUsed = (await db.select().from(vehicles)
-    .where(and(eq(vehicles.companyId, req.params.id), eq(vehicles.tier, 'entry'), eq(vehicles.active, true)))).length
+    .where(and(eq(vehicles.companyId, (req.params.id as string)), eq(vehicles.tier, 'entry'), eq(vehicles.active, true)))).length
   const midUsed = (await db.select().from(vehicles)
-    .where(and(eq(vehicles.companyId, req.params.id), eq(vehicles.tier, 'mid'), eq(vehicles.active, true)))).length
+    .where(and(eq(vehicles.companyId, (req.params.id as string)), eq(vehicles.tier, 'mid'), eq(vehicles.active, true)))).length
   const topUsed = (await db.select().from(vehicles)
-    .where(and(eq(vehicles.companyId, req.params.id), eq(vehicles.tier, 'top'), eq(vehicles.active, true)))).length
+    .where(and(eq(vehicles.companyId, (req.params.id as string)), eq(vehicles.tier, 'top'), eq(vehicles.active, true)))).length
 
   return res.success({
     company,
@@ -88,12 +88,12 @@ router.put('/companies/:id/slots', requireSuperAdmin, asyncRoute(async (req, res
     midSlots: parseInt(midSlots, 10) || 0,
     topSlots: parseInt(topSlots, 10) || 0,
     updatedAt: new Date(),
-  }).where(eq(companies.id, req.params.id)).returning()
+  }).where(eq(companies.id, (req.params.id as string))).returning()
 
   const highestTier = parseInt(topSlots, 10) > 0 ? 'top'
     : parseInt(midSlots, 10) > 0 ? 'mid'
     : parseInt(entrySlots, 10) > 0 ? 'entry' : 'locked'
-  await db.update(companies).set({ subscriptionTier: highestTier }).where(eq(companies.id, req.params.id))
+  await db.update(companies).set({ subscriptionTier: highestTier }).where(eq(companies.id, (req.params.id as string)))
 
   return res.success(updated)
 }))
@@ -103,17 +103,17 @@ router.put('/companies/:id/account-type', requireSuperAdmin, asyncRoute(async (r
   if (!['individual', 'contractor', 'garage_owner'].includes(accountType)) {
     return res.fail(null, 'Invalid account type')
   }
-  await db.update(companies).set({ accountType, updatedAt: new Date() }).where(eq(companies.id, req.params.id))
+  await db.update(companies).set({ accountType, updatedAt: new Date() }).where(eq(companies.id, (req.params.id as string)))
   return res.success({ success: true })
 }))
 
 router.put('/companies/:id/revoke', requireSuperAdmin, asyncRoute(async (req, res) => {
-  await db.update(companies).set({ active: false, updatedAt: new Date() }).where(eq(companies.id, req.params.id))
+  await db.update(companies).set({ active: false, updatedAt: new Date() }).where(eq(companies.id, (req.params.id as string)))
   return res.success({ success: true })
 }))
 
 router.delete('/companies/:id', requireSuperAdmin, asyncRoute(async (req, res) => {
-  const id = req.params.id
+  const id = (req.params.id as string)
   // Delete children before the parent — Postgres enforces the company_id FK (Mongo did not),
   // so this ordering is required for the delete to succeed at all. Note: other tables that
   // reference this company (drivers, trips, devices, settlements, safety_scores,
@@ -134,7 +134,7 @@ router.get('/upgrade-requests', requireSuperAdmin, asyncRoute(async (req, res) =
 router.put('/upgrade-requests/:id/action', requireSuperAdmin, asyncRoute(async (req, res) => {
   const { action } = req.body
   const [updated] = await db.update(upgradeRequests).set({ status: action, actionedAt: new Date() })
-    .where(eq(upgradeRequests.id, req.params.id)).returning()
+    .where(eq(upgradeRequests.id, (req.params.id as string))).returning()
   return res.success(updated)
 }))
 
@@ -147,7 +147,7 @@ router.put('/companies/:id/set-role', requireSuperAdmin, asyncRoute(async (req, 
   if (!['contractor', 'garageOwner'].includes(role)) {
     return res.fail(null, 'Invalid role')
   }
-  await db.update(companies).set({ role, updatedAt: new Date() }).where(eq(companies.id, req.params.id))
+  await db.update(companies).set({ role, updatedAt: new Date() }).where(eq(companies.id, (req.params.id as string)))
   return res.success({ success: true })
 }))
 
@@ -159,21 +159,21 @@ router.get('/devices', requireSuperAdmin, asyncRoute(async (req, res) => {
 
 router.get('/companies/:id/devices', requireSuperAdmin, asyncRoute(async (req, res) => {
   const list = await db.select().from(devices)
-    .where(eq(devices.registeredByCompanyId, req.params.id))
+    .where(eq(devices.registeredByCompanyId, (req.params.id as string)))
     .orderBy(desc(devices.registeredAt))
   return res.success(list)
 }))
 
 router.get('/companies/:id/vehicles', requireSuperAdmin, asyncRoute(async (req, res) => {
   const list = await db.select().from(vehicles)
-    .where(and(eq(vehicles.companyId, req.params.id), eq(vehicles.active, true)))
+    .where(and(eq(vehicles.companyId, (req.params.id as string)), eq(vehicles.active, true)))
     .orderBy(desc(vehicles.createdAt))
   return res.success(list)
 }))
 
 router.get('/companies/:id/users', requireSuperAdmin, asyncRoute(async (req, res) => {
   const list = await db.select().from(users)
-    .where(eq(users.companyId, req.params.id))
+    .where(eq(users.companyId, (req.params.id as string)))
     .orderBy(desc(users.createdAt))
   const safe = list.map(({ passwordHash, ...rest }) => rest)
   return res.success(safe)
@@ -188,7 +188,7 @@ router.put('/companies/:id/billing', requireSuperAdmin, asyncRoute(async (req, r
     billingMode,
     customPrice: customPrice != null ? String(parseFloat(customPrice)) : null,
     updatedAt: new Date(),
-  }).where(eq(companies.id, req.params.id))
+  }).where(eq(companies.id, (req.params.id as string)))
   return res.success({ success: true })
 }))
 

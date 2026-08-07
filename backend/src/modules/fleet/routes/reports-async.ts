@@ -22,7 +22,7 @@ router.post('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
 
 router.get('/:id', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   const [job] = await db.select().from(reportJobs)
-    .where(and(eq(reportJobs.id, req.params.id), eq(reportJobs.companyId, req.companyId!)))
+    .where(and(eq(reportJobs.id, (req.params.id as string)), eq(reportJobs.companyId, req.companyId!)))
     .limit(1)
   if (!job) return res.fail(null, 'Report job not found', 404)
 

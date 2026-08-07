@@ -12,7 +12,7 @@ router.post('/register-device', requireAuth, asyncRoute(async (req, res) => {
   const { platform, token } = req.body
   if (!platform || !token) return res.fail(null, 'platform and token required')
 
-  await registerDeviceToken(req.user!.userId, platform, token)
+  await registerDeviceToken(req.user!.userId as string, platform, token)
   return res.success(null, 'Device registered')
 }))
 

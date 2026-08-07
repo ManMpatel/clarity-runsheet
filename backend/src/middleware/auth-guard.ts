@@ -6,8 +6,19 @@ import { verifyAccessToken, type TokenPayload } from '../modules/auth/services/t
 
 declare global {
   namespace Express {
+    // Augments Passport's own `Express.User` (declared by @types/passport as an empty
+    // interface) rather than redeclaring `Request.user` directly — Passport already
+    // declares `Request.user?: User`, so a separate `user?: TokenPayload` here would
+    // conflict. `req.user` legitimately carries two different shapes depending on which
+    // auth path populated it: requireAuth's JWT decode sets TokenPayload; the web Google
+    // OAuth callback (passport.ts's `done(null, user)`) sets the full `users` DB row before
+    // a token is even issued yet. Loosely typed rather than a strict union of the two,
+    // since call sites already cast explicitly where they need a specific shape (see
+    // routes/google.ts's callback handler).
+    interface User extends Partial<TokenPayload> {
+      [key: string]: any
+    }
     interface Request {
-      user?: TokenPayload
       companyId?: string | null
       role?: string
       subscriptionTier?: string | null

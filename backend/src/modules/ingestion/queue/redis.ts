@@ -23,4 +23,4 @@ function getClient() {
   return client
 }
 
-module.exports = { getClient }
+export { getClient }
