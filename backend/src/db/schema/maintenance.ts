@@ -6,8 +6,8 @@ export const maintenanceStatusEnum = pgEnum('maintenance_status', ['pending', 'c
 
 export const maintenance = pgTable('maintenance', {
   id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
-  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
   type: text('type').notNull(),
   dueDate: date('due_date'),
   dueOdometer: integer('due_odometer'),

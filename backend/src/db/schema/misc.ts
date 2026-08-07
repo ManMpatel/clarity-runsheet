@@ -5,7 +5,7 @@ export const upgradeRequestStatusEnum = pgEnum('upgrade_request_status', ['pendi
 
 export const upgradeRequests = pgTable('upgrade_requests', {
   id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
   companyName: text('company_name').notNull(),
   requestedBy: text('requested_by').notNull(),
   entrySlots: integer('entry_slots').notNull().default(0),
@@ -23,7 +23,7 @@ export const devices = pgTable('devices', {
   // on insert) but none was ever created in api/db/setup.js. Real gap, fixed here.
   imei: text('imei').notNull().unique(),
   deviceType: text('device_type').notNull().default('FMC920'),
-  registeredByCompanyId: uuid('registered_by_company_id').references(() => companies.id),
+  registeredByCompanyId: uuid('registered_by_company_id').references(() => companies.id, { onDelete: 'set null' }),
   customerId: text('customer_id'),
   subscriptionStatus: text('subscription_status'),
   notes: text('notes'),
@@ -33,7 +33,7 @@ export const devices = pgTable('devices', {
 
 export const settlements = pgTable('settlements', {
   id: uuid('id').primaryKey().defaultRandom(),
-  garageCompanyId: uuid('garage_company_id').notNull().references(() => companies.id),
+  garageCompanyId: uuid('garage_company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
   amount: integer('amount').notNull(),
   period: text('period').notNull(),
   note: text('note'),
@@ -58,7 +58,7 @@ export const reportJobStatusEnum = pgEnum('report_job_status', ['pending', 'runn
 
 export const reportJobs = pgTable('report_jobs', {
   id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
   type: text('type').notNull(), // 'driver-scores' | 'fuel-idle' | 'trip-summary' | 'vehicle-health'
   status: reportJobStatusEnum('status').notNull().default('pending'),
   resultUrl: text('result_url'),

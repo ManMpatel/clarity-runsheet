@@ -5,7 +5,7 @@ import { vehicles } from './vehicles'
 
 export const geofences = pgTable('geofences', {
   id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   // Client-supplied GeoJSON polygon, now PostGIS geometry — nullable when the zone is
   // circular (centre+radius) instead of a drawn polygon.
@@ -24,8 +24,8 @@ export const geofences = pgTable('geofences', {
 // Replaces the old embedded `geofences.vehicleIds` array — a geofence with zero rows here
 // applies to all of a company's vehicles (same "empty = all" semantics as before).
 export const geofenceVehicles = pgTable('geofence_vehicles', {
-  geofenceId: uuid('geofence_id').notNull().references(() => geofences.id),
-  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id),
+  geofenceId: uuid('geofence_id').notNull().references(() => geofences.id, { onDelete: 'cascade' }),
+  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
 }, (t) => ({
   pk: primaryKey({ columns: [t.geofenceId, t.vehicleId] }),
 }))
@@ -36,9 +36,9 @@ export const geofenceEvents = pgTable('geofence_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   type: geofenceEventTypeEnum('type').notNull(),
   imei: text('imei').notNull(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
-  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id),
-  zoneId: uuid('zone_id').notNull().references(() => geofences.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
+  zoneId: uuid('zone_id').notNull().references(() => geofences.id, { onDelete: 'cascade' }),
   zoneName: text('zone_name').notNull(),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
   lat: doublePrecision('lat'),

@@ -13,8 +13,8 @@ export const alerts = pgTable('alerts', {
   id: uuid('id').primaryKey().defaultRandom(),
   type: alertTypeEnum('type').notNull(),
   imei: text('imei'), // nullable — maintenanceDue alerts have no imei
-  companyId: uuid('company_id').notNull().references(() => companies.id),
-  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
   message: text('message').notNull(),
   severity: alertSeverityEnum('severity').notNull(),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
@@ -30,7 +30,7 @@ export const alerts = pgTable('alerts', {
 
 export const alertRules = pgTable('alert_rules', {
   id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
   type: alertTypeEnum('type').notNull(),
   active: boolean('active').notNull().default(true),
   speedLimit: smallint('speed_limit'),

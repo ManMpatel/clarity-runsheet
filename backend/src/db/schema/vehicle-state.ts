@@ -13,7 +13,7 @@ export const vehicleStatusEnum = pgEnum('vehicle_status', ['moving', 'idle', 'st
 // live-map UI (VanSidePanel etc.) depends on these, so they're carried forward as real columns
 // rather than silently dropped.
 export const vehicleState = pgTable('vehicle_state', {
-  vehicleId: uuid('vehicle_id').primaryKey().references(() => vehicles.id),
+  vehicleId: uuid('vehicle_id').primaryKey().references(() => vehicles.id, { onDelete: 'cascade' }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),

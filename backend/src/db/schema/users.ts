@@ -9,7 +9,7 @@ import { companies, subscriptionTierEnum } from './companies'
 // instead of a `super_admins` collection), flagged in the migration summary for confirmation.
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').references(() => companies.id), // nullable: superAdmin users have none
+  companyId: uuid('company_id').references(() => companies.id, { onDelete: 'set null' }), // nullable: superAdmin users have none
   name: text('name').notNull(),
   email: text('email').notNull(),
   passwordHash: text('password_hash'),

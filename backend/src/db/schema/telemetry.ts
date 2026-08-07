@@ -11,8 +11,8 @@ import { vehicles } from './vehicles'
 export const telemetry = pgTable('telemetry', {
   time: timestamp('time', { withTimezone: true }).notNull(),
   imei: text('imei').notNull(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
-  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
   altitude: integer('altitude'),

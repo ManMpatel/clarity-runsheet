@@ -7,7 +7,7 @@ export const immobiliseActionEnum = pgEnum('immobilise_action', ['cut', 'restore
 
 export const vehicles = pgTable('vehicles', {
   id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
   imei: text('imei').notNull().unique(),
   registration: text('registration'),
@@ -27,17 +27,17 @@ export const vehicles = pgTable('vehicles', {
 
 export const vehicleTierHistory = pgTable('vehicle_tier_history', {
   id: uuid('id').primaryKey().defaultRandom(),
-  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id),
+  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
   fromTier: tierEnum('from_tier'),
   toTier: tierEnum('to_tier').notNull(),
   changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
-  changedBy: uuid('changed_by').references(() => users.id),
+  changedBy: uuid('changed_by').references(() => users.id, { onDelete: 'set null' }),
 })
 
 export const vehicleImmobiliseHistory = pgTable('vehicle_immobilise_history', {
   id: uuid('id').primaryKey().defaultRandom(),
-  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id),
+  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
   action: immobiliseActionEnum('action').notNull(),
-  triggeredBy: uuid('triggered_by').references(() => users.id),
+  triggeredBy: uuid('triggered_by').references(() => users.id, { onDelete: 'set null' }),
   at: timestamp('at', { withTimezone: true }).notNull().defaultNow(),
 })

@@ -3,6 +3,7 @@
 // replaces the Mongo native driver + api/db/setup.js's ad-hoc index bootstrap (indexes now live
 // in the Drizzle schema + migrations instead of being created imperatively at boot).
 require('dotenv').config()
+import path from 'path'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
@@ -54,6 +55,11 @@ app.use(platform)
 app.use(passport.initialize())
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
+
+// Serves the async report-job output written by fleet/reports-queue.ts. Single-instance-only —
+// flagged there as a follow-up to move to real blob storage (S3 etc.) if this is ever
+// horizontally scaled; this is the minimal fix so resultUrl actually resolves to something today.
+app.use('/storage/reports', express.static(path.join(__dirname, '..', '..', 'storage', 'reports')))
 
 // Web Google OAuth stays outside /api/v1 — it's a browser redirect flow, not a JSON API call.
 app.use('/auth/google', webGoogleRouter)

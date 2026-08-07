@@ -4,8 +4,8 @@ import { drivers } from './drivers'
 
 export const safetyScores = pgTable('safety_scores', {
   id: uuid('id').primaryKey().defaultRandom(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
-  driverId: uuid('driver_id').notNull().references(() => drivers.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  driverId: uuid('driver_id').notNull().references(() => drivers.id, { onDelete: 'cascade' }),
   weekStart: date('week_start').notNull(),
   weekEnd: date('week_end').notNull(),
   brakingScore: numeric('braking_score'),

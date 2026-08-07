@@ -5,7 +5,7 @@ import { users } from './users'
 // Refresh tokens are stored HASHED (sha256), never raw, so a DB read alone can't be replayed.
 export const refreshTokens = pgTable('refresh_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   tokenHash: text('token_hash').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
@@ -16,7 +16,7 @@ export const refreshTokens = pgTable('refresh_tokens', {
 // Backs the new POST /api/v1/notifications/register-device endpoint + FCM/Expo push dispatch.
 export const deviceTokens = pgTable('device_tokens', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull().references(() => users.id),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   platform: text('platform').notNull(), // 'ios' | 'android' | 'web'
   token: text('token').notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -28,7 +28,7 @@ export const deviceTokens = pgTable('device_tokens', {
 // an in-memory or Redis store — survives a process restart, which an in-memory map wouldn't.
 export const idempotencyKeys = pgTable('idempotency_keys', {
   key: text('key').primaryKey(),
-  userId: uuid('user_id').references(() => users.id),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   response: jsonb('response'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })

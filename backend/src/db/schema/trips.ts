@@ -11,9 +11,9 @@ export const classificationEnum = pgEnum('trip_classification', ['business', 'pe
 export const trips = pgTable('trips', {
   id: uuid('id').primaryKey().defaultRandom(),
   imei: text('imei').notNull(),
-  companyId: uuid('company_id').notNull().references(() => companies.id),
-  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id),
-  driverId: uuid('driver_id').references(() => drivers.id),
+  companyId: uuid('company_id').notNull().references(() => companies.id, { onDelete: 'cascade' }),
+  vehicleId: uuid('vehicle_id').notNull().references(() => vehicles.id, { onDelete: 'cascade' }),
+  driverId: uuid('driver_id').references(() => drivers.id, { onDelete: 'set null' }),
   startTime: timestamp('start_time', { withTimezone: true }).notNull(),
   endTime: timestamp('end_time', { withTimezone: true }),
   startLat: doublePrecision('start_lat'),
