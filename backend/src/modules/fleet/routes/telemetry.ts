@@ -18,7 +18,11 @@ router.get('/live', requireAuth, requireCompany, asyncRoute(async (req, res) => 
   const states = await Promise.all(
     fleet.map(async (v) => {
       const [state] = await db.select().from(vehicleState).where(eq(vehicleState.vehicleId, v.id)).limit(1)
-      return { vehicle: v, state: state || null }
+      // Both frontend/web and frontend/mobile read state.latitude/state.longitude (a wire-format
+      // contract predating this migration) — see ingestion/processors/enrichment.ts's matching
+      // comment for why the DB columns themselves stay lat/lng.
+      const aliased = state ? { ...state, latitude: state.lat, longitude: state.lng } : null
+      return { vehicle: v, state: aliased }
     })
   )
   return res.success(states)

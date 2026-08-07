@@ -93,5 +93,17 @@ export async function enrichAndSaveVanState(imei: string, companyId: string, veh
 
   // Shape returned to the caller mirrors the old Redis-cached blob's fields (imei/companyId
   // included) since worker/index.js's broadcastVanUpdate payload used them directly.
-  return { imei, companyId, ...enriched, angle: doc.angle, externalVoltage: doc.externalVoltage, batteryVoltage: doc.batteryVoltage, gsmSignal: doc.gsmSignal, timestamp: doc.time }
+  //
+  // IMPORTANT: both frontend/web (LiveMap.jsx) and frontend/mobile (HomeScreen.js) read
+  // `van.latitude`/`van.longitude` off this payload — that naming predates this migration and
+  // is a wire-format contract two independent clients already depend on. The `vehicle_state`
+  // Postgres columns are named `lat`/`lng` (shorter, fine internally), so this is the one place
+  // that translates between the two — aliased here rather than renaming the DB columns to avoid
+  // a much larger schema/query rename across every table that has a lat/lng pair.
+  return {
+    imei, companyId, ...enriched,
+    latitude: lat, longitude: lng,
+    angle: doc.angle, externalVoltage: doc.externalVoltage, batteryVoltage: doc.batteryVoltage,
+    gsmSignal: doc.gsmSignal, timestamp: doc.time,
+  }
 }
