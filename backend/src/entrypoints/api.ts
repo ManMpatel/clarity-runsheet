@@ -1,73 +1,94 @@
+// Ported from api/index.js. All routes now mount under /api/v1/* (were flat /api/*), every
+// response goes through the {success,message,data,errors} envelope, and Postgres/Drizzle
+// replaces the Mongo native driver + api/db/setup.js's ad-hoc index bootstrap (indexes now live
+// in the Drizzle schema + migrations instead of being created imperatively at boot).
 require('dotenv').config()
-const express = require('express')
-const cors = require('cors')
-const { connect } = require('./db/mongo')
-const { setupDatabase } = require('./db/setup')
-const { rateLimiter } = require('./middleware/rateLimiter')
-const upgradeRoutes = require('./routes/upgrade')
+import express from 'express'
+import cors from 'cors'
+import cookieParser from 'cookie-parser'
+import passport from '../modules/auth/passport'
+import { responseEnvelope, errorHandler } from '../middleware/response-envelope'
+import { platform } from '../middleware/platform'
+import { apiRateLimit } from '../middleware/rate-limit'
 
-const authRoutes        = require('./routes/auth')
-const googleAuthRoutes  = require('./routes/auth-google')
-const vehicleRoutes     = require('./routes/vehicles')
-const telemetryRoutes   = require('./routes/telemetry')
-const tripRoutes        = require('./routes/trips')
-const driverRoutes      = require('./routes/drivers')
-const alertRoutes       = require('./routes/alerts')
-const geofenceRoutes    = require('./routes/geofences')
-const maintenanceRoutes = require('./routes/maintenance')
-const reportsRoutes     = require('./routes/reports')
-const fbtRoutes         = require('./routes/fbt')
-const settingsRoutes    = require('./routes/settings')
-const adminRoutes       = require('./routes/admin')
-const supportRoutes = require('./routes/support')
-const adminAuthRoutes   = require('./routes/admin-auth')
-const imeiRoutes      = require('./routes/imei')
-const referralRoutes  = require('./routes/referrals')
-const billingRoutes   = require('./routes/billing')
-const passport   = require('passport')
+import authRoutes from '../modules/auth/routes/auth'
+import adminAuthRoutes from '../modules/auth/routes/admin-auth'
+import { webGoogleRouter, mobileGoogleRouter } from '../modules/auth/routes/google'
+import billingRoutes from '../modules/billing/routes/billing'
+import upgradeRoutes from '../modules/billing/routes/upgrade'
+import vehicleRoutes from '../modules/fleet/routes/vehicles'
+import telemetryRoutes from '../modules/fleet/routes/telemetry'
+import tripRoutes from '../modules/fleet/routes/trips'
+import driverRoutes from '../modules/fleet/routes/drivers'
+import geofenceRoutes from '../modules/fleet/routes/geofences'
+import maintenanceRoutes from '../modules/fleet/routes/maintenance'
+import fbtRoutes from '../modules/fleet/routes/fbt'
+import imeiRoutes from '../modules/fleet/routes/imei'
+import adminRoutes from '../modules/admin/routes/admin'
+import reportsRoutes from '../modules/admin/routes/reports'
+import settingsRoutes from '../modules/admin/routes/settings'
+import supportRoutes from '../modules/admin/routes/support'
+import referralRoutes from '../modules/admin/routes/referrals'
+import alertRoutes from '../modules/fleet/routes/alerts'
+import registerDeviceRoute from '../modules/notifications/routes/register-device'
+import reportsAsyncRoutes from '../modules/fleet/routes/reports-async'
 
-const app  = express()
+const app = express()
 const PORT = process.env.PORT || 3000
 
-app.use(cors({ origin: process.env.DASHBOARD_URL || 'http://localhost:5173' }))
+// CORS scoped to the web origin only — mobile requests aren't subject to CORS at all, that's a
+// browser-only mechanism. `credentials: true` is required for the httpOnly refresh cookie to be
+// sent/received cross-origin from the dashboard's dev server.
+app.use(cors({ origin: process.env.WEB_URL || process.env.DASHBOARD_URL || 'http://localhost:5173', credentials: true }))
+app.use(cookieParser())
+
+// Stripe's webhook needs the raw body for signature verification — must be registered before
+// express.json() touches the request. Same ordering constraint as the original.
 app.use((req, res, next) => {
-  if (req.originalUrl === '/api/billing/webhook') return next()
+  if (req.originalUrl === '/api/v1/billing/webhook') return next()
   express.json()(req, res, next)
 })
-app.use(rateLimiter)
 
+app.use(responseEnvelope)
+app.use(platform)
 app.use(passport.initialize())
-app.use('/api/auth',        authRoutes)
-app.use('/api/auth/google', googleAuthRoutes)
-app.use('/api/vehicles',    vehicleRoutes)
-app.use('/api/telemetry',   telemetryRoutes)
-app.use('/api/trips',       tripRoutes)
-app.use('/api/drivers',     driverRoutes)
-app.use('/api/alerts',      alertRoutes)
-app.use('/api/geofences',   geofenceRoutes)
-app.use('/api/maintenance', maintenanceRoutes)
-app.use('/api/reports',     reportsRoutes)
-app.use('/api/fbt',         fbtRoutes)
-app.use('/api/settings',    settingsRoutes)
-app.use('/api/admin',       adminRoutes)
-app.use('/api/admin/auth',  adminAuthRoutes)
-app.use('/api/upgrade', upgradeRoutes)
-app.use('/api/support', supportRoutes)
-app.use('/api/imei',      imeiRoutes)
-app.use('/api/referrals', referralRoutes)
-app.use('/api/billing',   billingRoutes)
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
-async function start() {
-  await connect()
-  await setupDatabase()
-  app.listen(PORT, () => {
-    console.log(`[API] Running on port ${PORT}`)
-  })
-}
+// Web Google OAuth stays outside /api/v1 — it's a browser redirect flow, not a JSON API call.
+app.use('/auth/google', webGoogleRouter)
 
-start().catch(err => {
-  console.error('[API] Fatal error:', err.message)
-  process.exit(1)
+const v1 = express.Router()
+v1.use(apiRateLimit)
+
+v1.use('/auth', authRoutes)
+v1.use('/auth/google', mobileGoogleRouter)
+v1.use('/admin/auth', adminAuthRoutes)
+v1.use('/vehicles', vehicleRoutes)
+v1.use('/telemetry', telemetryRoutes)
+v1.use('/trips', tripRoutes)
+v1.use('/drivers', driverRoutes)
+v1.use('/alerts', alertRoutes)
+v1.use('/geofences', geofenceRoutes)
+v1.use('/maintenance', maintenanceRoutes)
+v1.use('/reports', reportsRoutes)
+v1.use('/reports', reportsAsyncRoutes) // POST /reports + GET /reports/:id polling (Phase 4 async reports)
+v1.use('/fbt', fbtRoutes)
+v1.use('/settings', settingsRoutes)
+v1.use('/admin', adminRoutes)
+v1.use('/upgrade', upgradeRoutes)
+v1.use('/support', supportRoutes)
+v1.use('/imei', imeiRoutes)
+v1.use('/referrals', referralRoutes)
+v1.use('/billing', billingRoutes)
+v1.use('/notifications', registerDeviceRoute)
+
+app.use('/api/v1', v1)
+
+// Mounted last — catches everything thrown/next(err)'d anywhere above. No HTML error pages, no
+// redirects, ever, under /api/v1/*.
+app.use(errorHandler)
+
+app.listen(PORT, () => {
+  console.log(`[API] Running on port ${PORT}`)
 })

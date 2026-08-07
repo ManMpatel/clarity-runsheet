@@ -1,141 +1,92 @@
-const express = require('express')
-const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
-const speakeasy = require('speakeasy')
-const QRCode = require('qrcode')
-const { getCollection } = require('../db/mongo')
+// Ported from api/routes/admin-auth.js. Logic preserved as-is (two-stage: password -> 5min
+// tempToken -> TOTP -> 8h admin token) — only the target table changed, from a separate
+// `super_admins` Mongo collection to `users` with role='superAdmin' (see Phase 3 schema note on
+// why super_admins was merged rather than kept separate).
+import express from 'express'
+import jwt from 'jsonwebtoken'
+import speakeasy from 'speakeasy'
+import QRCode from 'qrcode'
+import { eq, and } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { users } from '../../../db/schema'
+import { asyncRoute } from '../../../middleware/response-envelope'
+import { authRateLimit } from '../../../middleware/rate-limit'
+import { hashPassword, verifyPassword } from '../services/passwords'
 
 const router = express.Router()
 
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimit, asyncRoute(async (req, res) => {
+  const { email, password } = req.body
+  if (!email || !password) return res.fail(null, 'Email and password required')
+
+  const [admin] = await db.select().from(users)
+    .where(and(eq(users.email, email.toLowerCase()), eq(users.role, 'superAdmin'))).limit(1)
+  if (!admin || !admin.passwordHash) return res.fail(null, 'Invalid credentials', 401)
+
+  const valid = await verifyPassword(password, admin.passwordHash)
+  if (!valid) return res.fail(null, 'Invalid credentials', 401)
+
+  if (!admin.totpSecret) return res.fail(null, 'TOTP not configured for this account', 403)
+
+  const tempToken = jwt.sign(
+    { adminId: admin.id, stage: 'password_ok' },
+    process.env.JWT_SECRET!,
+    { expiresIn: '5m' }
+  )
+
+  return res.success({ tempToken })
+}))
+
+router.post('/verify-totp', asyncRoute(async (req, res) => {
+  const { tempToken, code } = req.body
+  if (!tempToken || !code) return res.fail(null, 'Token and code required')
+
+  let decoded: any
   try {
-    const { email, password } = req.body
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' })
-    }
-
-    const admins = await getCollection('super_admins')
-    const admin = await admins.findOne({ email: email.toLowerCase() })
-    if (!admin) {
-      return res.status(401).json({ error: 'Invalid credentials' })
-    }
-
-    const valid = await bcrypt.compare(password, admin.passwordHash)
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' })
-    }
-
-    if (!admin.totpSecret) {
-      return res.status(403).json({ error: 'TOTP not configured for this account' })
-    }
-
-    const tempToken = jwt.sign(
-      { adminId: admin._id.toString(), stage: 'password_ok' },
-      process.env.JWT_SECRET,
-      { expiresIn: '5m' }
-    )
-
-    return res.json({ tempToken })
-  } catch (err) {
-    console.error('[AdminAuth] Login error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
+    decoded = jwt.verify(tempToken, process.env.JWT_SECRET!)
+  } catch {
+    return res.fail(null, 'Temp token invalid or expired', 401)
   }
-})
+  if (decoded.stage !== 'password_ok') return res.fail(null, 'Invalid token stage', 401)
 
-router.post('/verify-totp', async (req, res) => {
-  try {
-    const { tempToken, code } = req.body
-    if (!tempToken || !code) {
-      return res.status(400).json({ error: 'Token and code required' })
-    }
+  const [admin] = await db.select().from(users).where(eq(users.id, decoded.adminId)).limit(1)
+  if (!admin) return res.fail(null, 'Admin not found', 401)
 
-    let decoded
-    try {
-      decoded = jwt.verify(tempToken, process.env.JWT_SECRET)
-    } catch (err) {
-      return res.status(401).json({ error: 'Temp token invalid or expired' })
-    }
+  const valid = speakeasy.totp.verify({ secret: admin.totpSecret!, encoding: 'base32', token: code })
+  if (!valid) return res.fail(null, 'Invalid authenticator code', 401)
 
-    if (decoded.stage !== 'password_ok') {
-      return res.status(401).json({ error: 'Invalid token stage' })
-    }
+  const adminToken = jwt.sign(
+    { userId: admin.id, adminId: admin.id, role: 'superAdmin', totp_verified: true },
+    process.env.JWT_SECRET!,
+    { expiresIn: '8h' }
+  )
 
-    const admins = await getCollection('super_admins')
-    const { ObjectId } = require('mongodb')
-    const admin = await admins.findOne({ _id: new ObjectId(decoded.adminId) })
-    if (!admin) {
-      return res.status(401).json({ error: 'Admin not found' })
-    }
+  return res.success({ token: adminToken, admin: { email: admin.email } })
+}))
 
-    const valid = speakeasy.totp.verify({
-      secret:   admin.totpSecret,
-      encoding: 'base32',
-      token:    code,
-    })
+router.post('/setup-totp', authRateLimit, asyncRoute(async (req, res) => {
+  const { email, password } = req.body
+  if (!email || !password) return res.fail(null, 'Email and password required')
 
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid authenticator code' })
-    }
+  const [admin] = await db.select().from(users)
+    .where(and(eq(users.email, email.toLowerCase()), eq(users.role, 'superAdmin'))).limit(1)
+  if (!admin || !admin.passwordHash) return res.fail(null, 'Invalid credentials', 401)
 
-    const adminToken = jwt.sign(
-      {
-        adminId:       admin._id.toString(),
-        role:          'superAdmin',
-        totp_verified: true,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    )
+  const valid = await verifyPassword(password, admin.passwordHash)
+  if (!valid) return res.fail(null, 'Invalid credentials', 401)
+  if (admin.totpSecret) return res.fail(null, 'TOTP already configured', 409)
 
-    return res.json({ token: adminToken, admin: { email: admin.email } })
-  } catch (err) {
-    console.error('[AdminAuth] TOTP verify error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+  const secret = speakeasy.generateSecret({ name: 'Clarity Fleet Admin' })
+  const otpAuthUrl = speakeasy.otpauthURL({
+    secret: secret.base32, label: admin.email, issuer: 'Clarity Fleet Admin', encoding: 'base32',
+  })
+  const qrDataUrl = await QRCode.toDataURL(otpAuthUrl)
 
-router.post('/setup-totp', async (req, res) => {
-  try {
-    const { email, password } = req.body
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password required' })
-    }
+  await db.update(users).set({
+    totpSecret: secret.base32, totpConfiguredAt: new Date(),
+  }).where(eq(users.id, admin.id))
 
-    const admins = await getCollection('super_admins')
-    const admin = await admins.findOne({ email: email.toLowerCase() })
-    if (!admin) {
-      return res.status(401).json({ error: 'Invalid credentials' })
-    }
+  return res.success({ qrDataUrl, secret: secret.base32 })
+}))
 
-    const valid = await bcrypt.compare(password, admin.passwordHash)
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid credentials' })
-    }
-
-    if (admin.totpSecret) {
-      return res.status(409).json({ error: 'TOTP already configured' })
-    }
-
-    const secret = speakeasy.generateSecret({ name: 'Clarity Fleet Admin' })
-    const otpAuthUrl = speakeasy.otpauthURL({
-      secret:   secret.base32,
-      label:    admin.email,
-      issuer:   'Clarity Fleet Admin',
-      encoding: 'base32',
-    })
-
-    const qrDataUrl = await QRCode.toDataURL(otpAuthUrl)
-
-    await admins.updateOne(
-      { _id: admin._id },
-      { $set: { totpSecret: secret.base32, totpConfiguredAt: new Date() } }
-    )
-
-    return res.json({ qrDataUrl, secret: secret.base32 })
-  } catch (err) {
-    console.error('[AdminAuth] Setup TOTP error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-module.exports = router
+export default router

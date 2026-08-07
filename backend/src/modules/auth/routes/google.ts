@@ -1,182 +1,105 @@
-const express        = require('express')
-const passport       = require('passport')
-const GoogleStrategy = require('passport-google-oauth20').Strategy
-const jwt            = require('jsonwebtoken')
-const { getCollection } = require('../db/mongo')
+// Two separate code paths, per Phase 4 spec — the flow is fundamentally different per client:
+//   - web: Passport redirect flow, mounted OUTSIDE /api/v1 (it's a browser redirect, not
+//     something mobile calls). Router exported as `webGoogleRouter`, mounted at /auth/google.
+//   - mobile: POST /api/v1/auth/google/token, verifies a client-obtained Google ID token via
+//     google-auth-library (google-verify.ts) instead of Passport. Router exported as
+//     `mobileGoogleRouter`, mounted under /api/v1/auth/google.
+import express from 'express'
+import { eq } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { users, companies } from '../../../db/schema'
+import { asyncRoute } from '../../../middleware/response-envelope'
+import { issueAccessToken, issueRefreshToken, setRefreshCookie } from '../services/tokens'
+import { verifyGoogleIdToken } from '../services/google-verify'
+import { slugify } from '../passport'
+import passport from '../passport'
 
-const router = express.Router()
+export const webGoogleRouter = express.Router()
 
-passport.use(new GoogleStrategy(
-  {
-    clientID:     process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL:  process.env.GOOGLE_CALLBACK_URL,
-  },
-  async (accessToken, refreshToken, profile, done) => {
-    try {
-      const email = profile.emails[0].value.toLowerCase()
-      const name  = profile.displayName
-
-      const users     = await getCollection('users')
-      const companies = await getCollection('companies')
-
-      let user = await users.findOne({ email })
-
-      if (!user) {
-        const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-        const existingCompany = await companies.findOne({ slug })
-        const finalSlug = existingCompany ? `${slug}-${Date.now()}` : slug
-
-        const companyResult = await companies.insertOne({
-          name,
-          slug:             finalSlug,
-          subscriptionTier: 'locked',
-          slots: { entrySlots: 0, midSlots: 0, topSlots: 0 },
-          active:    true,
-          createdAt: new Date(),
-        })
-
-        const inserted = await users.insertOne({
-          companyId:        companyResult.insertedId.toString(),
-          name,
-          email,
-          passwordHash:     null,
-          googleId:         profile.id,
-          role:             'companyAdmin',
-          subscriptionTier: 'locked',
-          createdAt:        new Date(),
-        })
-
-        user = await users.findOne({ _id: inserted.insertedId })
-      }
-
-      return done(null, user)
-    } catch (err) {
-      return done(err, null)
-    }
-  }
-))
-
-router.get('/', passport.authenticate('google', {
+webGoogleRouter.get('/', passport.authenticate('google', {
   scope: ['profile', 'email'],
   session: false,
 }))
 
-router.get('/callback',
+webGoogleRouter.get('/callback',
   passport.authenticate('google', { session: false, failureRedirect: '/login?error=google' }),
-  async (req, res) => {
-    try {
-      const user = req.user
-      const companies = await getCollection('companies')
-      const { ObjectId } = require('mongodb')
-      const company = await companies.findOne({
-        _id: ObjectId.createFromHexString(user.companyId.toString())
-      })
+  asyncRoute(async (req, res) => {
+    const user = req.user as typeof users.$inferSelect
+    const [company] = user.companyId ? await db.select().from(companies).where(eq(companies.id, user.companyId)).limit(1) : []
 
-      const token = jwt.sign(
-        {
-          userId:           user._id.toString(),
-          companyId:        user.companyId.toString(),
-          role:             user.role,
-          subscriptionTier: user.subscriptionTier || 'entry',
-        },
-        process.env.JWT_SECRET,
-        { expiresIn: '7d' }
-      )
+    const accessToken = issueAccessToken({
+      userId: user.id,
+      companyId: user.companyId,
+      role: user.role,
+      subscriptionTier: user.subscriptionTier || 'entry',
+      accountType: company?.accountType || 'contractor',
+    })
+    const refreshToken = await issueRefreshToken(user.id)
+    setRefreshCookie(res, refreshToken)
 
-      const onboarding = company?.onboardingComplete ? 'true' : 'false'
-      const dashboard  = process.env.DASHBOARD_URL || 'http://localhost:5173'
+    const onboarding = company?.onboardingComplete ? 'true' : 'false'
+    const webUrl = process.env.WEB_URL || process.env.DASHBOARD_URL || 'http://localhost:5173'
 
-      res.redirect(`${dashboard}/auth/google/success?token=${token}&onboarding=${onboarding}`)
-    } catch (err) {
-      console.error('[Google Auth] Callback error:', err.message)
-      res.redirect('/login?error=server')
-    }
-  }
+    // No redirect responses anywhere under /api/v1/* — but this route is deliberately OUTSIDE
+    // /api/v1 precisely because a browser OAuth callback has to redirect. The refresh token
+    // already landed in the httpOnly cookie above; only the short-lived access token travels in
+    // the URL (matches the existing GoogleAuthSuccess.jsx page's expectations).
+    res.redirect(`${webUrl}/auth/google/success?token=${accessToken}&onboarding=${onboarding}`)
+  })
 )
 
-router.post('/mobile', async (req, res) => {
-  try {
-    const { idToken } = req.body
-    if (!idToken) return res.status(400).json({ error: 'idToken required' })
+export const mobileGoogleRouter = express.Router()
 
-    const axios = require('axios')
-    const { data: payload } = await axios.get(
-      `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
-    )
+mobileGoogleRouter.post('/token', asyncRoute(async (req, res) => {
+  const { idToken } = req.body
+  if (!idToken) return res.fail(null, 'idToken required')
 
-    if (!payload.email) return res.status(401).json({ error: 'Invalid Google token' })
+  const identity = await verifyGoogleIdToken(idToken)
 
-    const email = payload.email.toLowerCase()
-    const name  = payload.name || email.split('@')[0]
+  let [user] = await db.select().from(users).where(eq(users.email, identity.email)).limit(1)
 
-    const users     = await getCollection('users')
-    const companies = await getCollection('companies')
-    const { ObjectId } = require('mongodb')
+  if (!user) {
+    const slug = slugify(identity.name)
+    const [existingCompany] = await db.select().from(companies).where(eq(companies.slug, slug)).limit(1)
+    const finalSlug = existingCompany ? `${slug}-${Date.now()}` : slug
 
-    let user = await users.findOne({ email })
+    const [company] = await db.insert(companies).values({
+      name: identity.name,
+      slug: finalSlug,
+      subscriptionTier: 'locked',
+    }).returning()
 
-    if (!user) {
-      const slug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-      const existingCompany = await companies.findOne({ slug })
-      const finalSlug = existingCompany ? `${slug}-${Date.now()}` : slug
-
-      const companyResult = await companies.insertOne({
-        name,
-        slug:             finalSlug,
-        subscriptionTier: 'locked',
-        slots:            { entrySlots: 0, midSlots: 0, topSlots: 0 },
-        active:           true,
-        createdAt:        new Date(),
-      })
-
-      const inserted = await users.insertOne({
-        companyId:        companyResult.insertedId.toString(),
-        name,
-        email,
-        passwordHash:     null,
-        googleId:         payload.sub,
-        role:             'companyAdmin',
-        subscriptionTier: 'locked',
-        createdAt:        new Date(),
-      })
-
-      user = await users.findOne({ _id: inserted.insertedId })
-    } else if (!user.googleId) {
-      await users.updateOne({ _id: user._id }, { $set: { googleId: payload.sub } })
-    }
-
-    const company = await companies.findOne({
-      _id: ObjectId.createFromHexString(user.companyId.toString())
-    })
-
-    const token = jwt.sign(
-      {
-        userId:           user._id.toString(),
-        companyId:        user.companyId.toString(),
-        role:             user.role,
-        subscriptionTier: user.subscriptionTier || company?.subscriptionTier || 'locked',
-        accountType:      company?.accountType  || 'contractor',
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '90d' }
-    )
-
-    return res.json({
-      token,
-      user: {
-        _id:              user._id,
-        name:             user.name,
-        email:            user.email,
-        role:             user.role,
-        subscriptionTier: user.subscriptionTier || 'locked',
-        companyId:        user.companyId,
-      }
-    })
-  } catch (err) {
-    console.error('[Google Mobile Auth] Error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
+    ;[user] = await db.insert(users).values({
+      companyId: company.id,
+      name: identity.name,
+      email: identity.email,
+      googleId: identity.googleId,
+      role: 'companyAdmin',
+      subscriptionTier: 'locked',
+      emailVerified: true,
+    }).returning()
+  } else if (!user.googleId) {
+    await db.update(users).set({ googleId: identity.googleId }).where(eq(users.id, user.id))
   }
-})
 
-module.exports = router
+  const [company] = user.companyId ? await db.select().from(companies).where(eq(companies.id, user.companyId)).limit(1) : []
+
+  const accessToken = issueAccessToken({
+    userId: user.id,
+    companyId: user.companyId,
+    role: user.role,
+    subscriptionTier: user.subscriptionTier || company?.subscriptionTier || 'locked',
+    accountType: company?.accountType || 'contractor',
+  })
+  const refreshToken = await issueRefreshToken(user.id)
+  setRefreshCookie(res, refreshToken) // harmless no-op for a native client with no cookie jar
+
+  return res.success({
+    accessToken,
+    refreshToken,
+    user: {
+      id: user.id, name: user.name, email: user.email, role: user.role,
+      subscriptionTier: user.subscriptionTier || 'locked', companyId: user.companyId,
+    },
+  })
+}))
