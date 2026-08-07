@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: timescale/timescaledb-ha:pg16-all
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: clarity_fleet
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/home/postgres/pgdata/data
+
+  # Present ONLY for the tcp-listener -> ingestion telemetry_queue handoff (LPUSH/BRPOP).
+  # Not used for sessions, caching, or job queues anywhere else in the backend.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
+  api:
+    build: ./backend
+    command: npx tsx src/entrypoints/api.ts
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/clarity_fleet
+      REDIS_URL: redis://redis:6379
+      TCP_INTERNAL_URL: http://tcp-listener:4001
+    ports:
+      - '3000:3000'
+    depends_on:
+      - postgres
+      - redis
+      - tcp-listener
+
+  tcp-listener:
+    build: ./backend
+    command: npx tsx src/entrypoints/tcp-listener.ts
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379
+    ports:
+      - '5027:5027'
+      - '4001:4001'
+    depends_on:
+      - redis
+
+  ingestion:
+    build: ./backend
+    command: npx tsx src/entrypoints/ingestion.ts
+    restart: unless-stopped
+    env_file: ./backend/.env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/clarity_fleet
+      REDIS_URL: redis://redis:6379
+    ports:
+      - '3001:3001'
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  postgres_data:

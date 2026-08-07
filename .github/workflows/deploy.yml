@@ -1,3 +1,9 @@
+# NOTE (backend/frontend restructure): all three deploy jobs below now check out the same
+# ~/clarity/backend path on each target host (previously ~/clarity/api, ~/clarity/tcp-listener,
+# ~/clarity/worker separately) since api/tcp-listener/ingestion are one package with three
+# entrypoints now. Each host's pm2 ecosystem file needs its `script`/`args` updated server-side
+# to point at `npx tsx src/entrypoints/{api,tcp-listener,ingestion}.ts` — that's host config, not
+# something this repo can change, so do that manually before the next deploy.
 name: Deploy to Production
 
 on:
@@ -22,7 +28,7 @@ jobs:
       - name: Deploy to clarity-api
         run: |
           ssh -i ~/.ssh/id_rsa root@209.38.83.138 "
-            cd ~/clarity/api &&
+            cd ~/clarity/backend &&
             git pull origin main &&
             npm install --production &&
             pm2 restart clarity-api
@@ -46,7 +52,7 @@ jobs:
         if: failure() && steps.healthcheck.outcome == 'failure'
         run: |
           ssh -i ~/.ssh/id_rsa root@209.38.83.138 "
-            cd ~/clarity/api &&
+            cd ~/clarity/backend &&
             git revert HEAD --no-edit &&
             npm install --production &&
             pm2 restart clarity-api &&
@@ -69,7 +75,7 @@ jobs:
       - name: Deploy to clarity-tcp
         run: |
           ssh -i ~/.ssh/id_rsa root@170.64.148.64 "
-            cd ~/clarity/tcp-listener &&
+            cd ~/clarity/backend &&
             git pull origin main &&
             npm install --production &&
             pm2 restart clarity-tcp
@@ -92,7 +98,7 @@ jobs:
         if: failure() && steps.tcpcheck.outcome == 'failure'
         run: |
           ssh -i ~/.ssh/id_rsa root@170.64.148.64 "
-            cd ~/clarity/tcp-listener &&
+            cd ~/clarity/backend &&
             git revert HEAD --no-edit &&
             npm install --production &&
             pm2 restart clarity-tcp &&
@@ -115,7 +121,7 @@ jobs:
       - name: Deploy to clarity-worker
         run: |
           ssh -i ~/.ssh/id_rsa root@134.199.144.238 "
-            cd ~/clarity/worker &&
+            cd ~/clarity/backend &&
             git pull origin main &&
             npm install --production &&
             pm2 restart clarity-worker
@@ -138,7 +144,7 @@ jobs:
         if: failure() && steps.workercheck.outcome == 'failure'
         run: |
           ssh -i ~/.ssh/id_rsa root@134.199.144.238 "
-            cd ~/clarity/worker &&
+            cd ~/clarity/backend &&
             git revert HEAD --no-edit &&
             npm install --production &&
             pm2 restart clarity-worker &&
