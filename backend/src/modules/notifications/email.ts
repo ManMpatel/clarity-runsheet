@@ -1,3 +1,5 @@
+// @ts-nocheck — relocated from api/services/resend.js, the superset implementation (the
+// worker/services/resend.js copy only had sendUpgradeNotification and was dropped in Phase 2).
 const { Resend } = require('resend')
 
 const client = new Resend(process.env.RESEND_API_KEY)

@@ -1,81 +1,61 @@
-const { getCollection } = require('../db/mongo')
-const { getGeofenceState, setGeofenceState } = require('../db/redis')
+// Ported from worker/processors/geofence.js. The old point-in-polygon check ran in application
+// code (a hand-rolled ray-casting algorithm); this is now a real logic change explicitly
+// authorized by Phase 5 (distinct from the tcp-listener "zero diff" constraint): containment is
+// now a PostGIS ST_Contains query, and enter/exit transition detection compares against the
+// in-memory state.ts containment map (replacing the old per-zone Redis geo:state key).
+import { and, eq, sql } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { geofences, geofenceEvents } from '../../../db/schema'
+import { isInsideZone, setInsideZone } from '../state'
+import type { NormalisedTelemetry } from './telemetry'
 
-function pointInPolygon(point, polygon) {
-  const [x, y] = point
-  const coords = polygon.coordinates[0]
-  let inside = false
+export async function processGeofences(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry) {
+  const events: any[] = []
 
-  for (let i = 0, j = coords.length - 1; i < coords.length; j = i++) {
-    const [xi, yi] = coords[i]
-    const [xj, yj] = coords[j]
-    const intersect =
-      yi > y !== yj > y &&
-      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
-    if (intersect) inside = !inside
-  }
+  // Vehicle-scoped zones (geofence_vehicles has a row for this vehicle) OR company-wide zones
+  // (no rows in geofence_vehicles at all) — same "empty vehicleIds = applies to all" semantics
+  // as the old embedded array.
+  const zones = await db.execute(sql`
+    SELECT g.id, g.name,
+           ST_Contains(g.geometry, ST_SetSRID(ST_MakePoint(${record.lng}, ${record.lat}), 4326)) AS inside
+    FROM geofences g
+    WHERE g.company_id = ${companyId}
+      AND g.active = true
+      AND g.geometry IS NOT NULL
+      AND (
+        NOT EXISTS (SELECT 1 FROM geofence_vehicles gv WHERE gv.geofence_id = g.id)
+        OR EXISTS (SELECT 1 FROM geofence_vehicles gv WHERE gv.geofence_id = g.id AND gv.vehicle_id = ${vehicleId})
+      )
+  `)
 
-  return inside
-}
-
-async function processGeofences(imei, companyId, vehicleId, record) {
-  const collection = await getCollection('geofences')
-  const events = []
-
-  const zones = await collection
-    .find({ companyId, active: true })
-    .toArray()
-
-  const point = [record.longitude, record.latitude]
-
-  for (const zone of zones) {
-    // If zone has specific vehicles assigned, skip if this vehicle not in list
-    if (zone.vehicleIds && zone.vehicleIds.length > 0) {
-      if (!zone.vehicleIds.includes(vehicleId)) continue
-    }
-
-    const inside = pointInPolygon(point, zone.geometry)
-    const prevState = await getGeofenceState(imei, zone._id.toString())
-    const wasInside = prevState === 'inside'
+  for (const zone of zones.rows as any[]) {
+    const inside = zone.inside === true
+    const wasInside = isInsideZone(vehicleId, zone.id)
 
     if (inside && !wasInside) {
-      await setGeofenceState(imei, zone._id.toString(), 'inside')
-      const event = await saveGeofenceEvent(
-        imei, companyId, vehicleId, record, zone, 'enter'
-      )
-      events.push(event)
+      setInsideZone(vehicleId, zone.id, true)
+      events.push(await saveGeofenceEvent(imei, companyId, vehicleId, record, zone, 'enter'))
     } else if (!inside && wasInside) {
-      await setGeofenceState(imei, zone._id.toString(), 'outside')
-      const event = await saveGeofenceEvent(
-        imei, companyId, vehicleId, record, zone, 'exit'
-      )
-      events.push(event)
+      setInsideZone(vehicleId, zone.id, false)
+      events.push(await saveGeofenceEvent(imei, companyId, vehicleId, record, zone, 'exit'))
     }
   }
 
   return events
 }
 
-async function saveGeofenceEvent(imei, companyId, vehicleId, record, zone, type) {
-  const collection = await getCollection('geofence_events')
-
-  const event = {
+async function saveGeofenceEvent(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry, zone: { id: string; name: string }, type: 'enter' | 'exit') {
+  const [event] = await db.insert(geofenceEvents).values({
     type,
     imei,
     companyId,
     vehicleId,
-    zoneId:    zone._id,
-    zoneName:  zone.name,
-    timestamp: new Date(record.timestamp),
-    location: {
-      type: 'Point',
-      coordinates: [record.longitude, record.latitude],
-    },
-    createdAt: new Date(),
-  }
+    zoneId: zone.id,
+    zoneName: zone.name,
+    timestamp: record.time,
+    lat: record.lat,
+    lng: record.lng,
+  }).returning()
 
-  await collection.insertOne(event)
   return event
 }
-
-module.exports = { processGeofences }

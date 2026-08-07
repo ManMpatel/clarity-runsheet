@@ -1,67 +1,84 @@
-const { getCollection } = require('../db/mongo')
+// Ported from worker/processors/telemetry.js. Same normalization logic; the destination is now
+// a Postgres/TimescaleDB insert instead of a Mongo time-series collection insertOne. Retention
+// (the old 1-year TTL) is now handled entirely by TimescaleDB's add_retention_policy (Phase 3
+// migration) — no app-level TTL logic needed.
+import { db } from '../../../db/client'
+import { telemetry } from '../../../db/schema'
 
 const METRES_TO_KM = 0.001
 const MILLIVOLTS_TO_VOLTS = 0.001
 const RPM_DIVISOR = 4
 
-function normaliseRecord(imei, companyId, vehicleId, record) {
+export interface NormalisedTelemetry {
+  imei: string
+  companyId: string
+  vehicleId: string
+  time: Date
+  lat: number
+  lng: number
+  altitude: number | null
+  angle: number | null
+  satellites: number | null
+  speed: number | null
+  priority: number | null
+  ignition: boolean | null
+  movement: boolean | null
+  odometer: number | null
+  externalVoltage: number | null
+  batteryVoltage: number | null
+  engineRpm: number | null
+  engineLoad: number | null
+  coolantTemp: number | null
+  fuelLevel: number | null
+  gsmSignal: number | null
+  dtcCount: number | null
+  crashDetection: number | null
+  greenDrivingType: number | null
+  greenDrivingValue: number | null
+  extras: Record<string, unknown>
+}
+
+function normaliseRecord(imei: string, companyId: string, vehicleId: string, record: any): NormalisedTelemetry {
   const io = record.io || {}
 
   return {
-    metadata: {
-      imei,
-      companyId,
-      vehicleId,
-    },
-    timestamp: new Date(record.timestamp),
-    location: {
-      type: 'Point',
-      coordinates: [record.longitude, record.latitude],
-    },
-    altitude:   record.altitude,
-    angle:      record.angle,
-    satellites: record.satellites,
-    speed:      record.speed,
-    priority:   record.priority,
-    ignition:   io.ignition ?? (io.ignitionOnCounter > 0 ? true : null),
-    movement:   io.movementSensor ?? null,
-    odometer:   io.totalOdometer
-                  ? Math.round(io.totalOdometer * METRES_TO_KM)
-                  : null,
+    imei,
+    companyId,
+    vehicleId,
+    time: new Date(record.timestamp),
+    lat: record.latitude,
+    lng: record.longitude,
+    altitude: record.altitude ?? null,
+    angle: record.angle ?? null,
+    satellites: record.satellites ?? null,
+    speed: record.speed ?? null,
+    priority: record.priority ?? null,
+    ignition: io.ignition ?? (io.ignitionOnCounter > 0 ? true : null),
+    movement: io.movementSensor ?? null,
+    odometer: io.totalOdometer ? Math.round(io.totalOdometer * METRES_TO_KM) : null,
     externalVoltage: io.externalVoltage
-                  ? (io.externalVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2)
-                  : io.batteryVoltage
-                  ? (io.batteryVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2)
-                  : null,
-    batteryVoltage: io.batteryVoltage
-                  ? (io.batteryVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2)
-                  : null,
-    engineRpm:  io.engineRpm
-                  ? Math.round(io.engineRpm / RPM_DIVISOR)
-                  : null,
-    engineLoad:       io.engineLoad       ?? null,
-    coolantTemp:      io.coolantTemperature ?? null,
-    fuelLevel:        io.fuelTankLevelInput ?? null,
-    gsmSignal:        io.gsmSignal         ?? null,
-    dtcCount:         io.numberOfDTCs      ?? null,
-    crashDetection:   io.crashDetection    ?? null,
-    greenDrivingType: io.greenDrivingType  ?? null,
-    greenDrivingValue:io.greenDrivingValue ?? null,
-    rawIo: io,
+      ? Number((io.externalVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2))
+      : io.batteryVoltage
+      ? Number((io.batteryVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2))
+      : null,
+    batteryVoltage: io.batteryVoltage ? Number((io.batteryVoltage * MILLIVOLTS_TO_VOLTS).toFixed(2)) : null,
+    engineRpm: io.engineRpm ? Math.round(io.engineRpm / RPM_DIVISOR) : null,
+    engineLoad: io.engineLoad ?? null,
+    coolantTemp: io.coolantTemperature ?? null,
+    fuelLevel: io.fuelTankLevelInput ?? null,
+    gsmSignal: io.gsmSignal ?? null,
+    dtcCount: io.numberOfDTCs ?? null,
+    crashDetection: io.crashDetection ?? null,
+    greenDrivingType: io.greenDrivingType ?? null,
+    greenDrivingValue: io.greenDrivingValue ?? null,
+    extras: io,
   }
 }
 
-async function writeTelemetry(imei, companyId, vehicleId, records) {
-  const collection = await getCollection('telemetry_events')
-  const docs = records.map(r => normaliseRecord(imei, companyId, vehicleId, r))
-
-  if (docs.length === 1) {
-    await collection.insertOne(docs[0])
-  } else {
-    await collection.insertMany(docs)
-  }
-
+export async function writeTelemetry(imei: string, companyId: string, vehicleId: string, records: any[]) {
+  const docs = records.map((r) => normaliseRecord(imei, companyId, vehicleId, r))
+  await db.insert(telemetry).values(docs as any)
   return docs
 }
 
-module.exports = { writeTelemetry, normaliseRecord }
+export { normaliseRecord }

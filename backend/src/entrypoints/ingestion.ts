@@ -1,33 +1,39 @@
+// Ported from worker/index.js. The BRPOP polling loop's SHAPE is unchanged (same queue key, same
+// tight while(true) + brpop(2) pattern) — that's the untouched half of the tcp-listener handoff
+// per the hard constraint. What changed is everything downstream of the dequeue: Mongo lookups
+// and writes replaced with Drizzle/Postgres, the Redis van:state cache replaced by enrichment's
+// vehicle_state upsert, and alert triggers now firing both a socket emit and a push dispatch.
 require('dotenv').config()
-const { getClient } = require('./db/redis')
-const { connect } = require('./db/mongo')
-const { init: initSocket, broadcastVanUpdate, broadcastAlert } = require('./broadcaster/socketio')
-const { writeTelemetry } = require('./processors/telemetry')
-const { processDriverEvents } = require('./processors/driver-events')
-const { processGeofences } = require('./processors/geofence')
-const { processAlerts } = require('./processors/alerts')
-const { processTripDetection } = require('./processors/trip-builder')
-const { enrichAndSaveVanState } = require('./processors/enrichment')
+import { eq } from 'drizzle-orm'
+import { db } from '../db/client'
+import { vehicles } from '../db/schema'
+import { getClient } from '../modules/ingestion/queue/redis'
+import { init as initSocket, broadcastVanUpdate } from '../socket'
+import { writeTelemetry } from '../modules/ingestion/processors/telemetry'
+import { processDriverEvents } from '../modules/ingestion/processors/driver-events'
+import { processGeofences } from '../modules/ingestion/processors/geofence'
+import { processAlerts } from '../modules/ingestion/processors/alerts'
+import { processTripDetection } from '../modules/ingestion/processors/trip-builder'
+import { enrichAndSaveVanState } from '../modules/ingestion/processors/enrichment'
+import { startSafetyScoreCron } from '../modules/ingestion/cron/safety-scores'
+import { startMaintenanceCron } from '../modules/ingestion/cron/maintenance-flags'
+import { startLicenceExpiryCron } from '../modules/ingestion/cron/licence-expiry'
 
 const QUEUE_KEY = 'telemetry_queue'
 const POLL_INTERVAL = 100
 
 async function start() {
-  await connect()
   initSocket()
-  
-  const { startSafetyScoreCron }    = require('./cron/safety-scores')
-  const { startMaintenanceCron }    = require('./cron/maintenance-flags')
-  const { startLicenceExpiryCron }  = require('./cron/licence-expiry')
   startSafetyScoreCron()
   startMaintenanceCron()
   startLicenceExpiryCron()
+
   const redis = getClient()
-  console.log('[Worker] Started — polling queue')
+  console.log('[Ingestion] Started — polling queue')
   poll(redis)
 }
 
-async function poll(redis) {
+async function poll(redis: any) {
   while (true) {
     try {
       const result = await redis.brpop(QUEUE_KEY, 2)
@@ -36,79 +42,56 @@ async function poll(redis) {
       const raw = result[1]
       const payload = JSON.parse(raw)
       await processPayload(payload)
-    } catch (err) {
-      console.error('[Worker] Poll error:', err.message)
+    } catch (err: any) {
+      console.error('[Ingestion] Poll error:', err.message)
       await sleep(POLL_INTERVAL)
     }
   }
 }
 
-async function processPayload(payload) {
+async function processPayload(payload: any) {
   const { imei, receivedAt, ...record } = payload
 
-  const vehicleDoc = await lookupVehicle(imei)
-  if (!vehicleDoc) {
-    console.warn(`[Worker] Unknown IMEI: ${imei}`)
+  const vehicle = await lookupVehicle(imei)
+  if (!vehicle) {
+    console.warn(`[Ingestion] Unknown IMEI: ${imei}`)
     return
   }
 
-  const { companyId, vehicleId } = vehicleDoc
+  const { companyId, vehicleId } = vehicle
 
-  const normalisedDocs = await writeTelemetry(imei, companyId, vehicleId, [record])
-  const doc = normalisedDocs[0]
+  const [doc] = await writeTelemetry(imei, companyId, vehicleId, [record])
 
   const geofenceEvents = await processGeofences(imei, companyId, vehicleId, doc)
-  const driverEvents = await processDriverEvents(imei, companyId, vehicleId, doc)
+  const driverEventsFired = await processDriverEvents(imei, companyId, vehicleId, doc)
   await processAlerts(imei, companyId, vehicleId, doc, geofenceEvents)
   await processTripDetection(imei, companyId, vehicleId, doc)
 
-  const redis    = getClient()
-  const enriched = await enrichAndSaveVanState(redis, imei, companyId, vehicleId, doc)
+  const enriched = await enrichAndSaveVanState(imei, companyId, vehicleId, doc)
 
-  broadcastVanUpdate(companyId, {
-    imei,
-    vehicleId,
-    companyId,
-    latitude:        enriched.latitude,
-    longitude:       enriched.longitude,
-    speed:           enriched.speed,
-    angle:           enriched.angle,
-    ignition:        enriched.ignition,
-    externalVoltage: enriched.externalVoltage,
-    batteryVoltage:  enriched.batteryVoltage,
-    gsmSignal:       enriched.gsmSignal,
-    odometer:        enriched.odometer,
-    timestamp:       enriched.timestamp,
-    address:         enriched.address,
-    todayKm:         enriched.todayKm,
-    status:          enriched.status,
-    stateChangedAt:  enriched.stateChangedAt,
-  })
+  broadcastVanUpdate(companyId, enriched)
 
-  if (geofenceEvents.length > 0 || driverEvents.length > 0) {
-    for (const event of [...geofenceEvents, ...driverEvents]) {
+  // geofence enter/exit and driver-safety events (crash/harsh braking/speeding) also get a
+  // live socket push, independent of whether an alert_rule matched them.
+  if (geofenceEvents.length > 0 || driverEventsFired.length > 0) {
+    const { broadcastAlert } = require('../socket')
+    for (const event of [...geofenceEvents, ...driverEventsFired]) {
       broadcastAlert(companyId, event)
     }
   }
+}
 
-  }
-
-async function lookupVehicle(imei) {
-  const { getCollection } = require('./db/mongo')
-  const collection = await getCollection('vehicles')
-  const vehicle = await collection.findOne({ imei })
+async function lookupVehicle(imei: string) {
+  const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.imei, imei)).limit(1)
   if (!vehicle) return null
-  return {
-    companyId: vehicle.companyId.toString(),
-    vehicleId: vehicle._id.toString(),
-  }
+  return { companyId: vehicle.companyId, vehicleId: vehicle.id }
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-start().catch(err => {
-  console.error('[Worker] Fatal error:', err.message)
+start().catch((err) => {
+  console.error('[Ingestion] Fatal error:', err.message)
   process.exit(1)
 })

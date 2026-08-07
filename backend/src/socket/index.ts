@@ -1,3 +1,9 @@
+// @ts-nocheck — relocated from worker/broadcaster/socketio.js, unchanged. Still instantiated by
+// the ingestion entrypoint (not api), matching current process ownership: ingestion is where
+// telemetry updates and alerts originate, so it emits in-process rather than needing a
+// cross-process call into api just to broadcast. Works identically for the web dashboard and the
+// Expo app's socket.io-client (same protocol) while either app is open — see notifications/push.ts
+// for the closed-app path.
 const { Server } = require('socket.io')
 const http = require('http')
 

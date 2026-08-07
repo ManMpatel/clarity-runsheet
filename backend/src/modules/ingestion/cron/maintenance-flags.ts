@@ -1,13 +1,20 @@
-const cron = require('node-cron')
-const { getCollection } = require('../db/mongo')
-const { getClient } = require('../db/redis')
+// Ported from worker/cron/maintenance-flags.js. The old 24h dedup cache was a Redis key
+// (`maintenance:notified:{id}` EX 86400) — replaced here with the new `maintenance.lastFlaggedAt`
+// column (see Phase 3 schema note) rather than an in-memory map, since this dedup specifically
+// benefits from surviving an ingestion restart (unlike alert-cooldown/geofence-debounce state).
+import cron from 'node-cron'
+import { eq, and, lte, or, isNull } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { companies, maintenance, vehicles, alerts } from '../../../db/schema'
 
-function startMaintenanceCron() {
+const DEDUP_MS = 24 * 60 * 60 * 1000
+
+export function startMaintenanceCron() {
   cron.schedule('0 6 * * *', async () => {
     console.log('[Cron] Running daily maintenance check')
     try {
       await checkMaintenanceDue()
-    } catch (err) {
+    } catch (err: any) {
       console.error('[Cron] Maintenance check error:', err.message)
     }
   })
@@ -15,53 +22,39 @@ function startMaintenanceCron() {
 }
 
 async function checkMaintenanceDue() {
-  const companies = await getCollection('companies')
-  const allCompanies = await companies.find({ active: true }).toArray()
-
+  const allCompanies = await db.select().from(companies).where(eq(companies.active, true))
   for (const company of allCompanies) {
-    await checkCompanyMaintenance(company._id.toString())
+    await checkCompanyMaintenance(company.id)
   }
 }
 
-async function checkCompanyMaintenance(companyId) {
-  const now      = new Date()
-  const in7Days  = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+async function checkCompanyMaintenance(companyId: string) {
+  const now = new Date()
+  const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-  const maintenance = await getCollection('maintenance')
-  const due = await maintenance.find({
-    companyId,
-    status:  'pending',
-    dueDate: { $lte: in7Days },
-  }).toArray()
-
-  if (due.length === 0) return
-
-  const vehicles = await getCollection('vehicles')
-  const redis    = getClient()
+  const due = await db.select().from(maintenance).where(and(
+    eq(maintenance.companyId, companyId),
+    eq(maintenance.status, 'pending'),
+    lte(maintenance.dueDate, in7Days),
+  ))
 
   for (const record of due) {
-    const vehicle = await vehicles.findOne({ _id: record.vehicleId })
-    const key     = `maintenance:notified:${record._id}`
-    const already = await redis.get(key)
-    if (already) continue
+    const alreadyNotified = record.lastFlaggedAt && (now.getTime() - new Date(record.lastFlaggedAt).getTime()) < DEDUP_MS
+    if (alreadyNotified) continue
+
+    const [vehicle] = await db.select().from(vehicles).where(eq(vehicles.id, record.vehicleId)).limit(1)
 
     console.log(`[Cron] Maintenance due: ${record.type} for vehicle ${vehicle?.name || record.vehicleId}`)
 
-    await redis.set(key, '1', 'EX', 86400)
+    await db.update(maintenance).set({ lastFlaggedAt: now }).where(eq(maintenance.id, record.id))
 
-    const alerts = await getCollection('alerts')
-    await alerts.insertOne({
-      type:      'maintenanceDue',
+    await db.insert(alerts).values({
+      type: 'maintenanceDue',
       companyId,
-      vehicleId: record.vehicleId?.toString(),
-      message:   `${record.type} due ${
-        new Date(record.dueDate).toLocaleDateString('en-AU')
-      } for ${vehicle?.name || 'van'}`,
-      severity:  'info',
-      read:      false,
-      createdAt: new Date(),
+      vehicleId: record.vehicleId,
+      message: `${record.type} due ${new Date(record.dueDate!).toLocaleDateString('en-AU')} for ${vehicle?.name || 'van'}`,
+      severity: 'info',
+      timestamp: now,
     })
   }
 }
-
-module.exports = { startMaintenanceCron }

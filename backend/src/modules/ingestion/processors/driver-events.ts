@@ -1,28 +1,29 @@
-const { getCollection } = require('../db/mongo')
-const { setAlertCooldown, checkAlertCooldown } = require('../db/redis')
+// Ported from worker/processors/driver-events.js. Cooldown keys move to the in-memory
+// state.ts map (were Redis alert:cooldown:{key} keys with the same TTLs).
+import { db } from '../../../db/client'
+import { driverEvents } from '../../../db/schema'
+import { checkCooldown, setCooldown } from '../state'
+import type { NormalisedTelemetry } from './telemetry'
 
-const GREEN_DRIVING_TYPES = {
+const GREEN_DRIVING_TYPES: Record<number, 'harshBraking' | 'harshAcceleration' | 'harshCornering'> = {
   1: 'harshBraking',
   2: 'harshAcceleration',
   3: 'harshCornering',
 }
 
-async function processDriverEvents(imei, companyId, vehicleId, record) {
+export async function processDriverEvents(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry) {
   const events = []
 
   if (record.crashDetection && record.crashDetection > 0) {
-    const event = await saveCrashEvent(imei, companyId, vehicleId, record)
-    events.push(event)
+    events.push(await saveCrashEvent(imei, companyId, vehicleId, record))
   }
 
   if (record.greenDrivingType && record.greenDrivingValue) {
-    const event = await saveGreenDrivingEvent(
-      imei, companyId, vehicleId, record
-    )
+    const event = await saveGreenDrivingEvent(imei, companyId, vehicleId, record)
     if (event) events.push(event)
   }
 
-  if (record.speed > 110) {
+  if ((record.speed ?? 0) > 110) {
     const event = await saveSpeedingEvent(imei, companyId, vehicleId, record)
     if (event) events.push(event)
   }
@@ -30,82 +31,59 @@ async function processDriverEvents(imei, companyId, vehicleId, record) {
   return events
 }
 
-async function saveCrashEvent(imei, companyId, vehicleId, record) {
-  const collection = await getCollection('driver_events')
-
-  const event = {
-    type:      'crash',
+async function saveCrashEvent(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry) {
+  const [event] = await db.insert(driverEvents).values({
+    type: 'crash',
     imei,
     companyId,
     vehicleId,
-    timestamp: new Date(record.timestamp),
-    location: {
-      type: 'Point',
-      coordinates: [record.longitude, record.latitude],
-    },
-    speed:    record.speed,
-    severity: record.crashDetection,
-    createdAt: new Date(),
-  }
-
-  await collection.insertOne(event)
+    timestamp: record.time,
+    lat: record.lat,
+    lng: record.lng,
+    speed: record.speed,
+    severity: String(record.crashDetection),
+  }).returning()
   return event
 }
 
-async function saveGreenDrivingEvent(imei, companyId, vehicleId, record) {
-  const type = GREEN_DRIVING_TYPES[record.greenDrivingType]
+async function saveGreenDrivingEvent(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry) {
+  const type = GREEN_DRIVING_TYPES[record.greenDrivingType!]
   if (!type) return null
 
   const cooldownKey = `${imei}:${type}`
-  const onCooldown = await checkAlertCooldown(cooldownKey)
-  if (onCooldown) return null
+  if (checkCooldown(cooldownKey)) return null
 
-  const collection = await getCollection('driver_events')
-
-  const event = {
+  const [event] = await db.insert(driverEvents).values({
     type,
     imei,
     companyId,
     vehicleId,
-    timestamp: new Date(record.timestamp),
-    location: {
-      type: 'Point',
-      coordinates: [record.longitude, record.latitude],
-    },
-    speed:    record.speed,
-    value:    record.greenDrivingValue,
-    createdAt: new Date(),
-  }
+    timestamp: record.time,
+    lat: record.lat,
+    lng: record.lng,
+    speed: record.speed,
+    value: String(record.greenDrivingValue),
+  }).returning()
 
-  await collection.insertOne(event)
-  await setAlertCooldown(cooldownKey, 30)
+  setCooldown(cooldownKey, 30)
   return event
 }
 
-async function saveSpeedingEvent(imei, companyId, vehicleId, record) {
+async function saveSpeedingEvent(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry) {
   const cooldownKey = `${imei}:speeding`
-  const onCooldown = await checkAlertCooldown(cooldownKey)
-  if (onCooldown) return null
+  if (checkCooldown(cooldownKey)) return null
 
-  const collection = await getCollection('driver_events')
-
-  const event = {
-    type:      'speeding',
+  const [event] = await db.insert(driverEvents).values({
+    type: 'speeding',
     imei,
     companyId,
     vehicleId,
-    timestamp: new Date(record.timestamp),
-    location: {
-      type: 'Point',
-      coordinates: [record.longitude, record.latitude],
-    },
-    speed:    record.speed,
-    createdAt: new Date(),
-  }
+    timestamp: record.time,
+    lat: record.lat,
+    lng: record.lng,
+    speed: record.speed,
+  }).returning()
 
-  await collection.insertOne(event)
-  await setAlertCooldown(cooldownKey, 300)
+  setCooldown(cooldownKey, 300)
   return event
 }
-
-module.exports = { processDriverEvents }

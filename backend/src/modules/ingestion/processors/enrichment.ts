@@ -1,97 +1,97 @@
+// Ported from worker/processors/enrichment.js. The old version read/wrote a Redis
+// `van:state:{imei}` JSON blob; this version reads the previous vehicle_state row from
+// Postgres and upserts the new one in place — same derived-field logic (status, since-timer,
+// today's km, cooldown-throttled reverse geocode), different storage. The reverse-geocode
+// cooldown moves to the in-memory state.ts map (was a Redis key with the same 60s TTL shape).
+import { eq } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { vehicleState } from '../../../db/schema'
+import { checkCooldown, setCooldown } from '../state'
+import type { NormalisedTelemetry } from './telemetry'
+
 const MAPBOX_TOKEN = process.env.MAPBOX_TOKEN
 
 function getTodayDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function getStatus(doc) {
-  if (doc.speed > 0) return 'moving'
-  if (doc.ignition)  return 'idle'
+function getStatus(doc: NormalisedTelemetry): 'moving' | 'idle' | 'stopped' {
+  if ((doc.speed ?? 0) > 0) return 'moving'
+  if (doc.ignition) return 'idle'
   return 'stopped'
 }
 
-async function reverseGeocode(lat, lon) {
+async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
   if (!MAPBOX_TOKEN) return null
   try {
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lon},${lat}.json?access_token=${MAPBOX_TOKEN}&types=address,street&limit=1`
-    const res  = await fetch(url)
-    const data = await res.json()
+    const res = await fetch(url)
+    const data: any = await res.json()
     return data.features?.[0]?.place_name || null
-  } catch (err) {
+  } catch (err: any) {
     console.error('[Enrichment] Geocode error:', err.message)
     return null
   }
 }
 
-async function enrichAndSaveVanState(redis, imei, companyId, vehicleId, doc) {
-  const stateKey = `van:state:${imei}`
-  const raw      = await redis.get(stateKey)
-  const prev     = raw ? JSON.parse(raw) : null
+export async function enrichAndSaveVanState(imei: string, companyId: string, vehicleId: string, doc: NormalisedTelemetry) {
+  const [prev] = await db.select().from(vehicleState).where(eq(vehicleState.vehicleId, vehicleId)).limit(1)
 
-  const lat           = doc.location.coordinates[1]
-  const lon           = doc.location.coordinates[0]
+  const lat = doc.lat
+  const lng = doc.lng
   const currentStatus = getStatus(doc)
-  const prevStatus    = prev?.status
+  const prevStatus = prev?.status ?? undefined
 
-  // Since timer — reset timestamp when status changes
-  const stateChangedAt = (currentStatus !== prevStatus)
-    ? Date.now()
-    : (prev?.stateChangedAt || Date.now())
+  const stateChangedAt = currentStatus !== prevStatus
+    ? new Date()
+    : (prev?.stateChangedAt ?? new Date())
 
-  // Today's km — delta from odometer at midnight
   const todayDate = getTodayDate()
-  let todayKm          = prev?.todayKm || 0
-  let todayOdometerBase = prev?.todayOdometerBase
+  let todayKm = prev?.todayKm ? Number(prev.todayKm) : 0
+  let todayOdometerBase = prev?.todayOdometerBase ?? null
 
   if (!todayOdometerBase || prev?.todayDate !== todayDate) {
-    todayOdometerBase = doc.odometer || 0
+    todayOdometerBase = doc.odometer ?? 0
     todayKm = 0
   } else if (doc.odometer != null && doc.odometer > todayOdometerBase) {
-    todayKm = parseFloat((doc.odometer - todayOdometerBase).toFixed(1))
+    todayKm = Number((doc.odometer - todayOdometerBase).toFixed(1))
   }
 
-  // Reverse geocode — only on status change or no address, max once per minute
-  let address = prev?.address || null
+  // Reverse geocode — only on status change or no address, max once per minute per vehicle.
+  let address = prev?.address ?? null
   const cooldownKey = `geocode:cooldown:${imei}`
-  const onCooldown  = await redis.get(cooldownKey)
+  const onCooldown = checkCooldown(cooldownKey)
 
   if (!onCooldown && (!address || currentStatus !== prevStatus)) {
-    const newAddress = await reverseGeocode(lat, lon)
+    const newAddress = await reverseGeocode(lat, lng)
     if (newAddress) {
       address = newAddress
-      await redis.set(cooldownKey, '1')
-      await redis.expire(cooldownKey, 60)
+      setCooldown(cooldownKey, 60)
     }
   }
 
-  // Save enriched state to Redis
   const enriched = {
-    imei,
-    companyId,
     vehicleId,
-    latitude:         lat,
-    longitude:        lon,
-    speed:            doc.speed,
-    angle:            doc.angle,
-    ignition:         doc.ignition,
-    externalVoltage:  doc.externalVoltage,
-    batteryVoltage:   doc.batteryVoltage,
-    gsmSignal:        doc.gsmSignal,
-    odometer:         doc.odometer,
-    timestamp:        doc.timestamp,
+    updatedAt: new Date(),
+    lat,
+    lng,
+    speed: doc.speed,
+    ignition: doc.ignition,
+    odometer: doc.odometer,
+    status: currentStatus,
+    stateChangedAt,
     address,
-    todayKm,
+    todayKm: String(todayKm),
     todayOdometerBase,
     todayDate,
-    status:           currentStatus,
-    stateChangedAt,
-    updatedAt:        Date.now(),
   }
 
-  await redis.set(stateKey, JSON.stringify(enriched))
-  await redis.expire(stateKey, 86400)
+  await db.insert(vehicleState).values(enriched).onConflictDoUpdate({
+    target: vehicleState.vehicleId,
+    set: enriched,
+  })
 
-  return enriched
+  // Shape returned to the caller mirrors the old Redis-cached blob's fields (imei/companyId
+  // included) since worker/index.js's broadcastVanUpdate payload used them directly.
+  return { imei, companyId, ...enriched, angle: doc.angle, externalVoltage: doc.externalVoltage, batteryVoltage: doc.batteryVoltage, gsmSignal: doc.gsmSignal, timestamp: doc.time }
 }
-
-module.exports = { enrichAndSaveVanState }
