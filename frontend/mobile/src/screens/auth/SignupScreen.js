@@ -36,7 +36,7 @@ export default function SignupScreen({ navigation }) {
 
     setLoading(true)
     try {
-      await api.post('/api/auth/signup', { companyName, name, email, password, driverConsent })
+      await api.post('/auth/signup', { companyName, name, email, password, driverConsent })
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.error || 'Signup failed')

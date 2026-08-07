@@ -32,7 +32,7 @@ export default function GeofenceScreen() {
 
   async function load() {
     try {
-      const res = await api.get('/api/geofences')
+      const res = await api.get('/geofences')
       setZones(res.data || [])
     } catch (err) {
       setError(err.response?.data?.error || 'Could not load geofences')
@@ -53,7 +53,7 @@ export default function GeofenceScreen() {
     setSaving(true)
     try {
       const geometry = generateCirclePolygon(lng, lat, radiusMetres)
-      const res = await api.post('/api/geofences', {
+      const res = await api.post('/geofences', {
         name: form.name,
         geometry,
         centre: { lat, lng },
@@ -80,8 +80,8 @@ export default function GeofenceScreen() {
 
   async function deleteZone(id) {
     try {
-      await api.delete(`/api/geofences/${id}`)
-      setZones(z => z.filter(zone => zone._id !== id))
+      await api.delete(`/geofences/${id}`)
+      setZones(z => z.filter(zone => zone.id !== id))
     } catch (err) {
       Alert.alert('Error', 'Could not delete zone')
     }
@@ -137,7 +137,7 @@ export default function GeofenceScreen() {
 
       <FlatList
         data={zones}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           !showAdd && (
@@ -149,7 +149,7 @@ export default function GeofenceScreen() {
           )
         }
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row} onLongPress={() => confirmDelete(item._id, item.name)}>
+          <TouchableOpacity style={styles.row} onLongPress={() => confirmDelete(item.id, item.name)}>
             <View style={styles.iconBadge}>
               <MaterialIcons name='location-on' size={20} color={colors.primary} />
             </View>

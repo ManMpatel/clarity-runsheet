@@ -27,7 +27,7 @@ export default function UpgradeScreen() {
     setError('')
     setLoading(true)
     try {
-      await api.post('/api/upgrade/request', form)
+      await api.post('/upgrade/request', form)
       setSubmitted(true)
     } catch (err) {
       setError(err.response?.data?.error || 'Request failed')

@@ -27,7 +27,7 @@ export default function ReportsScreen() {
     setData(null)
     setLoading(true)
     try {
-      const res = await api.get(`/api/reports/${selected}?from=${from}&to=${to}`)
+      const res = await api.get(`/reports/${selected}?from=${from}&to=${to}`)
       setData(res.data)
     } catch (err) {
       if (err.response?.status === 403) {
@@ -47,7 +47,7 @@ export default function ReportsScreen() {
       return (
         <FlatList
           data={data}
-          keyExtractor={(item, i) => item._id || String(i)}
+          keyExtractor={(item, i) => item.id || String(i)}
           ListEmptyComponent={<Text style={styles.empty}>No scores in this range</Text>}
           renderItem={({ item }) => (
             <View style={styles.resultRow}>
@@ -84,7 +84,7 @@ export default function ReportsScreen() {
       return (
         <FlatList
           data={data}
-          keyExtractor={(item, i) => item.vehicle?._id || String(i)}
+          keyExtractor={(item, i) => item.vehicle?.id || String(i)}
           ListEmptyComponent={<Text style={styles.empty}>No vehicle health data yet</Text>}
           renderItem={({ item }) => (
             <View style={styles.resultRow}>

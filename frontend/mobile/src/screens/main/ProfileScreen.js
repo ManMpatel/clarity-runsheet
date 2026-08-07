@@ -17,7 +17,7 @@ export default function ProfileScreen() {
 
   async function load() {
     try {
-      const res = await api.get('/api/auth/me')
+      const res = await api.get('/auth/me')
       setUser(res.data)
     } catch (err) {
       setError(err.response?.data?.error || 'Could not load profile')
@@ -38,7 +38,7 @@ export default function ProfileScreen() {
     }
     setSaving(true)
     try {
-      await api.put('/api/auth/password', { currentPassword: pwForm.current, newPassword: pwForm.next })
+      await api.put('/auth/password', { currentPassword: pwForm.current, newPassword: pwForm.next })
       setShowPw(false)
       setPwForm({ current: '', next: '', confirm: '' })
       Alert.alert('Password updated')

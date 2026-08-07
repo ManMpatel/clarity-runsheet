@@ -14,8 +14,8 @@ export default function FbtLogbookScreen() {
   async function load() {
     try {
       const [tRes, sRes] = await Promise.all([
-        api.get('/api/fbt'),
-        api.get('/api/fbt/summary'),
+        api.get('/fbt'),
+        api.get('/fbt/summary'),
       ])
       setTrips(tRes.data || [])
       setSummary(sRes.data?.summary || null)
@@ -28,8 +28,8 @@ export default function FbtLogbookScreen() {
 
   async function classify(tripId, classification) {
     try {
-      const res = await api.put(`/api/fbt/${tripId}/classify`, { classification })
-      setTrips(t => t.map(trip => trip._id === tripId ? res.data : trip))
+      const res = await api.put(`/fbt/${tripId}/classify`, { classification })
+      setTrips(t => t.map(trip => trip.id === tripId ? res.data : trip))
     } catch (err) {
       console.log(err.message)
     }
@@ -73,7 +73,7 @@ export default function FbtLogbookScreen() {
 
       <FlatList
         data={trips}
-        keyExtractor={(item, i) => item._id || String(i)}
+        keyExtractor={(item, i) => item.id || String(i)}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.center}>
@@ -90,13 +90,13 @@ export default function FbtLogbookScreen() {
             <View style={styles.toggleRow}>
               <TouchableOpacity
                 style={[styles.toggleBtn, item.classification === 'business' && styles.toggleBusiness]}
-                onPress={() => classify(item._id, 'business')}
+                onPress={() => classify(item.id, 'business')}
               >
                 <Text style={[styles.toggleText, item.classification === 'business' && styles.toggleTextActive]}>Business</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.toggleBtn, item.classification === 'personal' && styles.togglePersonal]}
-                onPress={() => classify(item._id, 'personal')}
+                onPress={() => classify(item.id, 'personal')}
               >
                 <Text style={[styles.toggleText, item.classification === 'personal' && styles.toggleTextActive]}>Personal</Text>
               </TouchableOpacity>

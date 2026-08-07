@@ -35,7 +35,7 @@ export async function registerForPushNotifications() {
     const token = (await Notifications.getExpoPushTokenAsync({
       projectId: '4f46da0b-01ed-491e-9f9e-9faeadd451fc',
     })).data
-    await api.put('/api/settings/push-token', { pushToken: token })
+    await api.post('/notifications/register-device', { platform: Platform.OS, token })
     console.log('[Push] Registered:', token)
     return token
   } catch (err) {

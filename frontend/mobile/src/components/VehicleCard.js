@@ -25,7 +25,7 @@ export default function VehicleCard({ vehicle, onClose }) {
     setCutting(true)
     try {
       const action = immobilised ? 'restore' : 'cut'
-      await api.post(`/api/vehicles/${vehicle._id}/${action}`)
+      await api.post(`/vehicles/${vehicle.id}/${action}`)
       setImmobilised(!immobilised)
     } catch (err) {
       Alert.alert('Could not change engine power', err.response?.data?.error || 'Try again')

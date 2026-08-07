@@ -21,7 +21,7 @@ export default function AlertsScreen() {
 
   async function load() {
     try {
-      const res = await api.get('/api/alerts?limit=50')
+      const res = await api.get('/alerts?limit=50')
       setAlerts(res.data.alerts || [])
     } catch (err) {
       setError(err.response?.data?.error || 'Could not load alerts')
@@ -32,8 +32,8 @@ export default function AlertsScreen() {
 
   async function markRead(id) {
     try {
-      await api.put(`/api/alerts/${id}/read`)
-      setAlerts(a => a.map(x => x._id === id ? { ...x, read: true } : x))
+      await api.put(`/alerts/${id}/read`)
+      setAlerts(a => a.map(x => x.id === id ? { ...x, read: true } : x))
     } catch (err) {
       console.log(err.message)
     }
@@ -41,7 +41,7 @@ export default function AlertsScreen() {
 
   async function markAllRead() {
     try {
-      await api.put('/api/alerts/read-all')
+      await api.put('/alerts/read-all')
       setAlerts(a => a.map(x => ({ ...x, read: true })))
     } catch (err) {
       console.log(err.message)
@@ -84,7 +84,7 @@ export default function AlertsScreen() {
 
       <FlatList
         data={alerts}
-        keyExtractor={(item, i) => item._id || String(i)}
+        keyExtractor={(item, i) => item.id || String(i)}
         ListEmptyComponent={
           <View style={styles.center}>
             <View style={styles.emptyIcon}>
@@ -97,7 +97,7 @@ export default function AlertsScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.row, !item.read && styles.unreadRow]}
-            onPress={() => !item.read && markRead(item._id)}
+            onPress={() => !item.read && markRead(item.id)}
           >
             <View style={[styles.dot, { backgroundColor: SEVERITY_COLORS[item.severity] || SEVERITY_COLORS.info }]} />
             <View style={styles.rowContent}>

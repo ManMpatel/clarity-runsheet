@@ -17,7 +17,7 @@ export default function DriversScreen() {
 
   async function load() {
     try {
-      const res = await api.get('/api/drivers')
+      const res = await api.get('/drivers')
       setDrivers(res.data || [])
     } catch (err) {
       setError(err.response?.data?.error || 'Could not load drivers')
@@ -34,7 +34,7 @@ export default function DriversScreen() {
     }
     setSaving(true)
     try {
-      const res = await api.post('/api/drivers', form)
+      const res = await api.post('/drivers', form)
       setDrivers(d => [...d, res.data])
       setForm({ name: '', email: '', mobile: '', licenceNumber: '' })
       setShowAdd(false)
@@ -77,7 +77,7 @@ export default function DriversScreen() {
 
       <FlatList
         data={drivers}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           !showAdd && (

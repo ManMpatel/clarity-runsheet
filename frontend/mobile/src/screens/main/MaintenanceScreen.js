@@ -28,8 +28,8 @@ export default function MaintenanceScreen() {
   async function load() {
     try {
       const [mRes, vRes] = await Promise.all([
-        api.get('/api/maintenance'),
-        api.get('/api/vehicles'),
+        api.get('/maintenance'),
+        api.get('/vehicles'),
       ])
       setRecords(mRes.data || [])
       setVehicles(vRes.data || [])
@@ -48,7 +48,7 @@ export default function MaintenanceScreen() {
     }
     setSaving(true)
     try {
-      const res = await api.post('/api/maintenance', form)
+      const res = await api.post('/maintenance', form)
       setRecords(r => [res.data, ...r])
       setForm({ vehicleId: '', type: '', dueDate: '', notes: '' })
       setShowAdd(false)
@@ -61,17 +61,17 @@ export default function MaintenanceScreen() {
 
   async function completeRecord(id) {
     try {
-      const res = await api.put(`/api/maintenance/${id}/complete`, {
+      const res = await api.put(`/maintenance/${id}/complete`, {
         completedDate: new Date().toISOString(),
       })
-      setRecords(r => r.map(rec => rec._id === id ? res.data : rec))
+      setRecords(r => r.map(rec => rec.id === id ? res.data : rec))
     } catch (err) {
       console.log(err.message)
     }
   }
 
   function vehicleName(id) {
-    return vehicles.find(v => v._id === id)?.name || 'Vehicle'
+    return vehicles.find(v => v.id === id)?.name || 'Vehicle'
   }
 
   function formatDate(d) {
@@ -103,11 +103,11 @@ export default function MaintenanceScreen() {
           <View style={styles.chipRow}>
             {vehicles.map(v => (
               <TouchableOpacity
-                key={v._id}
-                style={[styles.chip, form.vehicleId === v._id && styles.chipActive]}
-                onPress={() => setForm(f => ({ ...f, vehicleId: v._id }))}
+                key={v.id}
+                style={[styles.chip, form.vehicleId === v.id && styles.chipActive]}
+                onPress={() => setForm(f => ({ ...f, vehicleId: v.id }))}
               >
-                <Text style={[styles.chipText, form.vehicleId === v._id && styles.chipTextActive]}>{v.name}</Text>
+                <Text style={[styles.chipText, form.vehicleId === v.id && styles.chipTextActive]}>{v.name}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -122,7 +122,7 @@ export default function MaintenanceScreen() {
 
       <FlatList
         data={records}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           !showAdd && (
@@ -137,7 +137,7 @@ export default function MaintenanceScreen() {
           return (
             <TouchableOpacity
               style={styles.row}
-              onPress={() => item.status === 'pending' && completeRecord(item._id)}
+              onPress={() => item.status === 'pending' && completeRecord(item.id)}
             >
               <View style={[styles.statusIcon, { backgroundColor: status.color + '1A' }]}>
                 <MaterialIcons name={status.icon} size={18} color={status.color} />

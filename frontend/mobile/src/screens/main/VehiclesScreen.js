@@ -17,7 +17,7 @@ export default function VehiclesScreen() {
 
   async function load() {
     try {
-      const res = await api.get('/api/vehicles')
+      const res = await api.get('/vehicles')
       setVehicles(res.data || [])
     } catch (err) {
       setError(err.response?.data?.error || 'Could not load vehicles')
@@ -34,7 +34,7 @@ export default function VehiclesScreen() {
     }
     setSaving(true)
     try {
-      const res = await api.post('/api/vehicles', form)
+      const res = await api.post('/vehicles', form)
       setVehicles(v => [...v, res.data])
       setForm({ name: '', imei: '', registration: '', make: '', model: '', year: '' })
       setShowAdd(false)
@@ -54,8 +54,8 @@ export default function VehiclesScreen() {
 
   async function deleteVehicle(id) {
     try {
-      await api.delete(`/api/vehicles/${id}`)
-      setVehicles(v => v.filter(x => x._id !== id))
+      await api.delete(`/vehicles/${id}`)
+      setVehicles(v => v.filter(x => x.id !== id))
     } catch (err) {
       Alert.alert('Error', 'Could not remove vehicle')
     }
@@ -95,7 +95,7 @@ export default function VehiclesScreen() {
 
       <FlatList
         data={vehicles}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           !showAdd && (
@@ -106,7 +106,7 @@ export default function VehiclesScreen() {
           )
         }
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row} onLongPress={() => confirmDelete(item._id, item.name)}>
+          <TouchableOpacity style={styles.row} onLongPress={() => confirmDelete(item.id, item.name)}>
             <View style={styles.iconBadge}>
               <MaterialIcons name='local-shipping' size={20} color={colors.primary} />
             </View>

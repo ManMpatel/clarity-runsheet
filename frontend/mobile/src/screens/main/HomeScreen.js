@@ -6,6 +6,7 @@ import { buildMapHtml } from '../../lib/mapHtml'
 import { colors, radius, spacing } from '../../lib/theme'
 import VehicleCard from '../../components/VehicleCard'
 import TopBar from '../../components/TopBar'
+import { useSocket } from '../../hooks/useSocket'
 
 const MAPBOX_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_TOKEN
 
@@ -23,13 +24,45 @@ export default function HomeScreen() {
     return () => clearInterval(interval)
   }, [])
 
+  // Live updates: the initial load() below is a one-shot snapshot — after that, position/status
+  // changes arrive over the `van:update` socket event (see backend/src/socket/index.ts) and get
+  // merged into `vehicles` in place, resetting the "Updated N sec ago" staleness pill each time.
+  useSocket(handleVanUpdate)
+
+  function handleVanUpdate(data) {
+    setVehicles(prev => {
+      let matched = false
+      const next = prev.map(v => {
+        if (v.id !== data.vehicleId && v.imei !== data.imei) return v
+        matched = true
+        return {
+          ...v,
+          latitude:        data.latitude ?? v.latitude,
+          longitude:       data.longitude ?? v.longitude,
+          speed:           data.speed ?? v.speed,
+          ignition:        data.ignition ?? v.ignition,
+          address:         data.address ?? v.address,
+          todayKm:         data.todayKm != null ? Number(data.todayKm) : v.todayKm,
+          stateChangedAt:  data.stateChangedAt ?? v.stateChangedAt,
+          gsmSignal:       data.gsmSignal ?? v.gsmSignal,
+          odometer:        data.odometer ?? v.odometer,
+          batteryVoltage:  data.batteryVoltage ?? v.batteryVoltage,
+          externalVoltage: data.externalVoltage ?? v.externalVoltage,
+        }
+      })
+      return matched ? next : prev
+    })
+    setSecondsAgo(0)
+  }
+
   async function load() {
     try {
-      const res = await api.get('/api/telemetry/live')
+      const res = await api.get('/telemetry/live')
       const mapped = (res.data || [])
         .filter(item => item.state && item.state.latitude && item.state.longitude)
         .map(item => ({
-          _id:             item.vehicle._id,
+          id:              item.vehicle.id,
+          imei:            item.vehicle.imei,
           name:            item.vehicle.name,
           latitude:        item.state.latitude,
           longitude:       item.state.longitude,

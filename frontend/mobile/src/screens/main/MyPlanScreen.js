@@ -16,8 +16,8 @@ export default function MyPlanScreen() {
   async function load() {
     try {
       const [cRes, vRes] = await Promise.all([
-        api.get('/api/settings/company'),
-        api.get('/api/vehicles'),
+        api.get('/settings/company'),
+        api.get('/vehicles'),
       ])
       setCompany(cRes.data)
       setVehicleCount((vRes.data || []).length)

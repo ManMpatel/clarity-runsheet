@@ -13,7 +13,7 @@ export default function TripsScreen() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await api.get('/api/trips')
+        const res = await api.get('/trips')
         setTrips(res.data.trips || [])
       } catch (err) {
         setError(err.response?.data?.error || 'Could not load trips')
@@ -59,7 +59,7 @@ export default function TripsScreen() {
       </View>
       <FlatList
         data={trips}
-        keyExtractor={(item, i) => item._id || String(i)}
+        keyExtractor={(item, i) => item.id || String(i)}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.center}>

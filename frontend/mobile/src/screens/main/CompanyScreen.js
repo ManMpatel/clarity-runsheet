@@ -13,7 +13,7 @@ export default function CompanyScreen() {
 
   async function load() {
     try {
-      const res = await api.get('/api/settings/company')
+      const res = await api.get('/settings/company')
       setForm({
         name:     res.data.name || '',
         abn:      res.data.abn || '',
@@ -32,7 +32,7 @@ export default function CompanyScreen() {
   async function save() {
     setSaving(true)
     try {
-      await api.put('/api/settings/company', form)
+      await api.put('/settings/company', form)
       Alert.alert('Saved', 'Company details updated')
     } catch (err) {
       Alert.alert('Error', err.response?.data?.error || 'Could not save')

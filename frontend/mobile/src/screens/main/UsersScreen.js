@@ -19,7 +19,7 @@ export default function UsersScreen() {
 
   async function load() {
     try {
-      const res = await api.get('/api/settings/users')
+      const res = await api.get('/settings/users')
       setUsers(res.data || [])
     } catch (err) {
       setError(err.response?.data?.error || 'Could not load users')
@@ -36,7 +36,7 @@ export default function UsersScreen() {
     }
     setSaving(true)
     try {
-      const res = await api.post('/api/settings/users', form)
+      const res = await api.post('/settings/users', form)
       setUsers(u => [...u, res.data])
       setForm({ name: '', email: '', password: '', role: 'fleetManager' })
       setShowAdd(false)
@@ -91,7 +91,7 @@ export default function UsersScreen() {
 
       <FlatList
         data={users}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           !showAdd && (

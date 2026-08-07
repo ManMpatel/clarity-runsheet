@@ -13,7 +13,7 @@ export default function ScoreScreen() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await api.get('/api/drivers')
+        const res = await api.get('/drivers')
         setDrivers(res.data || [])
         await loadScores(res.data || [])
       } catch (err) {
@@ -29,10 +29,10 @@ export default function ScoreScreen() {
     const results = {}
     await Promise.all(driverList.map(async (d) => {
       try {
-        const res = await api.get(`/api/drivers/${d._id}/score`)
-        results[d._id] = res.data?.[0] || null
+        const res = await api.get(`/drivers/${d.id}/score`)
+        results[d.id] = res.data?.[0] || null
       } catch {
-        results[d._id] = null
+        results[d.id] = null
       }
     }))
     setScores(results)
@@ -68,7 +68,7 @@ export default function ScoreScreen() {
 
       <FlatList
         data={drivers}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <View style={styles.center}>
@@ -77,7 +77,7 @@ export default function ScoreScreen() {
           </View>
         }
         renderItem={({ item }) => {
-          const latest = scores[item._id]
+          const latest = scores[item.id]
           const score  = latest?.overallScore ?? null
           return (
             <View style={styles.row}>
