@@ -1,0 +1,16 @@
+{
+  "name": "clarity-runsheet",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Root dev orchestrator for Clarity Fleet — docker stack (postgres, redis, api, tcp-listener, ingestion) + web dashboard. Mobile is run separately.",
+  "scripts": {
+    "docker:up": "docker compose up",
+    "docker:down": "docker compose down",
+    "dev:web": "npm --prefix frontend/web run dev",
+    "dev": "concurrently -n docker,web -c blue,yellow \"npm run docker:up\" \"npm run dev:web\"",
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend/web install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
