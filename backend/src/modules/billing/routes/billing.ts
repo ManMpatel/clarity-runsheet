@@ -20,7 +20,10 @@ import { companies } from '../../../db/schema'
 import { requireAuth, requireCompany } from '../../../middleware/auth-guard'
 import { asyncRoute } from '../../../middleware/response-envelope'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+// Stripe billing is optional in dev/self-hosted setups — constructing the client eagerly with an
+// empty key throws at import time and takes the whole API process down, so only instantiate it
+// when a key is actually configured; routes below fail gracefully instead.
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 const router = express.Router()
 const PRICE_ID = process.env.STRIPE_PRICE_ID
 const WEB_URL = process.env.WEB_URL || process.env.DASHBOARD_URL || 'https://track.clarity-software.com.au'
@@ -49,6 +52,7 @@ router.get('/status', requireAuth, requireCompany, asyncRoute(async (req, res) =
 }))
 
 router.post('/checkout', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  if (!stripe) return res.fail(null, 'Billing is not configured', 503)
   const { quantity = 1 } = req.body
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
@@ -62,6 +66,7 @@ router.post('/checkout', requireAuth, requireCompany, asyncRoute(async (req, res
 }))
 
 router.post('/portal', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  if (!stripe) return res.fail(null, 'Billing is not configured', 503)
   const [company] = await db.select().from(companies).where(eq(companies.id, req.companyId!)).limit(1)
   if (!company?.stripeCustomerId) return res.fail(null, 'No active subscription found')
 
@@ -109,6 +114,7 @@ async function applySlotCounts(companyId: string, counts: Partial<Record<'entry'
 }
 
 router.post('/webhook', express.raw({ type: 'application/json' }), asyncRoute(async (req, res) => {
+  if (!stripe) return res.fail(null, 'Billing is not configured', 503)
   const sig = req.headers['stripe-signature'] as string
   let event: Stripe.Event
   try {

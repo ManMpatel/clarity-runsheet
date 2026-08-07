@@ -1,0 +1,44 @@
+Single-VPS production deployment plan — Clarity Fleet backend
+Context
+This repo currently has two disconnected deployment stories, neither of which fits what the user actually wants:
+
+docker-compose.yml at the root — this is dev-only. It binds Postgres/Redis straight to the host on all interfaces, has no TLS/reverse proxy, no persistent volume for generated report files, and the backend image it builds ships every devDependency.
+.github/workflows/deploy.yml — a real, existing CI/CD pipeline that SSHes into three separate droplets (209.38.83.138 api, 170.64.148.64 tcp, 134.199.144.238 worker) and does a bare-metal git pull && npm install --production && pm2 restart per host. The user confirmed they do not want this 3-droplet topology — they have one dedicated VPS and will run the deploy themselves on that single machine.
+The user also confirmed: frontend/web stays on Vercel (its committed vercel.json SPA-rewrite config already targets that) — this plan covers backend + Postgres + Redis only, deployed as Docker containers on one VPS, fronted by nginx for TLS. The existing 3-droplet deploy.yml is flagged as stale but left untouched — replacing/deleting it is the user's call, not assumed here.
+
+Runtime approach: keep running the backend via tsx directly (as today), not a compiled tsc/dist build — confirmed with the user as the lower-risk option since it matches what's already working.
+
+What's wrong with the current setup for a real VPS
+backend/Dockerfile bug: RUN npm install --omit=dev=false installs all deps (the flag does the opposite of what it looks like) — not a real prod-slim image, and if that were ever fixed naively to --omit=dev, the container would break immediately because tsx (the actual runtime dependency, since there's no compiled JS) currently lives in devDependencies.
+No .dockerignore — node_modules, .git, etc. all go into the Docker build context.
+No HEALTHCHECK, and only api.ts has an HTTP /health route at all — tcp-listener and ingestion have zero way to signal liveness to Docker's restart policy or an uptime monitor.
+backend/storage/reports (generated report files, written by the ingestion-side queue, served by api's static route) isn't in any volume — would be silently lost on container recreate, and needs to be shared between whichever containers write vs. serve it.
+Postgres (5432) and Redis (6379) are bound to 0.0.0.0 in the dev compose file — fine behind NAT locally, exposes a database and a queue to the open internet on a VPS with a public IP.
+No TLS/reverse proxy anywhere — api (3000) and ingestion's socket.io (3001) both need to be reachable over HTTPS/WSS by the Vercel-hosted dashboard; only tcp-listener's device port (5027) should stay raw/public, since GPS hardware speaks the Codec 8/8E protocol directly, not HTTP.
+Deliverable for this session
+The user does not want any of this executed yet — no Dockerfile rewrite, no compose override, no nginx config, no env templates, no DEPLOY.md runbook created as separate files. The only action to take now is writing one new file, VPS_MIGRATION_PLAN.md, at the repo root, containing this entire analysis (the "What's wrong" section above and the full "Plan" section below, including the file-by-file breakdown) as reference documentation. Nothing else in the repo is touched. The file-by-file breakdown below stays in the doc as the recommended future work, not as things actually created in this session.
+
+Plan (content of VPS_MIGRATION_PLAN.md — for future execution, not run now)
+A. Repo changes
+backend/package.json — move tsx from devDependencies to dependencies (it's the actual runtime engine, not a dev-only tool).
+backend/Dockerfile — rewrite as a real multi-stage build:
+deps stage: npm ci (full deps) — used only for the typecheck step.
+runtime stage: fresh node:20-slim, npm ci --omit=dev (now includes tsx per the package.json move), copy only src/, run as a non-root user, add HEALTHCHECK (wired to /health for the api entrypoint; documented as a known gap for the other two until step 3 lands).
+Add a minimal /health route to tcp-listener's existing internal HTTP server (already listening on :4001) and to ingestion's existing HTTP server backing socket.io (:3001) — small, targeted source changes so all three entrypoints are consistently health-checkable by Docker's restart policy and any external uptime monitor.
+backend/.dockerignore (new) — excludes node_modules, .git, .env*, tests/docs.
+docker-compose.prod.yml (new, used as a compose override on top of the existing docker-compose.yml, not a replacement) —
+postgres/redis ports bound to 127.0.0.1 only (not public).
+restart: always on all services.
+A shared named volume mounted into both api and ingestion for backend/storage (fixes the report-file persistence gap).
+env_file: ./backend/.env.production instead of ./backend/.env.
+backend/.env.production.example (new) — a production-flavored template distinct from the existing dev .env.example: Docker service-DNS values (postgres, redis, tcp-listener) instead of localhost, placeholders for the real Vercel dashboard URL, includes STRIPE_PRICE_ID (confirmed read by billing.ts but missing from the current .env.example entirely), and drops the unused MONGO_* vars (this backend is Postgres/Drizzle — Mongo vars aren't read anywhere).
+deploy/nginx/clarity.conf (new) — reverse-proxy config: TLS via certbot, api.clarity-software.com.au → 127.0.0.1:3000, a socket.io host/path → 127.0.0.1:3001 with websocket upgrade headers. tcp-listener's :5027 is intentionally not proxied — it stays a raw exposed TCP port for devices.
+deploy/backup.sh (new) — a small pg_dump | gzip cron script with retention cleanup, given this is telemetry + billing data.
+DEPLOY.md (new, repo root) — the runbook the user will execute themselves on their VPS: provision → install Docker/Compose → ufw firewall rules (allow 22/80/443/5027, deny 5432/6379/3000/3001/4001 from the public interface) → clone repo → fill in backend/.env.production (including pulling the real live Stripe keys from wherever they currently live, since those aren't something I can fabricate) → first-run DB setup (db:generate + db:migrate, then the hand-written 0001_telemetry_hypertable.sql applied manually via psql -f, per its own header comment, then npm run create-admin) → certbot cert issuance → bring the stack up with docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d → verify all three /health endpoints → enable Docker's restart-on-boot → wire up the backup cron → note how to tail logs (docker compose logs -f <service>).
+B. What this plan does not do
+Does not touch or replace .github/workflows/deploy.yml — flagged as targeting a topology the user no longer wants, left for them to decide.
+Does not SSH into, provision, or issue real TLS certs on the user's actual VPS, and does not fabricate real production secrets — the user will run DEPLOY.md themselves; I hand them exact commands, not remote access.
+Does not touch frontend/web or its Vercel configuration.
+Does not touch frontend/mobile.
+Verification (for this session)
+Since nothing except the doc itself is being written this session, "done" means: VPS_MIGRATION_PLAN.md exists at the repo root, contains the full analysis and file-by-file breakdown above, and no other file in the repo was modified. (The docker build/compose config checks described in the plan's own "Plan" section are verification steps for when the user later decides to execute the migration — not something run now.)
