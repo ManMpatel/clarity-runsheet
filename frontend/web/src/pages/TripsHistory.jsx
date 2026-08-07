@@ -18,7 +18,7 @@ export default function TripsHistory() {
   useEffect(() => {
     async function loadVehicles() {
       try {
-        const res = await api.get('/api/vehicles')
+        const res = await api.get('/vehicles')
         setVehicles(res.data)
       } catch (err) {
         console.error(err.message)
@@ -36,7 +36,7 @@ export default function TripsHistory() {
       if (filters.from)      params.append('from', filters.from)
       if (filters.to)        params.append('to', filters.to)
 
-      const res = await api.get(`/api/trips?${params}`)
+      const res = await api.get(`/trips?${params}`)
       setTrips(res.data.trips || [])
     } catch (err) {
       console.error(err.message)
@@ -64,7 +64,7 @@ export default function TripsHistory() {
     setReplayLoading(true)
     setReplayPoints([])
     try {
-      const res = await api.get(`/api/trips/${tripId}/replay`)
+      const res = await api.get(`/trips/${tripId}/replay`)
       setReplayPoints(res.data.points || [])
     } catch (err) {
       console.error('Replay failed', err.message)
@@ -77,7 +77,7 @@ export default function TripsHistory() {
     setReplayLoading(true)
     setReplayPoints([])
     try {
-      const res = await api.get(`/api/trips/${tripId}/replay`)
+      const res = await api.get(`/trips/${tripId}/replay`)
       setReplayPoints(res.data.points || [])
       setShowReplay(true)
     } catch (err) {
@@ -112,7 +112,7 @@ export default function TripsHistory() {
           >
             <option value=''>All vehicles</option>
             {vehicles.map(v => (
-              <option key={v._id} value={v._id}>{v.name}</option>
+              <option key={v.id} value={v.id}>{v.name}</option>
             ))}
           </select>
 
@@ -171,7 +171,7 @@ export default function TripsHistory() {
                   <tr
                     key={i}
                     className={`hover:bg-gray-50 cursor-pointer transition ${
-                      selected?._id === trip._id ? 'bg-blue-50' : ''
+                      selected?.id === trip.id ? 'bg-blue-50' : ''
                     }`}
                     onClick={() => setSelected(trip)}
                   >
@@ -260,7 +260,7 @@ export default function TripsHistory() {
                 </div>
                 <div className='flex gap-3 mt-5'>
                   <button
-                    onClick={() => handleReplay(selected._id)}
+                    onClick={() => handleReplay(selected.id)}
                     disabled={replayLoading}
                     className='flex-1 h-9 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50'
                   >

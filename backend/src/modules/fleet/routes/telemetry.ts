@@ -1,52 +1,46 @@
-const express = require('express')
-const { getCollection } = require('../db/mongo')
-const { requireAuth } = require('../middleware/auth')
-const { requireCompany } = require('../middleware/requireCompany')
-const { getClient } = require('../db/redis')
+// Ported from api/routes/telemetry.js. Mongo native driver -> Drizzle/Postgres, and the old
+// Redis `van:state:{imei}` live-state cache -> the `vehicle_state` table (single source of truth
+// for live state now, no more Redis in the read path). History still reads a time-series
+// collection, now the `telemetry` TimescaleDB hypertable instead of a Mongo time-series collection.
+import express from 'express'
+import { and, asc, eq, gte, lte } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { vehicles, vehicleState, telemetry } from '../../../db/schema'
+import { requireAuth, requireCompany } from '../../../middleware/auth-guard'
+import { asyncRoute } from '../../../middleware/response-envelope'
 
 const router = express.Router()
 
-router.get('/live', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const redis = getClient()
-    const vehicles = await getCollection('vehicles')
-    const fleet = await vehicles
-      .find({ ...req.companyFilter, active: true })
-      .toArray()
+router.get('/live', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const fleet = await db.select().from(vehicles)
+    .where(and(eq(vehicles.companyId, req.companyId!), eq(vehicles.active, true)))
 
-    const states = await Promise.all(
-      fleet.map(async (v) => {
-        const raw = await redis.get(`van:state:${v.imei}`)
-        const state = raw ? JSON.parse(raw) : null
-        return { vehicle: v, state }
-      })
-    )
-    return res.json(states)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+  const states = await Promise.all(
+    fleet.map(async (v) => {
+      const [state] = await db.select().from(vehicleState).where(eq(vehicleState.vehicleId, v.id)).limit(1)
+      return { vehicle: v, state: state || null }
+    })
+  )
+  return res.success(states)
+}))
+
+router.get('/history', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const { vehicleId, from, to, limit = '1000' } = req.query as Record<string, string>
+  if (!vehicleId || !from || !to) {
+    return res.fail(null, 'vehicleId, from, to required')
   }
-})
 
-router.get('/history', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const { vehicleId, from, to, limit = 1000 } = req.query
-    if (!vehicleId || !from || !to) {
-      return res.status(400).json({ error: 'vehicleId, from, to required' })
-    }
-    const collection = await getCollection('telemetry_events')
-    const records = await collection
-      .find({
-        'metadata.companyId': req.companyId,
-        'metadata.vehicleId': vehicleId,
-        timestamp: { $gte: new Date(from), $lte: new Date(to) },
-      })
-      .sort({ timestamp: 1 })
-      .limit(parseInt(limit))
-      .toArray()
-    return res.json(records)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+  const records = await db.select().from(telemetry)
+    .where(and(
+      eq(telemetry.companyId, req.companyId!),
+      eq(telemetry.vehicleId, vehicleId),
+      gte(telemetry.time, new Date(from)),
+      lte(telemetry.time, new Date(to)),
+    ))
+    .orderBy(asc(telemetry.time))
+    .limit(parseInt(limit))
 
-module.exports = router
+  return res.success(records)
+}))
+
+export default router

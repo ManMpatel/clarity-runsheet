@@ -1,163 +1,119 @@
-const express = require('express')
-const { ObjectId } = require('mongodb')
-const { getCollection } = require('../db/mongo')
-const { requireAuth, requireRole } = require('../middleware/auth')
-const { requireCompany } = require('../middleware/requireCompany')
+// Ported from api/routes/drivers.js. Mongo native driver -> Drizzle/Postgres. The
+// driver_history collection's "never deleted" append-only semantics are preserved as-is —
+// see driver-history schema note in db/schema/drivers.ts.
+import express from 'express'
+import { and, desc, eq, isNull } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { drivers, driverHistory, safetyScores } from '../../../db/schema'
+import { requireAuth, requireRole, requireCompany } from '../../../middleware/auth-guard'
+import { asyncRoute } from '../../../middleware/response-envelope'
 
 const router = express.Router()
 
-router.get('/', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const collection = await getCollection('drivers')
-    const drivers = await collection
-      .find(req.companyFilter)
-      .sort({ name: 1 })
-      .toArray()
-    return res.json(drivers)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const list = await db.select().from(drivers)
+    .where(eq(drivers.companyId, req.companyId!))
+    .orderBy(drivers.name)
+  return res.success(list)
+}))
 
-router.get('/:id', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const collection = await getCollection('drivers')
-    const driver = await collection.findOne({
-      _id: new ObjectId(req.params.id),
-      ...req.companyFilter,
-    })
-    if (!driver) return res.status(404).json({ error: 'Driver not found' })
-    return res.json(driver)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+router.get('/:id', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const [driver] = await db.select().from(drivers)
+    .where(and(eq(drivers.id, req.params.id), eq(drivers.companyId, req.companyId!)))
+    .limit(1)
+  if (!driver) return res.fail(null, 'Driver not found', 404)
+  return res.success(driver)
+}))
 
-router.get('/:id/score', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const scores = await getCollection('safety_scores')
-    const history = await scores
-      .find({ driverId: req.params.id, ...req.companyFilter })
-      .sort({ weekStart: -1 })
-      .limit(12)
-      .toArray()
-    return res.json(history)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+router.get('/:id/score', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const history = await db.select().from(safetyScores)
+    .where(and(eq(safetyScores.driverId, req.params.id), eq(safetyScores.companyId, req.companyId!)))
+    .orderBy(desc(safetyScores.weekStart))
+    .limit(12)
+  return res.success(history)
+}))
 
-// GET /api/drivers/:id/history
+// GET /api/v1/drivers/:id/history
 // Permanent log of every vehicle assignment change — never deleted
-router.get('/:id/history', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const collection = await getCollection('driver_history')
-    const history = await collection
-      .find({ driverId: req.params.id, companyId: req.companyId })
-      .sort({ startedAt: -1 })
-      .toArray()
-    return res.json(history)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+router.get('/:id/history', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const history = await db.select().from(driverHistory)
+    .where(and(eq(driverHistory.driverId, req.params.id), eq(driverHistory.companyId, req.companyId!)))
+    .orderBy(desc(driverHistory.startedAt))
+  return res.success(history)
+}))
+
+router.post('/', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
+  const { name, email, mobile, licenceNumber, licenceExpiry, vehicleId } = req.body
+  if (!name || !mobile || !email) {
+    return res.fail(null, 'Name, email and mobile required')
   }
-})
 
-router.post('/', requireAuth, requireCompany,
-  requireRole('companyAdmin', 'superAdmin'), async (req, res) => {
-  try {
-    const { name, email, mobile, licenceNumber, licenceExpiry, vehicleId } = req.body
-    if (!name || !mobile || !email) {
-      return res.status(400).json({ error: 'Name, email and mobile required' })
-    }
+  const [driver] = await db.insert(drivers).values({
+    companyId: req.companyId!,
+    name,
+    email: email.toLowerCase(),
+    mobile,
+    licenceNumber: licenceNumber || null,
+    licenceExpiry: licenceExpiry || null,
+    vehicleId: vehicleId || null,
+    active: true,
+  }).returning()
 
-    const collection = await getCollection('drivers')
-    const driver = {
-      companyId:     req.companyId,
-      name,
-      email:         email.toLowerCase(),
-      mobile,
-      licenceNumber: licenceNumber || null,
-      licenceExpiry: licenceExpiry ? new Date(licenceExpiry) : null,
-      vehicleId:     vehicleId || null,
-      active:        true,
-      createdAt:     new Date(),
-    }
+  return res.success(driver, 'Driver created')
+}))
 
-    const result = await collection.insertOne(driver)
-    return res.status(201).json({ ...driver, _id: result.insertedId })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+router.put('/:id', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
+  const { name, email, mobile, licenceNumber, licenceExpiry, vehicleId, active } = req.body
 
-router.put('/:id', requireAuth, requireCompany,
-  requireRole('companyAdmin', 'superAdmin'), async (req, res) => {
-  try {
-    const { name, email, mobile, licenceNumber, licenceExpiry, vehicleId, active } = req.body
-    const collection = await getCollection('drivers')
+  const [updated] = await db.update(drivers).set({
+    name, email, mobile, licenceNumber,
+    licenceExpiry: licenceExpiry || null,
+    vehicleId, active, updatedAt: new Date(),
+  }).where(and(eq(drivers.id, req.params.id), eq(drivers.companyId, req.companyId!))).returning()
 
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id), ...req.companyFilter },
-      { $set: { name, email, mobile, licenceNumber, licenceExpiry: licenceExpiry ? new Date(licenceExpiry) : null, vehicleId, active, updatedAt: new Date() } },
-      { returnDocument: 'after' }
-    )
+  if (!updated) return res.fail(null, 'Driver not found', 404)
+  return res.success(updated)
+}))
 
-    if (!result) return res.status(404).json({ error: 'Driver not found' })
-    return res.json(result)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-// PUT /api/drivers/:id/assign-vehicle
+// PUT /api/v1/drivers/:id/assign-vehicle
 // Assigns driver to a van — logs permanent history record
 // When driver changes, old record gets endedAt, new record created
-router.put('/:id/assign-vehicle', requireAuth, requireCompany,
-  requireRole('companyAdmin', 'superAdmin'), async (req, res) => {
-  try {
-    const { vehicleId } = req.body
-    const driverId = req.params.id
+router.put('/:id/assign-vehicle', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
+  const { vehicleId } = req.body
+  const driverId = req.params.id
 
-    const drivers    = await getCollection('drivers')
-    const history    = await getCollection('driver_history')
+  const [driver] = await db.select().from(drivers)
+    .where(and(eq(drivers.id, driverId), eq(drivers.companyId, req.companyId!)))
+    .limit(1)
+  if (!driver) return res.fail(null, 'Driver not found', 404)
 
-    const driver = await drivers.findOne({
-      _id: new ObjectId(driverId),
-      ...req.companyFilter,
-    })
-    if (!driver) return res.status(404).json({ error: 'Driver not found' })
-
-    // Close off previous assignment if exists
-    if (driver.vehicleId) {
-      await history.updateOne(
-        { driverId, vehicleId: driver.vehicleId, endedAt: null },
-        { $set: { endedAt: new Date() } }
-      )
-    }
-
-    // Update driver record
-    await drivers.updateOne(
-      { _id: new ObjectId(driverId) },
-      { $set: { vehicleId: vehicleId || null, updatedAt: new Date() } }
-    )
-
-    // Create new history record if assigning to a vehicle
-    if (vehicleId) {
-      await history.insertOne({
-        companyId:  req.companyId,
-        driverId,
-        vehicleId,
-        driverName: driver.name,
-        startedAt:  new Date(),
-        endedAt:    null,
-      })
-    }
-
-    return res.json({ success: true, driverId, vehicleId: vehicleId || null })
-  } catch (err) {
-    console.error('[Drivers] Assign vehicle error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
+  // Close off previous assignment if exists
+  if (driver.vehicleId) {
+    await db.update(driverHistory).set({ endedAt: new Date() })
+      .where(and(
+        eq(driverHistory.driverId, driverId),
+        eq(driverHistory.vehicleId, driver.vehicleId),
+        isNull(driverHistory.endedAt),
+      ))
   }
-})
 
-module.exports = router
+  // Update driver record
+  await db.update(drivers).set({ vehicleId: vehicleId || null, updatedAt: new Date() })
+    .where(eq(drivers.id, driverId))
+
+  // Create new history record if assigning to a vehicle
+  if (vehicleId) {
+    await db.insert(driverHistory).values({
+      companyId: req.companyId!,
+      driverId,
+      vehicleId,
+      driverName: driver.name,
+      startedAt: new Date(),
+      endedAt: null,
+    })
+  }
+
+  return res.success({ driverId, vehicleId: vehicleId || null })
+}))
+
+export default router

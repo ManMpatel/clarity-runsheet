@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import axios from 'axios'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+import api from '../../lib/api'
 
 const DEVICE_TYPES = ['FMC920', 'FMC003', 'FMC650']
 
@@ -27,12 +25,7 @@ export default function RegisterDevice() {
 
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      await axios.post(
-        `${API}/api/imei/register`,
-        { imei, deviceType, notes },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      await api.post('/imei/register', { imei, deviceType, notes })
       setSuccess(true)
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed')

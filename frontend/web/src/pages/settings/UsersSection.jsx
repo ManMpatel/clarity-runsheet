@@ -27,7 +27,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
 
   useEffect(() => {
     if (vehicles.length === 0) return
-    api.get('/api/vehicles/status')
+    api.get('/vehicles/status')
       .then(res => {
         const map = {}
         res.data.forEach(s => { map[s.vehicleId] = s })
@@ -38,7 +38,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
 
   async function addVan() {
     try {
-      const res = await api.post('/api/vehicles', form)
+      const res = await api.post('/vehicles', form)
       setVehicles(v => [...v, res.data])
       setShowAdd(false)
       setForm({ name: '', imei: '', registration: '', make: '', model: '', year: '' })
@@ -91,7 +91,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
         {vehicles.length === 0 ? (
           <p className='text-sm text-gray-400 p-6 text-center'>No vehicles yet — add your first van above</p>
         ) : vehicles.map((v, i) => {
-          const s = status[v._id] || { state: 'offline', lastSeen: null }
+          const s = status[v.id] || { state: 'offline', lastSeen: null }
           return (
             <div key={i} className='px-5 py-3.5 flex items-center justify-between'>
               <div className='flex items-center gap-3'>

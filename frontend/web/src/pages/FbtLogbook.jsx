@@ -13,8 +13,8 @@ export default function FbtLogbook() {
     async function load() {
       try {
         const [vRes, tRes] = await Promise.all([
-          api.get('/api/vehicles'),
-          api.get('/api/fbt'),
+          api.get('/vehicles'),
+          api.get('/fbt'),
         ])
         setVehicles(vRes.data)
         setTrips(tRes.data)
@@ -30,7 +30,7 @@ export default function FbtLogbook() {
 
   async function loadSummary() {
     try {
-      const res = await api.get('/api/fbt/summary')
+      const res = await api.get('/fbt/summary')
       setSummary(res.data)
     } catch (err) {
       console.error(err.message)
@@ -39,9 +39,9 @@ export default function FbtLogbook() {
 
   async function classify(tripId, classification) {
     try {
-      const res = await api.put(`/api/fbt/${tripId}/classify`, { classification })
+      const res = await api.put(`/fbt/${tripId}/classify`, { classification })
       setTrips(t => t.map(trip =>
-        trip._id === tripId ? res.data : trip
+        trip.id === tripId ? res.data : trip
       ))
       setClassifying(null)
       loadSummary()
@@ -89,7 +89,7 @@ export default function FbtLogbook() {
               <div key={i} className='flex items-center justify-between px-4 py-3'>
                 <div>
                   <p className='text-sm font-medium text-gray-800'>
-                    {vehicles.find(v => v._id === trip.vehicleId)?.name || trip.vehicleId}
+                    {vehicles.find(v => v.id === trip.vehicleId)?.name || trip.vehicleId}
                   </p>
                   <p className='text-xs text-gray-400 mt-0.5'>
                     {formatDate(trip.startTime)} — {trip.distanceKm?.toFixed(1) ?? '--'} km
@@ -97,13 +97,13 @@ export default function FbtLogbook() {
                 </div>
                 <div className='flex gap-2'>
                   <button
-                    onClick={() => classify(trip._id, 'business')}
+                    onClick={() => classify(trip.id, 'business')}
                     className='h-7 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition'
                   >
                     Business
                   </button>
                   <button
-                    onClick={() => classify(trip._id, 'personal')}
+                    onClick={() => classify(trip.id, 'personal')}
                     className='h-7 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition'
                   >
                     Personal
@@ -125,7 +125,7 @@ export default function FbtLogbook() {
               <div key={i} className='flex items-center justify-between px-4 py-3'>
                 <div>
                   <p className='text-sm font-medium text-gray-800'>
-                    {vehicles.find(v => v._id === trip.vehicleId)?.name || trip.vehicleId}
+                    {vehicles.find(v => v.id === trip.vehicleId)?.name || trip.vehicleId}
                   </p>
                   <p className='text-xs text-gray-400 mt-0.5'>
                     {formatDate(trip.startTime)} — {trip.distanceKm?.toFixed(1) ?? '--'} km

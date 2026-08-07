@@ -1,105 +1,89 @@
-const express = require('express')
-const { getCollection } = require('../db/mongo')
-const { requireAuth } = require('../middleware/auth')
-const { requireCompany } = require('../middleware/requireCompany')
-const { requireTier } = require('../middleware/requireTier')
+// Ported from api/routes/reports.js. These are the fast, synchronous report endpoints — direct
+// Drizzle queries against safety_scores / telemetry (TimescaleDB hypertable) / trips / vehicles.
+// Separate from the new async report-job infrastructure (fleet/reports-queue.ts,
+// fleet/routes/reports-async.ts) — not touched here.
+import express from 'express'
+import { eq, and, gte, lte, desc } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { safetyScores, telemetry, trips, vehicles } from '../../../db/schema'
+import { requireAuth, requireCompany, requireTier } from '../../../middleware/auth-guard'
+import { asyncRoute } from '../../../middleware/response-envelope'
 
 const router = express.Router()
 
-router.get('/driver-scores', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const { from, to } = req.query
-    const filter = { ...req.companyFilter }
-    if (from && to) {
-      filter.weekStart = { $gte: new Date(from), $lte: new Date(to) }
-    }
-
-    const collection = await getCollection('safety_scores')
-    const scores = await collection
-      .find(filter)
-      .sort({ weekStart: -1 })
-      .toArray()
-
-    return res.json(scores)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+router.get('/driver-scores', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const { from, to } = req.query
+  const conditions = [eq(safetyScores.companyId, req.companyId!)]
+  if (from && to) {
+    conditions.push(gte(safetyScores.weekStart, from as string))
+    conditions.push(lte(safetyScores.weekStart, to as string))
   }
-})
+
+  const scores = await db.select().from(safetyScores)
+    .where(and(...conditions))
+    .orderBy(desc(safetyScores.weekStart))
+
+  return res.success(scores)
+}))
 
 router.get('/fuel-idle', requireAuth, requireCompany,
-  requireTier('mid'), async (req, res) => {
-  try {
-    const { vehicleId, from, to } = req.query
-    const filter = {
-      'metadata.companyId': req.companyId,
-      timestamp: {
-        $gte: new Date(from),
-        $lte: new Date(to),
-      },
-    }
-    if (vehicleId) filter['metadata.vehicleId'] = vehicleId
+  requireTier('mid'), asyncRoute(async (req, res) => {
+  const { vehicleId, from, to } = req.query
+  const conditions = [
+    eq(telemetry.companyId, req.companyId!),
+    gte(telemetry.time, new Date(from as string)),
+    lte(telemetry.time, new Date(to as string)),
+  ]
+  if (vehicleId) conditions.push(eq(telemetry.vehicleId, vehicleId as string))
 
-    const collection = await getCollection('telemetry_events')
-    const records = await collection
-      .find(filter)
-      .project({ timestamp: 1, speed: 1, fuelLevel: 1, 'metadata.vehicleId': 1 })
-      .toArray()
+  const records = await db.select({
+    time: telemetry.time,
+    speed: telemetry.speed,
+    fuelLevel: telemetry.fuelLevel,
+    vehicleId: telemetry.vehicleId,
+  }).from(telemetry).where(and(...conditions))
 
-    const idleRecords = records.filter(r => r.speed === 0 && r.fuelLevel)
-    return res.json({ total: records.length, idleCount: idleRecords.length, records: idleRecords })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+  const idleRecords = records.filter(r => r.speed === 0 && r.fuelLevel)
+  return res.success({ total: records.length, idleCount: idleRecords.length, records: idleRecords })
+}))
+
+router.get('/trip-summary', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const { vehicleId, from, to } = req.query
+  const conditions = [eq(trips.companyId, req.companyId!)]
+  if (vehicleId) conditions.push(eq(trips.vehicleId, vehicleId as string))
+  if (from && to) {
+    conditions.push(gte(trips.startTime, new Date(from as string)))
+    conditions.push(lte(trips.startTime, new Date(to as string)))
   }
-})
 
-router.get('/trip-summary', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const { vehicleId, from, to } = req.query
-    const filter = { ...req.companyFilter }
-    if (vehicleId) filter.vehicleId = vehicleId
-    if (from && to) {
-      filter.startTime = { $gte: new Date(from), $lte: new Date(to) }
-    }
+  const tripRows = await db.select().from(trips).where(and(...conditions))
 
-    const collection = await getCollection('trips')
-    const trips = await collection.find(filter).toArray()
-
-    const summary = {
-      totalTrips:   trips.length,
-      totalKm:      trips.reduce((s, t) => s + (t.distanceKm || 0), 0),
-      totalDuration:trips.reduce((s, t) => s + (t.durationMinutes || 0), 0),
-      avgKmPerTrip: trips.length
-        ? (trips.reduce((s, t) => s + (t.distanceKm || 0), 0) / trips.length).toFixed(1)
-        : 0,
-    }
-
-    return res.json({ summary, trips })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+  const totalKm = tripRows.reduce((s, t) => s + Number(t.distanceKm || 0), 0)
+  const summary = {
+    totalTrips: tripRows.length,
+    totalKm,
+    totalDuration: tripRows.reduce((s, t) => s + (t.durationMinutes || 0), 0),
+    avgKmPerTrip: tripRows.length ? (totalKm / tripRows.length).toFixed(1) : 0,
   }
-})
+
+  return res.success({ summary, trips: tripRows })
+}))
 
 router.get('/vehicle-health', requireAuth, requireCompany,
-  requireTier('mid'), async (req, res) => {
-  try {
-    const vehicles = await getCollection('vehicles')
-    const fleet = await vehicles.find(req.companyFilter).toArray()
+  requireTier('mid'), asyncRoute(async (req, res) => {
+  const fleet = await db.select().from(vehicles).where(eq(vehicles.companyId, req.companyId!))
 
-    const telemetry = await getCollection('telemetry_events')
-    const healthData = await Promise.all(
-      fleet.map(async (v) => {
-        const latest = await telemetry.findOne(
-          { 'metadata.vehicleId': v._id.toString() },
-          { sort: { timestamp: -1 } }
-        )
-        return { vehicle: v, latest }
-      })
-    )
+  const healthData = await Promise.all(
+    fleet.map(async (v) => {
+      const [latest] = await db.select().from(telemetry)
+        .where(eq(telemetry.vehicleId, v.id))
+        .orderBy(desc(telemetry.time))
+        .limit(1)
+      return { vehicle: v, latest: latest || null }
+    })
+  )
 
-    return res.json(healthData)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+  return res.success(healthData)
+}))
 
-module.exports = router
+export default router

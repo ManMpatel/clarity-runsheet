@@ -47,14 +47,14 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
       midSlots:   slots?.slots?.midSlots   || 0,
       topSlots:   slots?.slots?.topSlots   || 0,
     })
-  }, [company._id, slots])
+  }, [company.id, slots])
 
   async function loadTab(t) {
     setTab(t)
     if (t === 'devices' && devices.length === 0) {
       setLoadingTab(true)
       try {
-        const res = await api.get(`/api/admin/companies/${company._id}/devices`)
+        const res = await api.get(`/admin/companies/${company.id}/devices`)
         setDevices(res.data)
       } catch (err) { console.error(err.message) }
       finally { setLoadingTab(false) }
@@ -62,7 +62,7 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
     if (t === 'vehicles' && vehicles.length === 0) {
       setLoadingTab(true)
       try {
-        const res = await api.get(`/api/admin/companies/${company._id}/vehicles`)
+        const res = await api.get(`/admin/companies/${company.id}/vehicles`)
         setVehicles(res.data)
       } catch (err) { console.error(err.message) }
       finally { setLoadingTab(false) }
@@ -70,7 +70,7 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
     if (t === 'users' && users.length === 0) {
       setLoadingTab(true)
       try {
-        const res = await api.get(`/api/admin/companies/${company._id}/users`)
+        const res = await api.get(`/admin/companies/${company.id}/users`)
         setUsers(res.data)
       } catch (err) { console.error(err.message) }
       finally { setLoadingTab(false) }
@@ -80,7 +80,7 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
   async function saveSlots() {
     setSaving(true)
     try {
-      await onSaveSlots(company._id, slotForm)
+      await onSaveSlots(company.id, slotForm)
       setEditing(false)
     } catch (err) { console.error(err.message) }
     finally { setSaving(false) }
@@ -89,7 +89,7 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
   async function saveBilling(mode, price) {
     setSavingBilling(true)
     try {
-      await api.put(`/api/admin/companies/${company._id}/billing`, {
+      await api.put(`/admin/companies/${company.id}/billing`, {
         billingMode: mode,
         customPrice: mode === 'becs' ? parseFloat(price) || null : null,
       })
@@ -100,7 +100,7 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
   async function saveAccountType(val) {
     setAccountType(val)
     try {
-      await api.put(`/api/admin/companies/${company._id}/account-type`, { accountType: val })
+      await api.put(`/admin/companies/${company.id}/account-type`, { accountType: val })
     } catch (err) { console.error(err.message) }
   }
 
@@ -108,8 +108,8 @@ export default function AdminCompanyDetail({ company, slots, onSaveSlots, onRevo
     if (!confirm('Revoke access for this company?')) return
     setRevoking(true)
     try {
-      await api.put(`/api/admin/companies/${company._id}/revoke`)
-      onRevoked?.(company._id)
+      await api.put(`/admin/companies/${company.id}/revoke`)
+      onRevoked?.(company.id)
     } catch (err) {
       console.error(err.message)
       alert('Failed to revoke')

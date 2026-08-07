@@ -14,7 +14,7 @@ export default function ProfileSection({ me, setMe, loading }) {
   async function saveName() {
     setSaving(true)
     try {
-      const res = await api.put('/api/auth/profile', { name })
+      const res = await api.put('/auth/profile', { name })
       setMe(m => ({ ...m, name: res.data.name }))
       setEditing(false)
       setToast({ message: 'Name updated', type: 'success' })
@@ -30,7 +30,7 @@ export default function ProfileSection({ me, setMe, loading }) {
     }
     setSaving(true)
     try {
-      await api.put('/api/auth/password', { currentPassword: pwForm.current, newPassword: pwForm.next })
+      await api.put('/auth/password', { currentPassword: pwForm.current, newPassword: pwForm.next })
       setPwForm({ current: '', next: '', confirm: '' })
       setShowPassword(false)
       setToast({ message: 'Password changed', type: 'success' })
@@ -42,7 +42,7 @@ export default function ProfileSection({ me, setMe, loading }) {
   async function resendVerification() {
     setResending(true)
     try {
-      await api.post('/api/auth/resend-verification')
+      await api.post('/auth/resend-verification')
       setToast({ message: 'Verification email sent — check your inbox', type: 'success' })
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Failed', type: 'error' })

@@ -50,8 +50,8 @@ export default function GeofenceManager() {
   async function loadData() {
     try {
       const [zonesRes, vehiclesRes] = await Promise.all([
-        api.get('/api/geofences'),
-        api.get('/api/vehicles'),
+        api.get('/geofences'),
+        api.get('/vehicles'),
       ])
       setZones(zonesRes.data)
       setVehicles(vehiclesRes.data)
@@ -131,7 +131,7 @@ export default function GeofenceManager() {
         type: 'FeatureCollection',
         features: zones.filter(z => z.geometry).map((z, i) => {
           const color = getZoneColor(i)
-          const isSelected = selected?._id === z._id
+          const isSelected = selected?.id === z.id
           const hasSelection = selected !== null
           return {
             type: 'Feature',
@@ -228,7 +228,7 @@ export default function GeofenceManager() {
     setSaving(true)
     try {
       const geometry = generateCirclePolygon(center.lng, center.lat, form.radiusMetres)
-      const res = await api.post('/api/geofences', {
+      const res = await api.post('/geofences', {
         ...form, geometry, centre: center,
         radiusMetres: form.radiusMetres,
         vehicleIds: selectedVehicles,
@@ -241,8 +241,8 @@ export default function GeofenceManager() {
 
   async function handleDelete(id) {
     try {
-      await api.delete(`/api/geofences/${id}`)
-      setZones(z => z.filter(zone => zone._id !== id))
+      await api.delete(`/geofences/${id}`)
+      setZones(z => z.filter(zone => zone.id !== id))
       setSelected(null)
     } catch (err) { console.error(err.message) }
   }
@@ -336,10 +336,10 @@ export default function GeofenceManager() {
                     <span className='text-xs text-gray-600 dark:text-gray-300 font-medium'>All vehicles</span>
                   </label>
                   {vehicles.map(v => (
-                    <label key={v._id} className='flex items-center gap-2 cursor-pointer'>
-                      <input type='checkbox' checked={selectedVehicles.includes(v._id)}
+                    <label key={v.id} className='flex items-center gap-2 cursor-pointer'>
+                      <input type='checkbox' checked={selectedVehicles.includes(v.id)}
                         onChange={e => setSelectedVehicles(s =>
-                          e.target.checked ? [...s, v._id] : s.filter(id => id !== v._id)
+                          e.target.checked ? [...s, v.id] : s.filter(id => id !== v.id)
                         )}
                         className='w-3.5 h-3.5 accent-blue-600' />
                       <span className='text-xs text-gray-600 dark:text-gray-300'>{v.name}</span>
@@ -389,7 +389,7 @@ export default function GeofenceManager() {
               </div>
             ) : zones.map((zone, i) => {
               const color = getZoneColor(i)
-              const isSelected = selected?._id === zone._id
+              const isSelected = selected?.id === zone.id
               return (
                 <button key={i}
                   onClick={() => setSelected(isSelected ? null : zone)}
@@ -421,9 +421,9 @@ export default function GeofenceManager() {
           <div className='border-t border-gray-200 dark:border-gray-800'>
             {/* Color header */}
             <div className='px-4 py-3 flex items-center gap-3'
-              style={{ backgroundColor: getZoneColor(zones.findIndex(z => z._id === selected._id)) + '18' }}>
+              style={{ backgroundColor: getZoneColor(zones.findIndex(z => z.id === selected.id)) + '18' }}>
               <div className='w-4 h-4 rounded-full flex-shrink-0'
-                style={{ backgroundColor: getZoneColor(zones.findIndex(z => z._id === selected._id)) }} />
+                style={{ backgroundColor: getZoneColor(zones.findIndex(z => z.id === selected.id)) }} />
               <div className='flex-1 min-w-0'>
                 <p className='text-sm font-bold text-gray-900 dark:text-white truncate'>{selected.name}</p>
                 <p className='text-xs text-gray-500'>
@@ -461,11 +461,11 @@ export default function GeofenceManager() {
                 ) : (
                   <div className='flex flex-wrap gap-1.5'>
                     {vehicles
-                      .filter(v => selected.vehicleIds.includes(v._id))
+                      .filter(v => selected.vehicleIds.includes(v.id))
                       .map(v => (
-                        <span key={v._id}
+                        <span key={v.id}
                           className='text-xs px-2 py-1 rounded-full font-medium text-white'
-                          style={{ backgroundColor: getZoneColor(zones.findIndex(z => z._id === selected._id)) }}>
+                          style={{ backgroundColor: getZoneColor(zones.findIndex(z => z.id === selected.id)) }}>
                           🚐 {v.name}
                         </span>
                       ))
@@ -480,7 +480,7 @@ export default function GeofenceManager() {
 
               {/* Actions */}
               <div className='flex gap-2 pt-1'>
-                <button onClick={() => handleDelete(selected._id)}
+                <button onClick={() => handleDelete(selected.id)}
                   className='flex-1 h-8 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold rounded-lg transition'>
                   🗑 Delete zone
                 </button>

@@ -1,103 +1,74 @@
-const express = require('express')
-const { ObjectId } = require('mongodb')
-const { getCollection } = require('../db/mongo')
-const { requireAuth, requireRole } = require('../middleware/auth')
-const { requireCompany } = require('../middleware/requireCompany')
+// Ported from api/routes/maintenance.js. Mongo native driver -> Drizzle/Postgres.
+import express from 'express'
+import { and, asc, eq, lte } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { maintenance } from '../../../db/schema'
+import { requireAuth, requireRole, requireCompany } from '../../../middleware/auth-guard'
+import { asyncRoute } from '../../../middleware/response-envelope'
 
 const router = express.Router()
 
-router.get('/', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const { vehicleId, status } = req.query
-    const filter = { ...req.companyFilter }
-    if (vehicleId) filter.vehicleId = vehicleId
-    if (status)    filter.status = status
+router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const { vehicleId, status } = req.query as Record<string, string>
 
-    const collection = await getCollection('maintenance')
-    const records = await collection
-      .find(filter)
-      .sort({ dueDate: 1 })
-      .toArray()
-    return res.json(records)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+  const conditions = [eq(maintenance.companyId, req.companyId!)]
+  if (vehicleId) conditions.push(eq(maintenance.vehicleId, vehicleId))
+  if (status) conditions.push(eq(maintenance.status, status as 'pending' | 'completed'))
+
+  const records = await db.select().from(maintenance)
+    .where(and(...conditions))
+    .orderBy(asc(maintenance.dueDate))
+
+  return res.success(records)
+}))
+
+router.post('/', requireAuth, requireCompany, requireRole('companyAdmin', 'fleetManager', 'superAdmin'), asyncRoute(async (req, res) => {
+  const { vehicleId, type, dueDate, dueOdometer, notes } = req.body
+  if (!vehicleId || !type) {
+    return res.fail(null, 'Vehicle and type required')
   }
-})
 
-router.post('/', requireAuth, requireCompany,
-  requireRole('companyAdmin', 'fleetManager', 'superAdmin'), async (req, res) => {
-  try {
-    const { vehicleId, type, dueDate, dueOdometer, notes } = req.body
-    if (!vehicleId || !type) {
-      return res.status(400).json({ error: 'Vehicle and type required' })
-    }
+  const [record] = await db.insert(maintenance).values({
+    companyId: req.companyId!,
+    vehicleId,
+    type,
+    dueDate: dueDate || null,
+    dueOdometer: dueOdometer || null,
+    notes: notes || null,
+    status: 'pending',
+  }).returning()
 
-    const collection = await getCollection('maintenance')
-    const record = {
-      companyId:   req.companyId,
-      vehicleId,
-      type,
-      dueDate:     dueDate ? new Date(dueDate) : null,
-      dueOdometer: dueOdometer || null,
-      notes:       notes || null,
-      status:      'pending',
-      createdAt:   new Date(),
-    }
+  return res.success(record, 'Maintenance record created')
+}))
 
-    const result = await collection.insertOne(record)
-    return res.status(201).json({ ...record, _id: result.insertedId })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+router.put('/:id/complete', requireAuth, requireCompany, requireRole('companyAdmin', 'fleetManager', 'superAdmin'), asyncRoute(async (req, res) => {
+  const { completedDate, notes, nextDueDate, nextDueOdometer } = req.body
 
-router.put('/:id/complete', requireAuth, requireCompany,
-  requireRole('companyAdmin', 'fleetManager', 'superAdmin'), async (req, res) => {
-  try {
-    const { completedDate, notes, nextDueDate, nextDueOdometer } = req.body
-    const collection = await getCollection('maintenance')
+  const [updated] = await db.update(maintenance).set({
+    status: 'completed',
+    completedDate: completedDate || new Date().toISOString().slice(0, 10),
+    completionNotes: notes || null,
+    nextDueDate: nextDueDate || null,
+    nextDueOdometer: nextDueOdometer || null,
+    updatedAt: new Date(),
+  }).where(and(eq(maintenance.id, req.params.id), eq(maintenance.companyId, req.companyId!))).returning()
 
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id), ...req.companyFilter },
-      {
-        $set: {
-          status:          'completed',
-          completedDate:   completedDate ? new Date(completedDate) : new Date(),
-          completionNotes: notes || null,
-          nextDueDate:     nextDueDate ? new Date(nextDueDate) : null,
-          nextDueOdometer: nextDueOdometer || null,
-          updatedAt:       new Date(),
-        }
-      },
-      { returnDocument: 'after' }
-    )
+  if (!updated) return res.fail(null, 'Record not found', 404)
+  return res.success(updated)
+}))
 
-    if (!result) return res.status(404).json({ error: 'Record not found' })
-    return res.json(result)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+router.get('/due', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
-router.get('/due', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const now = new Date()
-    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const due = await db.select().from(maintenance)
+    .where(and(
+      eq(maintenance.companyId, req.companyId!),
+      eq(maintenance.status, 'pending'),
+      lte(maintenance.dueDate, nextWeek),
+    ))
+    .orderBy(asc(maintenance.dueDate))
 
-    const collection = await getCollection('maintenance')
-    const due = await collection
-      .find({
-        ...req.companyFilter,
-        status:  'pending',
-        dueDate: { $lte: nextWeek },
-      })
-      .sort({ dueDate: 1 })
-      .toArray()
+  return res.success(due)
+}))
 
-    return res.json(due)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-module.exports = router
+export default router

@@ -9,7 +9,7 @@ export default function AdminCommissions() {
   const [saving, setSaving]     = useState(false)
 
   useEffect(() => {
-    api.get('/api/referrals/admin/all')
+    api.get('/referrals/admin/all')
       .then(res => setGarages(res.data))
       .catch(err => console.error(err.message))
       .finally(() => setLoading(false))
@@ -20,9 +20,9 @@ export default function AdminCommissions() {
     if (!selected) return
     setSaving(true)
     try {
-      await api.post(`/api/referrals/admin/${selected._id}/settle`, form)
+      await api.post(`/referrals/admin/${selected.id}/settle`, form)
       setGarages(g => g.map(x =>
-        x._id === selected._id
+        x.id === selected.id
           ? { ...x, totalSettled: x.totalSettled + parseFloat(form.amount) }
           : x
       ))

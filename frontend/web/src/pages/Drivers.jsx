@@ -17,8 +17,8 @@ export default function Drivers() {
     async function load() {
       try {
         const [dRes, vRes] = await Promise.all([
-          api.get('/api/drivers'),
-          api.get('/api/vehicles'),
+          api.get('/drivers'),
+          api.get('/vehicles'),
         ])
         setDrivers(dRes.data)
         setVehicles(vRes.data)
@@ -58,11 +58,11 @@ export default function Drivers() {
     setError('')
     try {
       if (modal === 'add') {
-        const res = await api.post('/api/drivers', form)
+        const res = await api.post('/drivers', form)
         setDrivers(d => [...d, res.data])
       } else {
-        const res = await api.put(`/api/drivers/${modal._id}`, form)
-        setDrivers(d => d.map(x => x._id === modal._id ? res.data : x))
+        const res = await api.put(`/drivers/${modal.id}`, form)
+        setDrivers(d => d.map(x => x.id === modal.id ? res.data : x))
       }
       setModal(null)
     } catch (err) {
@@ -72,8 +72,8 @@ export default function Drivers() {
 
   async function toggleActive(driver) {
     try {
-      const res = await api.put(`/api/drivers/${driver._id}`, { ...driver, active: !driver.active })
-      setDrivers(d => d.map(x => x._id === driver._id ? res.data : x))
+      const res = await api.put(`/drivers/${driver.id}`, { ...driver, active: !driver.active })
+      setDrivers(d => d.map(x => x.id === driver.id ? res.data : x))
     } catch (err) { console.error(err.message) }
   }
 
@@ -85,7 +85,7 @@ export default function Drivers() {
     return { label: new Date(expiry).toLocaleDateString('en-AU'), cls: 'bg-green-100 text-green-700' }
   }
 
-  const vName = id => vehicles.find(v => v._id === id)?.name || '—'
+  const vName = id => vehicles.find(v => v.id === id)?.name || '—'
 
   const FIELDS = [
     { key: 'name',          label: 'Full name',      type: 'text',  ph: 'John Smith' },
@@ -134,7 +134,7 @@ export default function Drivers() {
               {drivers.map(driver => {
                 const tag = licenceTag(driver.licenceExpiry)
                 return (
-                  <tr key={driver._id} className='hover:bg-gray-50 dark:hover:bg-gray-800/50'>
+                  <tr key={driver.id} className='hover:bg-gray-50 dark:hover:bg-gray-800/50'>
                     <td className='px-4 py-3'>
                       <p className='font-medium text-gray-800 dark:text-white'>{driver.name}</p>
                       <p className='text-xs text-gray-400 mt-0.5'>{driver.mobile}</p>
@@ -198,7 +198,7 @@ export default function Drivers() {
                   onChange={e => setForm(f => ({ ...f, vehicleId: e.target.value }))}
                   className='w-full h-9 px-3 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white'>
                   <option value=''>Unassigned</option>
-                  {vehicles.map(v => <option key={v._id} value={v._id}>{v.name}</option>)}
+                  {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                 </select>
               </div>
             </div>

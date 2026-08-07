@@ -26,7 +26,7 @@ export default function Alerts() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await api.get('/api/alerts?limit=50')
+        const res = await api.get('/alerts?limit=50')
         setAlerts(res.data.alerts, res.data.unread)
       } catch (err) {
         console.error(err.message)
@@ -39,7 +39,7 @@ export default function Alerts() {
 
   async function handleMarkRead(id) {
     try {
-      await api.put(`/api/alerts/${id}/read`)
+      await api.put(`/alerts/${id}/read`)
       markRead(id)
     } catch (err) {
       console.error(err.message)
@@ -48,7 +48,7 @@ export default function Alerts() {
 
   async function handleMarkAllRead() {
     try {
-      await api.put('/api/alerts/read-all')
+      await api.put('/alerts/read-all')
       markAllRead()
     } catch (err) {
       console.error(err.message)
@@ -132,7 +132,7 @@ export default function Alerts() {
               </div>
               {!alert.read && (
                 <button
-                  onClick={() => handleMarkRead(alert._id)}
+                  onClick={() => handleMarkRead(alert.id)}
                   className='text-xs text-blue-600 hover:underline flex-shrink-0'
                 >
                   Mark read

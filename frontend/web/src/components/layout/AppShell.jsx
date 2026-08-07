@@ -11,7 +11,7 @@ export default function AppShell() {
   const [resending, setResending]   = useState(false)
 
   useEffect(() => {
-    api.get('/api/auth/me').then(res => {
+    api.get('/auth/me').then(res => {
       if (!res.data.emailVerified) setUnverified(true)
     }).catch(() => {})
   }, [])
@@ -19,7 +19,7 @@ export default function AppShell() {
   async function resend() {
     setResending(true)
     try {
-      await api.post('/api/auth/resend-verification')
+      await api.post('/auth/resend-verification')
       setDismissed(true)
     } catch (err) {
       console.error(err.message)

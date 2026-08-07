@@ -20,11 +20,11 @@ export default function AdminLogin() {
     setError('')
     setLoading(true)
     try {
-      const res = await axios.post(`${API}/api/admin/auth/login`, { email, password })
-      setTempToken(res.data.tempToken)
+      const res = await axios.post(`${API}/api/v1/admin/auth/login`, { email, password })
+      setTempToken(res.data.data.tempToken)
       setStep('totp')
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed')
+      setError(err.response?.data?.message || 'Login failed')
     } finally {
       setLoading(false)
     }
@@ -35,15 +35,15 @@ export default function AdminLogin() {
     setError('')
     setLoading(true)
     try {
-      const res = await axios.post(`${API}/api/admin/auth/verify-totp`, {
+      const res = await axios.post(`${API}/api/v1/admin/auth/verify-totp`, {
         tempToken,
         code,
       })
-      localStorage.setItem('adminToken', res.data.token)
-      navigate('/admin') 
+      localStorage.setItem('adminToken', res.data.data.token)
+      navigate('/admin')
 
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid code')
+      setError(err.response?.data?.message || 'Invalid code')
     } finally {
       setLoading(false)
     }

@@ -9,7 +9,7 @@ export default function VehicleHealth() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await api.get('/api/reports/vehicle-health')
+        const res = await api.get('/reports/vehicle-health')
         setFleet(res.data)
       } catch (err) {
         console.error(err.message)

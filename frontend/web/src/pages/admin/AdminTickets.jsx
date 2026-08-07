@@ -6,7 +6,7 @@ export default function AdminTickets() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    api.get('/api/support/tickets')
+    api.get('/support/tickets')
       .then(res => setTickets(res.data))
       .catch(err => console.error(err.message))
       .finally(() => setLoading(false))

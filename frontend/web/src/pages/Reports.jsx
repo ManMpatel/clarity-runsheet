@@ -24,7 +24,7 @@ export default function Reports() {
     setError('')
     setLoading(true)
     try {
-      const res = await api.get(`/api/reports/${selected}?from=${from}&to=${to}`)
+      const res = await api.get(`/reports/${selected}?from=${from}&to=${to}`)
       setData(res.data)
     } catch (err) {
       if (err.response?.status === 403) {

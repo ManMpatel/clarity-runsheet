@@ -13,7 +13,7 @@ export default function ForgotPassword() {
     setError('')
     setLoading(true)
     try {
-      await api.post('/api/auth/forgot-password', { email })
+      await api.post('/auth/forgot-password', { email })
       setDone(true)
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong')

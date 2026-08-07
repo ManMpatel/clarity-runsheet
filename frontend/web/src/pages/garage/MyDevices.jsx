@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+import api from '../../lib/api'
 
 const STATUS_COLORS = {
   pending:  { bg: '#1c1a00', border: '#854d0e', color: '#facc15' },
@@ -19,10 +17,7 @@ export default function MyDevices() {
   useEffect(() => {
     async function load() {
       try {
-        const token = localStorage.getItem('token')
-        const res = await axios.get(`${API}/api/imei/my-devices`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
+        const res = await api.get('/imei/my-devices')
         setDevices(res.data)
       } catch (err) {
         setError(err.response?.data?.error || 'Failed to load devices')
@@ -62,7 +57,7 @@ export default function MyDevices() {
         {devices.map(device => {
           const s = STATUS_COLORS[device.subscriptionStatus] || STATUS_COLORS.pending
           return (
-            <div key={device._id} style={styles.card}>
+            <div key={device.id} style={styles.card}>
               <div style={styles.cardTop}>
                 <div>
                   <p style={styles.imei}>{device.imei}</p>

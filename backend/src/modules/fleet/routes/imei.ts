@@ -1,114 +1,92 @@
-const express = require('express')
-const { getCollection } = require('../db/mongo')
-const { requireAuth } = require('../middleware/auth')
+// Ported from api/routes/imei.js. Mongo native driver -> Drizzle/Postgres. The `devices.imei`
+// column now has a REAL unique constraint (see db/schema/misc.ts note — the old code claimed one
+// existed via a Mongo error-code-11000 check, but api/db/setup.js never actually created it).
+import express from 'express'
+import { desc, eq } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { devices } from '../../../db/schema'
+import { requireAuth } from '../../../middleware/auth-guard'
+import { asyncRoute } from '../../../middleware/response-envelope'
 
 const router = express.Router()
 
-// GET /api/imei/check?imei=123456789012345
-router.get('/check', requireAuth, async (req, res) => {
-  try {
-    const { imei } = req.query
+// GET /api/v1/imei/check?imei=123456789012345
+router.get('/check', requireAuth, asyncRoute(async (req, res) => {
+  const { imei } = req.query as Record<string, string>
 
-    if (!imei) {
-      return res.status(400).json({ error: 'IMEI required' })
-    }
-
-    if (!/^\d{15}$/.test(imei)) {
-      return res.status(400).json({ error: 'IMEI must be exactly 15 digits' })
-    }
-
-    const devices = await getCollection('devices')
-    const device = await devices.findOne({ imei })
-
-    if (!device) {
-      return res.json({ status: 'unregistered', message: 'Device is available to register' })
-    }
-
-    if (device.registeredByCompanyId === req.companyId) {
-      return res.json({
-        status:       'registered_to_you',
-        message:      'Already registered to your account',
-        imei:         device.imei,
-        registeredAt: device.registeredAt,
-      })
-    }
-
-    return res.json({
-      status:  'registered_to_other',
-      message: 'This IMEI is already registered to another account',
-    })
-  } catch (err) {
-    console.error('[IMEI] Check error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
+  if (!imei) {
+    return res.fail(null, 'IMEI required')
   }
-})
 
-// POST /api/imei/register
-// Garage registers IMEI before installation — locks commission to their companyId
-router.post('/register', requireAuth, async (req, res) => {
-  try {
-    const { imei, deviceType, notes } = req.body
+  if (!/^\d{15}$/.test(imei)) {
+    return res.fail(null, 'IMEI must be exactly 15 digits')
+  }
 
-    if (!imei) {
-      return res.status(400).json({ error: 'IMEI required' })
-    }
+  const [device] = await db.select().from(devices).where(eq(devices.imei, imei)).limit(1)
 
-    if (!/^\d{15}$/.test(imei)) {
-      return res.status(400).json({ error: 'IMEI must be exactly 15 digits' })
-    }
+  if (!device) {
+    return res.success({ status: 'unregistered', message: 'Device is available to register' })
+  }
 
-    const devices = await getCollection('devices')
-
-    // Race condition protection — unique index on imei field handles this
-    const existing = await devices.findOne({ imei })
-    if (existing) {
-      return res.status(409).json({ error: 'IMEI already registered' })
-    }
-
-    const device = {
-      imei,
-      deviceType:             deviceType || 'FMC920',
-      registeredByCompanyId:  req.companyId,
-      customerId:             null,
-      subscriptionStatus:     'pending',
-      notes:                  notes || '',
-      registeredAt:           new Date(),
-      updatedAt:              new Date(),
-    }
-
-    await devices.insertOne(device)
-
-    return res.status(201).json({
-      success: true,
-      message: 'Device registered successfully',
-      imei,
+  if (device.registeredByCompanyId === req.companyId) {
+    return res.success({
+      status: 'registered_to_you',
+      message: 'Already registered to your account',
+      imei: device.imei,
       registeredAt: device.registeredAt,
     })
-  } catch (err) {
-    // MongoDB duplicate key error
-    if (err.code === 11000) {
-      return res.status(409).json({ error: 'IMEI already registered' })
-    }
-    console.error('[IMEI] Register error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
   }
-})
 
-// GET /api/imei/my-devices
-// Garage owner sees all devices they have registered
-router.get('/my-devices', requireAuth, async (req, res) => {
+  return res.success({
+    status: 'registered_to_other',
+    message: 'This IMEI is already registered to another account',
+  })
+}))
+
+// POST /api/v1/imei/register
+// Garage registers IMEI before installation — locks commission to their companyId
+router.post('/register', requireAuth, asyncRoute(async (req, res) => {
+  const { imei, deviceType, notes } = req.body
+
+  if (!imei) {
+    return res.fail(null, 'IMEI required')
+  }
+
+  if (!/^\d{15}$/.test(imei)) {
+    return res.fail(null, 'IMEI must be exactly 15 digits')
+  }
+
   try {
-    const devices = await getCollection('devices')
-    const list = await devices
-      .find({ registeredByCompanyId: req.companyId })
-      .sort({ registeredAt: -1 })
-      .toArray()
+    const [device] = await db.insert(devices).values({
+      imei,
+      deviceType: deviceType || 'FMC920',
+      registeredByCompanyId: req.companyId!,
+      customerId: null,
+      subscriptionStatus: 'pending',
+      notes: notes || '',
+    }).returning()
 
-    return res.json(list)
-  } catch (err) {
-    console.error('[IMEI] My devices error:', err.message)
-    return res.status(500).json({ error: 'Server error' })
+    return res.success({
+      imei,
+      registeredAt: device.registeredAt,
+    }, 'Device registered successfully')
+  } catch (err: any) {
+    // Postgres unique-violation on devices.imei
+    if (err.code === '23505') {
+      return res.fail(null, 'IMEI already registered', 409)
+    }
+    throw err
   }
-})
+}))
 
-module.exports = router
+// GET /api/v1/imei/my-devices
+// Garage owner sees all devices they have registered
+router.get('/my-devices', requireAuth, asyncRoute(async (req, res) => {
+  const list = await db.select().from(devices)
+    .where(eq(devices.registeredByCompanyId, req.companyId!))
+    .orderBy(desc(devices.registeredAt))
+
+  return res.success(list)
+}))
+
+export default router

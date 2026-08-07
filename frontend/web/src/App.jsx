@@ -46,7 +46,7 @@ function TierGate({ tier, children }) {
   useEffect(() => {
     if (subscriptionTier === 'top') { setAccess(true); return }
     if (subscriptionTier === 'mid' && tier === 'mid') { setAccess(true); return }
-    api.get('/api/vehicles').then(res => {
+    api.get('/vehicles').then(res => {
       const v = res.data
       if (tier === 'mid') setAccess(v.some(x => x.tier === 'mid' || x.tier === 'top'))
       if (tier === 'top') setAccess(v.some(x => x.tier === 'top'))

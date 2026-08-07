@@ -7,7 +7,7 @@ export default function AdminDevices() {
   const [search, setSearch]   = useState('')
 
   useEffect(() => {
-    api.get('/api/admin/devices')
+    api.get('/admin/devices')
       .then(res => setDevices(res.data))
       .catch(err => console.error(err.message))
       .finally(() => setLoading(false))

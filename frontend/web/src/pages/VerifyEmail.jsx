@@ -6,7 +6,7 @@ import api from '../lib/api'
 export default function VerifyEmail() {
   const [params]  = useSearchParams()
   const navigate  = useNavigate()
-  const setAuth   = useAuthStore(s => s.setAuth)
+  const login     = useAuthStore(s => s.login)
   const token     = params.get('token')
   const [status, setStatus] = useState('waiting')
   const [error, setError]   = useState('')
@@ -14,8 +14,8 @@ export default function VerifyEmail() {
   async function confirm() {
     setStatus('loading')
     try {
-      const res = await api.get(`/api/auth/verify-email?token=${token}`)
-      setAuth(res.data.token, res.data.user)
+      const res = await api.get(`/auth/verify-email?token=${token}`)
+      login(res.data.accessToken, res.data.user)
       setStatus('success')
       setTimeout(() => {
         navigate(res.data.onboardingComplete ? '/dashboard' : '/onboarding')

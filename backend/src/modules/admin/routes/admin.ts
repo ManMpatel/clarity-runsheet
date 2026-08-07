@@ -1,322 +1,195 @@
-const express = require('express')
-const bcrypt = require('bcryptjs')
-const { getCollection } = require('../db/mongo')
-const { requireSuperAdmin } = require('../middleware/superAdmin')
+// Ported from api/routes/admin.js. Straightforward Mongo-to-Postgres translation — all routes
+// here are true super-admin (cross-tenant) routes and are intentionally NOT scoped by
+// req.companyId, same as the original. Two bugs fixed per migration review:
+//   1. The original defined `GET /devices` twice (identical bodies) — deduped to one handler.
+//   2. (see referrals.ts) accountType casing — this file's /account-type endpoint already
+//      validated the correct snake_case values, so nothing changed here for that bug.
+import express from 'express'
+import { eq, and, desc } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { companies, users, vehicles, devices, upgradeRequests } from '../../../db/schema'
+import { requireSuperAdmin } from '../../../middleware/auth-guard'
+import { asyncRoute } from '../../../middleware/response-envelope'
+import { hashPassword } from '../../auth/services/passwords'
 
 const router = express.Router()
 
-router.get('/companies', requireSuperAdmin, async (req, res) => {
-  try {
-    const collection = await getCollection('companies')
-    const companies = await collection.find({}).sort({ createdAt: -1 }).toArray()
+router.get('/companies', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const allCompanies = await db.select().from(companies).orderBy(desc(companies.createdAt))
 
-    const users = await getCollection('users')
-    const enriched = await Promise.all(companies.map(async (c) => {
-      const admin = await users.findOne(
-        { companyId: c._id.toString(), role: 'companyAdmin' },
-        { projection: { email: 1, name: 1, mobile: 1 } }
-      )
-      return { ...c, adminEmail: admin?.email || null, adminName: admin?.name || null }
-    }))
+  const enriched = await Promise.all(allCompanies.map(async (c) => {
+    const [admin] = await db.select().from(users)
+      .where(and(eq(users.companyId, c.id), eq(users.role, 'companyAdmin'))).limit(1)
+    return { ...c, adminEmail: admin?.email || null, adminName: admin?.name || null }
+  }))
 
-    return res.json(enriched)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+  return res.success(enriched)
+}))
+
+router.post('/companies', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const { name, slug, adminName, adminEmail, adminPassword, subscriptionTier } = req.body
+  if (!name || !slug || !adminEmail || !adminPassword) {
+    return res.fail(null, 'All fields required')
   }
-})
 
-router.post('/companies', requireSuperAdmin, async (req, res) => {
-  try {
-    const { name, slug, adminName, adminEmail, adminPassword, subscriptionTier } = req.body
-    if (!name || !slug || !adminEmail || !adminPassword) {
-      return res.status(400).json({ error: 'All fields required' })
-    }
+  const [existing] = await db.select().from(companies).where(eq(companies.slug, slug)).limit(1)
+  if (existing) return res.fail(null, 'Slug already exists', 409)
 
-    const companies = await getCollection('companies')
-    const existing = await companies.findOne({ slug })
-    if (existing) return res.status(409).json({ error: 'Slug already exists' })
+  const [company] = await db.insert(companies).values({
+    name,
+    slug,
+    subscriptionTier: subscriptionTier || 'entry',
+    active: true,
+  }).returning()
 
-    const company = {
-      name,
-      slug,
-      subscriptionTier: subscriptionTier || 'entry',
-      active:           true,
-      createdAt:        new Date(),
-    }
+  const passwordHash = await hashPassword(adminPassword)
+  await db.insert(users).values({
+    companyId: company.id,
+    name: adminName || adminEmail,
+    email: adminEmail.toLowerCase(),
+    passwordHash,
+    role: 'companyAdmin',
+    subscriptionTier: subscriptionTier || 'entry',
+  })
 
-    const companyResult = await companies.insertOne(company)
-    const companyId = companyResult.insertedId.toString()
+  return res.success({ company }, 'Company created')
+}))
 
-    const passwordHash = await bcrypt.hash(adminPassword, 12)
-    const users = await getCollection('users')
-    const user = {
-      companyId,
-      name:             adminName || adminEmail,
-      email:            adminEmail.toLowerCase(),
-      passwordHash,
-      role:             'companyAdmin',
-      subscriptionTier: subscriptionTier || 'entry',
-      createdAt:        new Date(),
-    }
+router.put('/companies/:id/tier', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const { subscriptionTier } = req.body
+  await db.update(companies).set({ subscriptionTier, updatedAt: new Date() })
+    .where(eq(companies.id, req.params.id))
+  return res.success({ success: true })
+}))
 
-    await users.insertOne(user)
-    return res.status(201).json({ company: { ...company, _id: companyResult.insertedId } })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+router.get('/companies/:id/slots', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const [company] = await db.select().from(companies).where(eq(companies.id, req.params.id)).limit(1)
+  if (!company) return res.fail(null, 'Company not found', 404)
+
+  const entryUsed = (await db.select().from(vehicles)
+    .where(and(eq(vehicles.companyId, req.params.id), eq(vehicles.tier, 'entry'), eq(vehicles.active, true)))).length
+  const midUsed = (await db.select().from(vehicles)
+    .where(and(eq(vehicles.companyId, req.params.id), eq(vehicles.tier, 'mid'), eq(vehicles.active, true)))).length
+  const topUsed = (await db.select().from(vehicles)
+    .where(and(eq(vehicles.companyId, req.params.id), eq(vehicles.tier, 'top'), eq(vehicles.active, true)))).length
+
+  return res.success({
+    company,
+    slots: { entrySlots: company.entrySlots, midSlots: company.midSlots, topSlots: company.topSlots },
+    used: { entry: entryUsed, mid: midUsed, top: topUsed },
+  })
+}))
+
+router.put('/companies/:id/slots', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const { entrySlots, midSlots, topSlots } = req.body
+
+  const [updated] = await db.update(companies).set({
+    entrySlots: parseInt(entrySlots, 10) || 0,
+    midSlots: parseInt(midSlots, 10) || 0,
+    topSlots: parseInt(topSlots, 10) || 0,
+    updatedAt: new Date(),
+  }).where(eq(companies.id, req.params.id)).returning()
+
+  const highestTier = parseInt(topSlots, 10) > 0 ? 'top'
+    : parseInt(midSlots, 10) > 0 ? 'mid'
+    : parseInt(entrySlots, 10) > 0 ? 'entry' : 'locked'
+  await db.update(companies).set({ subscriptionTier: highestTier }).where(eq(companies.id, req.params.id))
+
+  return res.success(updated)
+}))
+
+router.put('/companies/:id/account-type', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const { accountType } = req.body
+  if (!['individual', 'contractor', 'garage_owner'].includes(accountType)) {
+    return res.fail(null, 'Invalid account type')
   }
-})
+  await db.update(companies).set({ accountType, updatedAt: new Date() }).where(eq(companies.id, req.params.id))
+  return res.success({ success: true })
+}))
 
-router.put('/companies/:id/tier', requireSuperAdmin, async (req, res) => {
-  try {
-    const { subscriptionTier } = req.body
-    const { ObjectId } = require('mongodb')
-    const collection = await getCollection('companies')
+router.put('/companies/:id/revoke', requireSuperAdmin, asyncRoute(async (req, res) => {
+  await db.update(companies).set({ active: false, updatedAt: new Date() }).where(eq(companies.id, req.params.id))
+  return res.success({ success: true })
+}))
 
-    await collection.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { subscriptionTier, updatedAt: new Date() } }
-    )
+router.delete('/companies/:id', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const id = req.params.id
+  // Delete children before the parent — Postgres enforces the company_id FK (Mongo did not),
+  // so this ordering is required for the delete to succeed at all. Note: other tables that
+  // reference this company (drivers, trips, devices, settlements, safety_scores,
+  // upgrade_requests) are — same as the original Mongo code — NOT cleaned up here, which can
+  // still cause the final company delete to fail with a foreign key violation. Flagged, not
+  // fixed, per instructions to preserve business logic as-is.
+  await db.delete(vehicles).where(eq(vehicles.companyId, id))
+  await db.delete(users).where(eq(users.companyId, id))
+  await db.delete(companies).where(eq(companies.id, id))
+  return res.success({ success: true })
+}))
 
-    return res.json({ success: true })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+router.get('/upgrade-requests', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const requests = await db.select().from(upgradeRequests).orderBy(desc(upgradeRequests.createdAt))
+  return res.success(requests)
+}))
+
+router.put('/upgrade-requests/:id/action', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const { action } = req.body
+  const [updated] = await db.update(upgradeRequests).set({ status: action, actionedAt: new Date() })
+    .where(eq(upgradeRequests.id, req.params.id)).returning()
+  return res.success(updated)
+}))
+
+router.put('/companies/:id/set-role', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const { role } = req.body
+  // NOTE: 'contractor'/'garageOwner' — legacy camelCase, deliberately unchanged. This is
+  // `companies.role`, a distinct free-text column from `companies.accountType`; nothing else
+  // reads it in a way that would break from the casing mismatch with accountType. See schema
+  // comment in db/schema/companies.ts.
+  if (!['contractor', 'garageOwner'].includes(role)) {
+    return res.fail(null, 'Invalid role')
   }
-})
+  await db.update(companies).set({ role, updatedAt: new Date() }).where(eq(companies.id, req.params.id))
+  return res.success({ success: true })
+}))
 
+// NOTE: the original file defined this route twice (identical bodies) — deduped to one handler.
+router.get('/devices', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const list = await db.select().from(devices).orderBy(desc(devices.registeredAt))
+  return res.success(list)
+}))
 
-router.get('/companies/:id/slots', requireSuperAdmin, async (req, res) => {
-  try {
-    const { ObjectId } = require('mongodb')
-    const companies = await getCollection('companies')
-    const company = await companies.findOne({
-      _id: new ObjectId(req.params.id)
-    })
-    if (!company) return res.status(404).json({ error: 'Company not found' })
+router.get('/companies/:id/devices', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const list = await db.select().from(devices)
+    .where(eq(devices.registeredByCompanyId, req.params.id))
+    .orderBy(desc(devices.registeredAt))
+  return res.success(list)
+}))
 
-    const vehicles = await getCollection('vehicles')
-    const entryUsed = await vehicles.countDocuments({ companyId: req.params.id, tier: 'entry', active: true })
-    const midUsed   = await vehicles.countDocuments({ companyId: req.params.id, tier: 'mid',   active: true })
-    const topUsed   = await vehicles.countDocuments({ companyId: req.params.id, tier: 'top',   active: true })
+router.get('/companies/:id/vehicles', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const list = await db.select().from(vehicles)
+    .where(and(eq(vehicles.companyId, req.params.id), eq(vehicles.active, true)))
+    .orderBy(desc(vehicles.createdAt))
+  return res.success(list)
+}))
 
-    return res.json({
-      company,
-      slots: company.slots || { entrySlots: 0, midSlots: 0, topSlots: 0 },
-      used:  { entry: entryUsed, mid: midUsed, top: topUsed },
-    })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+router.get('/companies/:id/users', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const list = await db.select().from(users)
+    .where(eq(users.companyId, req.params.id))
+    .orderBy(desc(users.createdAt))
+  const safe = list.map(({ passwordHash, ...rest }) => rest)
+  return res.success(safe)
+}))
+
+router.put('/companies/:id/billing', requireSuperAdmin, asyncRoute(async (req, res) => {
+  const { billingMode, customPrice } = req.body
+  if (!['stripe', 'becs', 'manual'].includes(billingMode)) {
+    return res.fail(null, 'Invalid billing mode')
   }
-})
+  await db.update(companies).set({
+    billingMode,
+    customPrice: customPrice != null ? String(parseFloat(customPrice)) : null,
+    updatedAt: new Date(),
+  }).where(eq(companies.id, req.params.id))
+  return res.success({ success: true })
+}))
 
-router.put('/companies/:id/slots', requireSuperAdmin, async (req, res) => {
-  try {
-    const { entrySlots, midSlots, topSlots } = req.body
-    const { ObjectId } = require('mongodb')
-    const companies = await getCollection('companies')
-
-    const result = await companies.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      {
-        $set: {
-          slots: {
-            entrySlots: parseInt(entrySlots) || 0,
-            midSlots:   parseInt(midSlots)   || 0,
-            topSlots:   parseInt(topSlots)   || 0,
-          },
-          updatedAt: new Date(),
-        }
-      },
-      { returnDocument: 'after' }
-    )
-    const highestTier = parseInt(topSlots) > 0 ? 'top' : parseInt(midSlots) > 0 ? 'mid' : parseInt(entrySlots) > 0 ? 'entry' : 'locked'
-    await companies.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { subscriptionTier: highestTier } }
-    )
-    return res.json(result)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.put('/companies/:id/account-type', requireSuperAdmin, async (req, res) => {
-  try {
-    const { accountType } = req.body
-    if (!['individual','contractor','garage_owner'].includes(accountType)) {
-      return res.status(400).json({ error: 'Invalid account type' })
-    }
-    const { ObjectId } = require('mongodb')
-    const companies = await getCollection('companies')
-    await companies.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { accountType, updatedAt: new Date() } }
-    )
-    return res.json({ success: true })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.put('/companies/:id/revoke', requireSuperAdmin, async (req, res) => {
-  try {
-    const { ObjectId } = require('mongodb')
-    const companies = await getCollection('companies')
-    await companies.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { active: false, updatedAt: new Date() } }
-    )
-    return res.json({ success: true })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.delete('/companies/:id', requireSuperAdmin, async (req, res) => {
-  try {
-    const { ObjectId } = require('mongodb')
-    const id = req.params.id
-    const companies  = await getCollection('companies')
-    const users      = await getCollection('users')
-    const vehicles   = await getCollection('vehicles')
-    await companies.deleteOne({ _id: new ObjectId(id) })
-    await users.deleteMany({ companyId: id })
-    await vehicles.deleteMany({ companyId: id })
-    return res.json({ success: true })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.get('/upgrade-requests', requireSuperAdmin, async (req, res) => {
-  try {
-    const collection = await getCollection('upgrade_requests')
-    const requests = await collection
-      .find({})
-      .sort({ createdAt: -1 })
-      .toArray()
-    return res.json(requests)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.put('/upgrade-requests/:id/action', requireSuperAdmin, async (req, res) => {
-  try {
-    const { action } = req.body
-    const { ObjectId } = require('mongodb')
-    const collection = await getCollection('upgrade_requests')
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { status: action, actionedAt: new Date() } },
-      { returnDocument: 'after' }
-    )
-    return res.json(result)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.put('/companies/:id/set-role', requireSuperAdmin, async (req, res) => {
-  try {
-    const { role } = req.body
-    if (!['contractor', 'garageOwner'].includes(role)) {
-      return res.status(400).json({ error: 'Invalid role' })
-    }
-    const { ObjectId } = require('mongodb')
-    const companies = await getCollection('companies')
-    await companies.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { role, updatedAt: new Date() } }
-    )
-    return res.json({ success: true })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.get('/devices', requireSuperAdmin, async (req, res) => {
-  try {
-    const devices = await getCollection('devices')
-    const list = await devices.find({}).sort({ registeredAt: -1 }).toArray()
-    return res.json(list)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-
-router.get('/companies/:id/devices', requireSuperAdmin, async (req, res) => {
-  try {
-    const devices = await getCollection('devices')
-    const list = await devices
-      .find({ registeredByCompanyId: req.params.id })
-      .sort({ registeredAt: -1 })
-      .toArray()
-    return res.json(list)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.get('/companies/:id/vehicles', requireSuperAdmin, async (req, res) => {
-  try {
-    const vehicles = await getCollection('vehicles')
-    const list = await vehicles
-      .find({ companyId: req.params.id, active: true })
-      .sort({ createdAt: -1 })
-      .toArray()
-    return res.json(list)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.get('/companies/:id/users', requireSuperAdmin, async (req, res) => {
-  try {
-    const users = await getCollection('users')
-    const list = await users
-      .find(
-        { companyId: req.params.id },
-        { projection: { passwordHash: 0 } }
-      )
-      .sort({ createdAt: -1 })
-      .toArray()
-    return res.json(list)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.get('/devices', requireSuperAdmin, async (req, res) => {
-  try {
-    const devices = await getCollection('devices')
-    const list = await devices.find({}).sort({ registeredAt: -1 }).toArray()
-    return res.json(list)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-router.put('/companies/:id/billing', requireSuperAdmin, async (req, res) => {
-  try {
-    const { billingMode, customPrice } = req.body
-    if (!['stripe', 'becs', 'manual'].includes(billingMode)) {
-      return res.status(400).json({ error: 'Invalid billing mode' })
-    }
-    const { ObjectId } = require('mongodb')
-    const companies = await getCollection('companies')
-    await companies.findOneAndUpdate(
-      { _id: new ObjectId(req.params.id) },
-      { $set: {
-        billingMode,
-        customPrice: customPrice != null ? parseFloat(customPrice) : null,
-        updatedAt:   new Date(),
-      }}
-    )
-    return res.json({ success: true })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
-
-module.exports = router
+export default router

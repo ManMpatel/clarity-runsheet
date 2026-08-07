@@ -11,7 +11,7 @@ export default function DriverBehaviour() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await api.get('/api/drivers')
+        const res = await api.get('/drivers')
         setDrivers(res.data)
         await loadScores(res.data)
       } catch (err) {
@@ -28,10 +28,10 @@ export default function DriverBehaviour() {
     await Promise.all(
       driverList.map(async (d) => {
         try {
-          const res = await api.get(`/api/drivers/${d._id}/score`)
-          results[d._id] = res.data
+          const res = await api.get(`/drivers/${d.id}/score`)
+          results[d.id] = res.data
         } catch {
-          results[d._id] = []
+          results[d.id] = []
         }
       })
     )
@@ -41,7 +41,7 @@ export default function DriverBehaviour() {
   async function selectDriver(driver) {
     setSelected(driver)
     try {
-      const res = await api.get(`/api/drivers/${driver._id}/score`)
+      const res = await api.get(`/drivers/${driver.id}/score`)
       setHistory(res.data)
     } catch (err) {
       setHistory([])
@@ -87,11 +87,11 @@ export default function DriverBehaviour() {
       ) : (
         <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
           {drivers.map((driver) => {
-            const latest = latestScore(driver._id)
+            const latest = latestScore(driver.id)
             const score  = latest?.overallScore ?? null
             return (
               <button
-                key={driver._id}
+                key={driver.id}
                 onClick={() => selectDriver(driver)}
                 className='bg-white rounded-xl border border-gray-200 p-5 text-left hover:border-blue-300 hover:shadow-sm transition'
               >

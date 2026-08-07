@@ -1,7 +1,5 @@
 import { useState } from 'react'
-import axios from 'axios'
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+import api from '../../lib/api'
 
 export default function IMEICheck() {
   const [imei, setImei]     = useState('')
@@ -20,11 +18,7 @@ export default function IMEICheck() {
 
     setLoading(true)
     try {
-      const token = localStorage.getItem('token')
-      const res = await axios.get(`${API}/api/imei/check`, {
-        params: { imei },
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await api.get('/imei/check', { params: { imei } })
       setResult(res.data)
     } catch (err) {
       setError(err.response?.data?.error || 'Check failed')

@@ -16,7 +16,7 @@ export default function CompanySection({ company, setCompany, loading }) {
   async function save() {
     setSaving(true)
     try {
-      const res = await api.put('/api/settings/company', form)
+      const res = await api.put('/settings/company', form)
       setCompany(res.data)
       setToast({ message: 'Company details saved', type: 'success' })
     } catch (err) {

@@ -7,18 +7,18 @@ export default function Billing() {
   const [loading,  setLoading]  = useState(false)
 
   useEffect(() => {
-    api.get('/api/billing/status').then(r => setStatus(r.data)).catch(() => {})
+    api.get('/billing/status').then(r => setStatus(r.data)).catch(() => {})
 
     const params = new URLSearchParams(window.location.search)
     if (params.get('success') === 'true') {
-      api.get('/api/billing/status').then(r => setStatus(r.data)).catch(() => {})
+      api.get('/billing/status').then(r => setStatus(r.data)).catch(() => {})
     }
   }, [])
 
   async function handleSubscribe() {
     setLoading(true)
     try {
-      const res = await api.post('/api/billing/checkout', { quantity })
+      const res = await api.post('/billing/checkout', { quantity })
       window.location.href = res.data.url
     } catch (err) {
       alert('Failed to start checkout. Please try again.')
@@ -30,7 +30,7 @@ export default function Billing() {
   async function handlePortal() {
     setLoading(true)
     try {
-      const res = await api.post('/api/billing/portal')
+      const res = await api.post('/billing/portal')
       window.location.href = res.data.url
     } catch (err) {
       alert('Failed to open billing portal. Please try again.')

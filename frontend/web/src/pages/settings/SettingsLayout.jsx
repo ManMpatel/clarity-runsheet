@@ -42,17 +42,33 @@ export default function SettingsLayout() {
     async function load() {
       try {
         const [meRes, cRes, uRes, vRes] = await Promise.all([
-          api.get('/api/auth/me'),
-          api.get('/api/settings/company'),
-          api.get('/api/settings/users'),
-          api.get('/api/vehicles'),
+          api.get('/auth/me'),
+          api.get('/settings/company'),
+          api.get('/settings/users'),
+          api.get('/vehicles'),
         ])
         setMe(meRes.data)
         setCompany(cRes.data)
         setUsers(uRes.data)
         setVehicles(vRes.data)
-        const sRes = null // slots fetched via billing status instead
-        if (sRes) setSlots(sRes.data)
+        // Was previously dead code (`const sRes = null`) — the My Plan page always showed 0/0
+        // slot usage for every tier. Company already carries flat entrySlots/midSlots/topSlots
+        // (Postgres schema), and vehicle tier counts are derivable from the vehicles already
+        // fetched above — no separate endpoint needed.
+        const company = cRes.data
+        const activeVehicles = (vRes.data || []).filter(v => v.active)
+        setSlots({
+          slots: {
+            entrySlots: company?.entrySlots || 0,
+            midSlots: company?.midSlots || 0,
+            topSlots: company?.topSlots || 0,
+          },
+          used: {
+            entry: activeVehicles.filter(v => v.tier === 'entry').length,
+            mid: activeVehicles.filter(v => v.tier === 'mid').length,
+            top: activeVehicles.filter(v => v.tier === 'top').length,
+          },
+        })
       } catch (err) {
         console.error(err.message)
       } finally {

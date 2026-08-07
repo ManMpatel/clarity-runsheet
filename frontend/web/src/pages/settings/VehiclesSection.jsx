@@ -99,8 +99,8 @@ function VehicleDrawer({ vehicle, status, onClose, onCut, onRestore }) {
             </div>
             <EngineToggle
               immobilised={vehicle.immobilised}
-              onCut={() => onCut(vehicle._id)}
-              onRestore={() => onRestore(vehicle._id)}
+              onCut={() => onCut(vehicle.id)}
+              onRestore={() => onRestore(vehicle.id)}
             />
           </div>
         </div>
@@ -119,7 +119,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
 
   useEffect(() => {
     if (vehicles.length === 0) return
-    api.get('/api/vehicles/status')
+    api.get('/vehicles/status')
       .then(res => {
         const map = {}
         res.data.forEach(s => { map[s.vehicleId] = s })
@@ -129,7 +129,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
 
   async function addVehicle() {
     try {
-      const res = await api.post('/api/vehicles', form)
+      const res = await api.post('/vehicles', form)
       setVehicles(v => [...v, res.data])
       setShowAdd(false)
       setForm({ name: '', imei: '', registration: '', make: '', model: '', year: '' })
@@ -142,8 +142,8 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
   async function deleteVehicle(id) {
     if (!confirm('Remove this vehicle?')) return
     try {
-      await api.delete(`/api/vehicles/${id}`)
-      setVehicles(v => v.filter(x => x._id !== id))
+      await api.delete(`/vehicles/${id}`)
+      setVehicles(v => v.filter(x => x.id !== id))
       setToast({ message: 'Vehicle removed', type: 'success' })
     } catch (err) {
       setToast({ message: 'Failed to remove', type: 'error' })
@@ -151,14 +151,14 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
   }
 
   function updateImmobilised(id, immobilised) {
-    setVehicles(v => v.map(x => x._id === id ? { ...x, immobilised } : x))
-    setSelected(s => s && s._id === id ? { ...s, immobilised } : s)
+    setVehicles(v => v.map(x => x.id === id ? { ...x, immobilised } : x))
+    setSelected(s => s && s.id === id ? { ...s, immobilised } : s)
   }
 
   async function cutVehicle(id) {
     if (!confirm('This will cut fuel/ignition on this vehicle. Are you sure?')) return
     try {
-      await api.post(`/api/vehicles/${id}/cut`)
+      await api.post(`/vehicles/${id}/cut`)
       updateImmobilised(id, true)
       setToast({ message: 'Cut command sent', type: 'success' })
     } catch (err) {
@@ -168,7 +168,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
 
   async function restoreVehicle(id) {
     try {
-      await api.post(`/api/vehicles/${id}/restore`)
+      await api.post(`/vehicles/${id}/restore`)
       updateImmobilised(id, false)
       setToast({ message: 'Restore command sent', type: 'success' })
     } catch (err) {
@@ -236,7 +236,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
         {vehicles.length === 0 ? (
           <p className='text-sm text-gray-400 p-6 text-center'>No vehicles yet — add your first van above</p>
         ) : vehicles.map((v, i) => {
-          const s = status[v._id] || { state: 'offline', lastSeen: null }
+          const s = status[v.id] || { state: 'offline', lastSeen: null }
           return (
             <div key={i} onClick={() => setSelected(v)}
               className='px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50'>
@@ -257,7 +257,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
                 }`}>Plan: {v.tier || 'entry'}</span>
                 <KebabMenu
                   onEdit={() => setEditing(v)}
-                  onDelete={() => deleteVehicle(v._id)}
+                  onDelete={() => deleteVehicle(v.id)}
                 />
               </div>
             </div>
@@ -267,7 +267,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
 
       <VehicleDrawer
         vehicle={selected}
-        status={selected ? status[selected._id] : null}
+        status={selected ? status[selected.id] : null}
         onClose={() => setSelected(null)}
         onCut={cutVehicle}
         onRestore={restoreVehicle}

@@ -41,7 +41,7 @@ export default function Onboarding() {
           setLoading(false)
           return
         }
-        await api.post('/api/imei/register', { imei, deviceType })
+        await api.post('/imei/register', { imei, deviceType })
       }
 
       if (step === 1) {
@@ -50,7 +50,7 @@ export default function Onboarding() {
           setLoading(false)
           return
         }
-        await api.post('/api/vehicles', {
+        await api.post('/vehicles', {
           name: vehicleName,
           registration: rego,
           imei,
@@ -59,7 +59,7 @@ export default function Onboarding() {
       }
 
       if (step === 2) {
-        await api.put('/api/fbt/settings', {
+        await api.put('/fbt/settings', {
           businessHours: { start: businessStart, end: businessEnd },
           businessDays,
           mode: 'auto',
@@ -67,12 +67,12 @@ export default function Onboarding() {
       }
 
       if (step === 3) {
-        await api.post('/api/alerts/preferences', {
+        await api.post('/alerts/preferences', {
           speeding:   alertSpeeding,
           harshDriving: alertHarsh,
           afterHours: alertAfterHours,
         })
-        await api.put('/api/settings/onboarding-complete')
+        await api.put('/settings/onboarding-complete')
         completeOnboarding()
         navigate('/dashboard')
         return
@@ -88,7 +88,7 @@ export default function Onboarding() {
 
   function handleSkip() {
     if (step === 3) {
-      api.put('/api/settings/onboarding-complete').catch(() => {})
+      api.put('/settings/onboarding-complete').catch(() => {})
       completeOnboarding()
       navigate('/dashboard')
       return

@@ -1,86 +1,77 @@
-const express = require('express')
-const { ObjectId } = require('mongodb')
-const { getCollection } = require('../db/mongo')
-const { requireAuth } = require('../middleware/auth')
-const { requireCompany } = require('../middleware/requireCompany')
+// Ported from api/routes/trips.js. Mongo native driver -> Drizzle/Postgres. Trip start/end
+// location is now plain lat/lng columns (startLat/startLng/endLat/endLng), not embedded GeoJSON —
+// see db/schema/trips.ts. Replay points now come from the telemetry hypertable's lat/lng columns
+// instead of a `location.coordinates` GeoJSON field.
+import express from 'express'
+import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm'
+import { db } from '../../../db/client'
+import { trips, vehicles, telemetry } from '../../../db/schema'
+import { requireAuth, requireCompany } from '../../../middleware/auth-guard'
+import { asyncRoute } from '../../../middleware/response-envelope'
 
 const router = express.Router()
 
-router.get('/', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const { vehicleId, from, to, page = 1, limit = 20 } = req.query
+router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const { vehicleId, from, to, page = '1', limit = '20' } = req.query as Record<string, string>
 
-    const filter = { ...req.companyFilter }
-    if (vehicleId) filter.vehicleId = vehicleId
-    if (from && to) {
-      filter.startTime = { $gte: new Date(from) }
-      filter.endTime   = { $lte: new Date(to) }
-    }
-
-    const collection = await getCollection('trips')
-    const total = await collection.countDocuments(filter)
-    const trips = await collection
-      .find(filter)
-      .sort({ startTime: -1 })
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .limit(parseInt(limit))
-      .toArray()
-
-    const vehicles  = await getCollection('vehicles')
-    const vIds      = [...new Set(trips.map(t => t.vehicleId).filter(Boolean))]
-    const vDocs     = await vehicles.find({ _id: { $in: vIds.map(id => new ObjectId(id)) } }).toArray()
-    const vMap      = Object.fromEntries(vDocs.map(v => [v._id.toString(), v.name]))
-    const enriched  = trips.map(t => ({ ...t, vehicleName: vMap[t.vehicleId] || null }))
-
-    return res.json({ trips: enriched, total, page: parseInt(page) })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
+  const conditions = [eq(trips.companyId, req.companyId!)]
+  if (vehicleId) conditions.push(eq(trips.vehicleId, vehicleId))
+  if (from && to) {
+    conditions.push(gte(trips.startTime, new Date(from)))
+    conditions.push(lte(trips.endTime, new Date(to)))
   }
-})
 
-router.get('/:id', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const collection = await getCollection('trips')
-    const trip = await collection.findOne({
-      _id: new ObjectId(req.params.id),
-      ...req.companyFilter,
-    })
-    if (!trip) return res.status(404).json({ error: 'Trip not found' })
-    return res.json(trip)
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+  const pageNum = parseInt(page)
+  const limitNum = parseInt(limit)
 
-router.get('/:id/replay', requireAuth, requireCompany, async (req, res) => {
-  try {
-    const trips = await getCollection('trips')
-    const trip = await trips.findOne({
-      _id: new ObjectId(req.params.id),
-      ...req.companyFilter,
-    })
-    if (!trip) return res.status(404).json({ error: 'Trip not found' })
+  const [{ count: total }] = await db.select({ count: sql<number>`count(*)::int` }).from(trips).where(and(...conditions))
 
-    const telemetry = await getCollection('telemetry_events')
-    const points = await telemetry
-      .find({
-        'metadata.companyId': req.companyId,
-        'metadata.vehicleId': trip.vehicleId,
-        timestamp: { $gte: trip.startTime, $lte: trip.endTime },
-      })
-      .sort({ timestamp: 1 })
-      .project({
-        timestamp: 1,
-        'location.coordinates': 1,
-        speed: 1,
-        angle: 1,
-      })
-      .toArray()
+  const list = await db.select().from(trips)
+    .where(and(...conditions))
+    .orderBy(desc(trips.startTime))
+    .offset((pageNum - 1) * limitNum)
+    .limit(limitNum)
 
-    return res.json({ trip, points })
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' })
-  }
-})
+  const vIds = [...new Set(list.map((t) => t.vehicleId).filter(Boolean))]
+  const vDocs = vIds.length ? await db.select().from(vehicles).where(inArray(vehicles.id, vIds)) : []
+  const vMap = Object.fromEntries(vDocs.map((v) => [v.id, v.name]))
+  const enriched = list.map((t) => ({ ...t, vehicleName: vMap[t.vehicleId] || null }))
 
-module.exports = router
+  return res.success({ trips: enriched, total, page: pageNum })
+}))
+
+router.get('/:id', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const [trip] = await db.select().from(trips)
+    .where(and(eq(trips.id, req.params.id), eq(trips.companyId, req.companyId!)))
+    .limit(1)
+  if (!trip) return res.fail(null, 'Trip not found', 404)
+  return res.success(trip)
+}))
+
+router.get('/:id/replay', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const [trip] = await db.select().from(trips)
+    .where(and(eq(trips.id, req.params.id), eq(trips.companyId, req.companyId!)))
+    .limit(1)
+  if (!trip) return res.fail(null, 'Trip not found', 404)
+
+  const conditions = [
+    eq(telemetry.companyId, req.companyId!),
+    eq(telemetry.vehicleId, trip.vehicleId),
+    gte(telemetry.time, trip.startTime),
+  ]
+  if (trip.endTime) conditions.push(lte(telemetry.time, trip.endTime))
+
+  const points = await db.select({
+    time: telemetry.time,
+    lat: telemetry.lat,
+    lng: telemetry.lng,
+    speed: telemetry.speed,
+    angle: telemetry.angle,
+  }).from(telemetry)
+    .where(and(...conditions))
+    .orderBy(asc(telemetry.time))
+
+  return res.success({ trip, points })
+}))
+
+export default router

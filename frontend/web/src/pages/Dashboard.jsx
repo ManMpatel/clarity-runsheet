@@ -16,8 +16,8 @@ export default function Dashboard() {
     async function load() {
       try {
         const [fleetRes, alertRes] = await Promise.all([
-          api.get('/api/telemetry/live'),
-          api.get('/api/alerts?limit=5'),
+          api.get('/telemetry/live'),
+          api.get('/alerts?limit=5'),
         ])
         setFleet(fleetRes.data)
         useAlertStore.getState().setAlerts(

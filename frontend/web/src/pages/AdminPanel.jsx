@@ -13,8 +13,8 @@ export default function AdminPanel() {
     async function load() {
       try {
         const [cRes, rRes] = await Promise.all([
-          api.get('/api/admin/companies'),
-          api.get('/api/admin/upgrade-requests'),
+          api.get('/admin/companies'),
+          api.get('/admin/upgrade-requests'),
         ])
         setCompanies(cRes.data)
         setRequests(rRes.data)
@@ -30,8 +30,8 @@ export default function AdminPanel() {
   async function handleRevoke(companyId) {
   if (!confirm('Revoke access for this company?')) return
   try {
-    await api.put(`/api/admin/companies/${companyId}/revoke`)
-    setCompanies(cs => cs.map(c => c._id === companyId ? { ...c, active: false } : c))
+    await api.put(`/admin/companies/${companyId}/revoke`)
+    setCompanies(cs => cs.map(c => c.id === companyId ? { ...c, active: false } : c))
   } catch (err) {
     alert('Failed to revoke')
   }
@@ -40,8 +40,8 @@ export default function AdminPanel() {
 async function handleDelete(companyId) {
   if (!confirm('Permanently delete this company and all their data? This cannot be undone.')) return
   try {
-    await api.delete(`/api/admin/companies/${companyId}`)
-    setCompanies(cs => cs.filter(c => c._id !== companyId))
+    await api.delete(`/admin/companies/${companyId}`)
+    setCompanies(cs => cs.filter(c => c.id !== companyId))
     setSelected(null)
   } catch (err) {
     alert('Failed to delete')
@@ -49,15 +49,15 @@ async function handleDelete(companyId) {
 }
 
 function handleRevokedInDetail(companyId) {
-  setCompanies(cs => cs.map(c => c._id === companyId ? { ...c, active: false } : c))
-  setSelected(s => s && s._id === companyId ? { ...s, active: false } : s)
+  setCompanies(cs => cs.map(c => c.id === companyId ? { ...c, active: false } : c))
+  setSelected(s => s && s.id === companyId ? { ...s, active: false } : s)
 }
 
   async function selectCompany(company) {
     setSelected(company)
     setSlots(null)
     try {
-      const res = await api.get(`/api/admin/companies/${company._id}/slots`)
+      const res = await api.get(`/admin/companies/${company.id}/slots`)
       setSlots(res.data)
     } catch (err) {
       console.error(err.message)
@@ -65,15 +65,15 @@ function handleRevokedInDetail(companyId) {
   }
 
   async function handleSaveSlots(companyId, slotForm) {
-    await api.put(`/api/admin/companies/${companyId}/slots`, slotForm)
-    const res = await api.get(`/api/admin/companies/${companyId}/slots`)
+    await api.put(`/admin/companies/${companyId}/slots`, slotForm)
+    const res = await api.get(`/admin/companies/${companyId}/slots`)
     setSlots(res.data)
   }
 
   async function actionRequest(id, action) {
     try {
-      await api.put(`/api/admin/upgrade-requests/${id}/action`, { action })
-      setRequests(r => r.map(req => req._id === id ? { ...req, status: action } : req))
+      await api.put(`/admin/upgrade-requests/${id}/action`, { action })
+      setRequests(r => r.map(req => req.id === id ? { ...req, status: action } : req))
     } catch (err) {
       console.error(err.message)
     }
@@ -107,13 +107,13 @@ function handleRevokedInDetail(companyId) {
                   </div>
                   <div className='flex gap-2'>
                     <button
-                      onClick={() => actionRequest(req._id, 'approved')}
+                      onClick={() => actionRequest(req.id, 'approved')}
                       className='h-7 px-3 bg-teal-600 hover:bg-teal-700 text-white text-xs font-medium rounded-lg'
                     >
                       Approve
                     </button>
                     <button
-                      onClick={() => actionRequest(req._id, 'rejected')}
+                      onClick={() => actionRequest(req.id, 'rejected')}
                       className='h-7 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded-lg'
                     >
                       Reject
@@ -143,7 +143,7 @@ function handleRevokedInDetail(companyId) {
                 key={i}
                 onClick={() => selectCompany(c)}
                 className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${
-                  selected?._id === c._id ? 'bg-purple-50 border-l-2 border-purple-500' : ''
+                  selected?.id === c.id ? 'bg-purple-50 border-l-2 border-purple-500' : ''
                 }`}
               >
                 <div className='flex items-center justify-between'>
@@ -173,12 +173,12 @@ function handleRevokedInDetail(companyId) {
                 </div>
                 <div className='flex gap-2 mt-2'>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleRevoke(c._id) }}
+                  onClick={(e) => { e.stopPropagation(); handleRevoke(c.id) }}
                   className='text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition'>
                   Revoke
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); handleDelete(c._id) }}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(c.id) }}
                   className='text-xs px-2 py-1 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition'>
                   Delete
                 </button>

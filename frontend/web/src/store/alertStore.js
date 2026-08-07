@@ -18,7 +18,7 @@ export const useAlertStore = create((set, get) => ({
   markRead(id) {
     set(state => ({
       alerts: state.alerts.map(a =>
-        a._id === id ? { ...a, read: true } : a
+        a.id === id ? { ...a, read: true } : a
       ),
       unreadCount: Math.max(0, state.unreadCount - 1),
     }))

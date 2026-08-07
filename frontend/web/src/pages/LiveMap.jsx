@@ -30,7 +30,7 @@ export default function LiveMap() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await api.get('/api/telemetry/live')
+        const res = await api.get('/telemetry/live')
         setFleet(res.data)
       } catch (err) {
         console.error('LiveMap load error:', err.message)

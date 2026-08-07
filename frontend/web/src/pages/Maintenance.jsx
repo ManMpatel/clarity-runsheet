@@ -15,8 +15,8 @@ export default function Maintenance() {
     async function load() {
       try {
         const [mRes, vRes] = await Promise.all([
-          api.get('/api/maintenance'),
-          api.get('/api/vehicles'),
+          api.get('/maintenance'),
+          api.get('/vehicles'),
         ])
         setRecords(mRes.data)
         setVehicles(vRes.data)
@@ -31,7 +31,7 @@ export default function Maintenance() {
 
   async function handleAdd() {
     try {
-      const res = await api.post('/api/maintenance', form)
+      const res = await api.post('/maintenance', form)
       setRecords(r => [res.data, ...r])
       setShowAdd(false)
       setForm({ vehicleId: '', type: '', dueDate: '', dueOdometer: '', notes: '' })
@@ -42,10 +42,10 @@ export default function Maintenance() {
 
   async function handleComplete(id) {
     try {
-      const res = await api.put(`/api/maintenance/${id}/complete`, {
+      const res = await api.put(`/maintenance/${id}/complete`, {
         completedDate: new Date().toISOString(),
       })
-      setRecords(r => r.map(rec => rec._id === id ? res.data : rec))
+      setRecords(r => r.map(rec => rec.id === id ? res.data : rec))
       setSelected(null)
     } catch (err) {
       console.error(err.message)
@@ -143,7 +143,7 @@ export default function Maintenance() {
               >
                 <option value=''>Select vehicle</option>
                 {vehicles.map(v => (
-                  <option key={v._id} value={v._id}>{v.name}</option>
+                  <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
               </select>
               <input
@@ -201,7 +201,7 @@ export default function Maintenance() {
             </div>
             <div className='space-y-2'>
               <DetailRow label='Vehicle' value={
-                vehicles.find(v => v._id === selected.vehicleId)?.name || selected.vehicleId
+                vehicles.find(v => v.id === selected.vehicleId)?.name || selected.vehicleId
               } />
               <DetailRow label='Due date' value={
                 selected.dueDate
@@ -219,7 +219,7 @@ export default function Maintenance() {
             <div className='flex gap-3 mt-5'>
               {selected.status === 'pending' && (
                 <button
-                  onClick={() => handleComplete(selected._id)}
+                  onClick={() => handleComplete(selected.id)}
                   className='flex-1 h-9 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition'
                 >
                   Mark complete
@@ -273,7 +273,7 @@ function Section({ title, color, records, vehicles, onSelect }) {
             <div>
               <p className='text-sm font-medium text-gray-800'>{rec.type}</p>
               <p className='text-xs text-gray-400 mt-0.5'>
-                {vehicles.find(v => v._id === rec.vehicleId)?.name || rec.vehicleId}
+                {vehicles.find(v => v.id === rec.vehicleId)?.name || rec.vehicleId}
               </p>
             </div>
             <div className='text-right'>

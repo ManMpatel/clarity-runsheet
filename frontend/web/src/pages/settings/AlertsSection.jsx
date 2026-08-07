@@ -13,7 +13,7 @@ export default function AlertsSection() {
   })
 
   useEffect(() => {
-    api.get('/api/alerts/preferences').then(res => {
+    api.get('/alerts/preferences').then(res => {
       const r = res.data
       const s = r.find(x => x.type === 'speeding')
       const a = r.find(x => x.type === 'afterHours')
@@ -33,7 +33,7 @@ export default function AlertsSection() {
   async function handleSave() {
     setSaving(true)
     try {
-      await api.post('/api/alerts/preferences', form)
+      await api.post('/alerts/preferences', form)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (err) {

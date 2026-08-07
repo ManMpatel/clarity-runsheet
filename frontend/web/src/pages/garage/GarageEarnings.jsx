@@ -10,8 +10,8 @@ export default function GarageEarnings() {
     async function load() {
       try {
         const [sRes, pRes] = await Promise.all([
-          api.get('/api/referrals/summary'),
-          api.get('/api/referrals/settlements'),
+          api.get('/referrals/summary'),
+          api.get('/referrals/settlements'),
         ])
         setSummary(sRes.data)
         setSettlements(pRes.data)
