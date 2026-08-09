@@ -18,7 +18,7 @@ export default function Login() {
     setError('')
     try {
       const res = await api.post('/auth/login', form)
-      login(res.data.accessToken, res.data.user)
+      login(res.data.accessToken, res.data.user, res.data.onboardingComplete)
       if (!res.data.onboardingComplete) {
         navigate('/onboarding')
       } else {

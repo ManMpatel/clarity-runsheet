@@ -30,7 +30,7 @@ import AdminTickets from './pages/admin/AdminTickets'
 import AdminDevices from './pages/admin/AdminDevices'
 import LockedFeature from './pages/LockedFeature'
 import { useEffect, useState } from 'react'
-import api from './lib/api'
+import api, { silentRefresh } from './lib/api'
 import GarageEarnings    from './pages/garage/GarageEarnings'
 import AdminCommissions  from './pages/admin/AdminCommissions'
 import Drivers from './pages/Drivers'
@@ -59,7 +59,7 @@ function TierGate({ tier, children }) {
 }
 
 function ProtectedRoute({ children }) {
-  const token = useAuthStore(s => s.token)
+  const token = useAuthStore(s => s.accessToken)
   if (!token) return <Navigate to='/login' replace />
   return children
 }
@@ -71,6 +71,17 @@ function SuperAdminRoute({ children }) {
 }
 
 export default function App() {
+  // The access token lives in memory only, so a page reload starts with none — trade the httpOnly
+  // refresh cookie for a fresh one before rendering, or ProtectedRoute sees a null token and
+  // bounces an already-logged-in user to /login on every refresh.
+  const [hydrating, setHydrating] = useState(true)
+
+  useEffect(() => {
+    silentRefresh().catch(() => null).finally(() => setHydrating(false))
+  }, [])
+
+  if (hydrating) return null
+
   return (
     <Routes>
       <Route path='/login'               element={<Login />} />

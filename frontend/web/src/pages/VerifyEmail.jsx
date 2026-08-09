@@ -15,7 +15,7 @@ export default function VerifyEmail() {
     setStatus('loading')
     try {
       const res = await api.get(`/auth/verify-email?token=${token}`)
-      login(res.data.accessToken, res.data.user)
+      login(res.data.accessToken, res.data.user, res.data.onboardingComplete)
       setStatus('success')
       setTimeout(() => {
         navigate(res.data.onboardingComplete ? '/dashboard' : '/onboarding')

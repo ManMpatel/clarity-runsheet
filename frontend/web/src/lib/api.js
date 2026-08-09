@@ -41,7 +41,9 @@ api.interceptors.response.use((res) => {
 
 let refreshPromise = null
 
-async function silentRefresh() {
+// Exported so App can run it once on boot: the access token is memory-only (see authStore.js),
+// so a page reload has no token until the refresh cookie is traded for a fresh one.
+export async function silentRefresh() {
   if (!refreshPromise) {
     refreshPromise = axios
       .post(`${API_ROOT}/api/v1/auth/refresh`, {}, { withCredentials: true, headers: { 'X-Platform': 'web' } })
