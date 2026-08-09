@@ -1,3 +1,5 @@
+import { TIER_PRICING, monthlyTotal } from '../../lib/pricing'
+
 export default function PlanSection({ company, slots, loading }) {
   if (loading) return <p className='text-sm text-gray-400'>Loading...</p>
 
@@ -7,7 +9,7 @@ export default function PlanSection({ company, slots, loading }) {
   const entryUsed  = slots?.used?.entry || 0
   const midUsed    = slots?.used?.mid   || 0
   const topUsed    = slots?.used?.top   || 0
-  const monthly    = (entryTotal * 18) + (midTotal * 25) + (topTotal * 45)
+  const monthly    = monthlyTotal({ entry: entryTotal, mid: midTotal, top: topTotal })
 
   return (
     <div>
@@ -33,9 +35,9 @@ export default function PlanSection({ company, slots, loading }) {
       <h2 className='text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3'>Slot usage</h2>
       <div className='space-y-3'>
         {[
-          { label: 'Entry — $18/van', used: entryUsed, total: entryTotal, color: 'bg-blue-500' },
-          { label: 'Mid — $25/van',   used: midUsed,   total: midTotal,   color: 'bg-teal-500' },
-          { label: 'Top — $45/van',   used: topUsed,   total: topTotal,   color: 'bg-purple-500' },
+          { label: `Entry — $${TIER_PRICING.entry}/van`, used: entryUsed, total: entryTotal, color: 'bg-blue-500' },
+          { label: `Mid — $${TIER_PRICING.mid}/van`,      used: midUsed,   total: midTotal,   color: 'bg-teal-500' },
+          { label: `Top — $${TIER_PRICING.top}/van`,      used: topUsed,   total: topTotal,   color: 'bg-purple-500' },
         ].map(s => (
           <div key={s.label} className='bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4'>
             <div className='flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-2'>

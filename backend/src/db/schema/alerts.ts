@@ -5,7 +5,7 @@ import { vehicles } from './vehicles'
 export const alertTypeEnum = pgEnum('alert_type', [
   'afterHours', 'speeding', 'engineFault', 'lowBattery', 'geofenceBreach',
   'towing', 'crash', 'harshBraking', 'harshAcceleration', 'harshCornering',
-  'maintenanceDue',
+  'maintenanceDue', 'tamper',
 ])
 export const alertSeverityEnum = pgEnum('alert_severity', ['critical', 'warning', 'info'])
 
@@ -36,9 +36,10 @@ export const alertRules = pgTable('alert_rules', {
   speedLimit: smallint('speed_limit'),
   voltageThreshold: numeric('voltage_threshold'),
   smsNumber: text('sms_number'),
-  // DEAD FIELD today — referenced in worker/processors/alerts.js's geofenceBreach check but never
-  // actually written anywhere. Shipped nullable/unwired (preserves current behavior) rather than
-  // guessing at a geofence-scoped-alert-rules feature that was never built. Flagged for the user.
+  // Unused by the geofenceBreach check — per-zone alert config (alertOnEntry/alertOnExit/
+  // activeHoursOnly) lives on the geofences row itself (see schema/geofences.ts), since a single
+  // company-wide on/off switch can't express "alert on exit from THIS zone but not that one".
+  // Column kept nullable rather than dropped to avoid an unnecessary migration.
   zoneId: uuid('zone_id'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({

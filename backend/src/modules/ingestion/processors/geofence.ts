@@ -17,6 +17,9 @@ export async function processGeofences(imei: string, companyId: string, vehicleI
   // as the old embedded array.
   const zones = await db.execute(sql`
     SELECT g.id, g.name,
+           g.alert_on_entry AS "alertOnEntry",
+           g.alert_on_exit AS "alertOnExit",
+           g.active_hours_only AS "activeHoursOnly",
            ST_Contains(g.geometry, ST_SetSRID(ST_MakePoint(${record.lng}, ${record.lat}), 4326)) AS inside
     FROM geofences g
     WHERE g.company_id = ${companyId}
@@ -44,7 +47,7 @@ export async function processGeofences(imei: string, companyId: string, vehicleI
   return events
 }
 
-async function saveGeofenceEvent(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry, zone: { id: string; name: string }, type: 'enter' | 'exit') {
+async function saveGeofenceEvent(imei: string, companyId: string, vehicleId: string, record: NormalisedTelemetry, zone: { id: string; name: string; alertOnEntry: boolean; alertOnExit: boolean; activeHoursOnly: boolean }, type: 'enter' | 'exit') {
   const [event] = await db.insert(geofenceEvents).values({
     type,
     imei,
@@ -57,5 +60,7 @@ async function saveGeofenceEvent(imei: string, companyId: string, vehicleId: str
     lng: record.lng,
   }).returning()
 
-  return event
+  // Not columns on geofence_events (that table just logs what happened) — attached here so
+  // processAlerts can decide whether THIS zone wants an alert without a second query.
+  return { ...event, alertOnEntry: zone.alertOnEntry, alertOnExit: zone.alertOnExit, activeHoursOnly: zone.activeHoursOnly }
 }

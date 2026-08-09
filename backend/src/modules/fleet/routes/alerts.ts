@@ -55,14 +55,19 @@ router.get('/preferences', requireAuth, requireCompany, asyncRoute(async (req, r
 
 // POST /api/v1/alerts/preferences
 router.post('/preferences', requireAuth, requireCompany, asyncRoute(async (req, res) => {
-  const { speeding, afterHours, speedLimit, voltageThreshold, smsNumber } = req.body
+  const { speeding, afterHours, speedLimit, voltageThreshold, smsNumber, geofenceBreach, tamper } = req.body
 
-  const rules: Array<{ type: 'speeding' | 'afterHours' | 'engineFault' | 'lowBattery' | 'towing', active: boolean, speedLimit?: number, voltageThreshold?: number }> = [
+  const rules: Array<{ type: 'speeding' | 'afterHours' | 'engineFault' | 'lowBattery' | 'towing' | 'crash' | 'geofenceBreach' | 'tamper', active: boolean, speedLimit?: number, voltageThreshold?: number }> = [
     { type: 'speeding', active: !!speeding, speedLimit: speedLimit || 110 },
     { type: 'afterHours', active: !!afterHours },
     { type: 'engineFault', active: true },
     { type: 'lowBattery', active: true, voltageThreshold: voltageThreshold || 11.5 },
     { type: 'towing', active: true },
+    { type: 'crash', active: true },
+    // Per-zone enter/exit/active-hours config lives on the geofences row itself (see
+    // processors/geofence.ts) — this toggle is only the company-wide on/off switch.
+    { type: 'geofenceBreach', active: geofenceBreach === undefined ? true : !!geofenceBreach },
+    { type: 'tamper', active: tamper === undefined ? true : !!tamper },
   ]
 
   for (const rule of rules) {

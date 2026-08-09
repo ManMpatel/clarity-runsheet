@@ -1,4 +1,7 @@
-// @ts-nocheck — relocated verbatim from tcp-listener/parser/avl-ids.js, zero logic diff.
+// @ts-nocheck — relocated verbatim from tcp-listener/parser/avl-ids.js, zero logic diff except
+// the addition of id 252 ('unplug') below, added for tamper-alert detection — a lookup-table
+// entry, not a behavior change to the parser itself. Previously fell through to `unknown_252` and
+// still landed in telemetry.extras, so no historical data was lost.
 const AVL_IDS = {
   1:   'digitalInput1',
   2:   'digitalInput2',
@@ -80,6 +83,7 @@ const AVL_IDS = {
   239: 'ignitionOnCounter',
   240: 'movementSensor',
   241: 'activeGsmOperator',
+  252: 'unplug',
   253: 'greenDrivingType',
   254: 'greenDrivingValue',
 }

@@ -7,6 +7,8 @@ export default function AlertsSection() {
   const [form, setForm] = useState({
     speeding:         true,
     afterHours:       true,
+    geofenceBreach:   true,
+    tamper:           true,
     speedLimit:       110,
     voltageThreshold: 11.5,
     smsNumber:        '',
@@ -18,10 +20,14 @@ export default function AlertsSection() {
       const s = r.find(x => x.type === 'speeding')
       const a = r.find(x => x.type === 'afterHours')
       const b = r.find(x => x.type === 'lowBattery')
-      if (s || a || b) {
+      const g = r.find(x => x.type === 'geofenceBreach')
+      const t = r.find(x => x.type === 'tamper')
+      if (s || a || b || g || t) {
         setForm({
           speeding:         s?.active ?? true,
           afterHours:       a?.active ?? true,
+          geofenceBreach:   g?.active ?? true,
+          tamper:           t?.active ?? true,
           speedLimit:       s?.speedLimit || 110,
           voltageThreshold: b?.voltageThreshold || 11.5,
           smsNumber:        s?.smsNumber || '',
@@ -66,8 +72,10 @@ export default function AlertsSection() {
       </div>
 
       <div className='bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800'>
-        {toggleRow('speeding',   'Speeding alerts',       'Fires when a van exceeds your speed limit')}
-        {toggleRow('afterHours', 'After-hours movement',  'Fires when ignition is on outside business hours')}
+        {toggleRow('speeding',       'Speeding alerts',       'Fires when a van exceeds your speed limit')}
+        {toggleRow('afterHours',     'After-hours movement',  'Fires when ignition is on outside business hours')}
+        {toggleRow('geofenceBreach', 'Geofence alerts',       'Fires when a van enters or exits a zone — set which per zone in Geofences')}
+        {toggleRow('tamper',         'Theft & tamper alerts', 'Fires when the tracker is unplugged or loses power')}
         {[
           ['Engine fault alerts',  'Always on — fires when OBD detects a fault code'],
           ['Low battery alerts',   'Always on — fires when voltage drops below threshold'],

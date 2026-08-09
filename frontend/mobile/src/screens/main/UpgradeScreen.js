@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native'
 import api from '../../lib/api'
 import { colors, radius, spacing } from '../../lib/theme'
+import { TIER_PRICING, TIER_LABELS } from '../../lib/pricing'
 
 const PLANS = [
-  { key: 'entrySlots', name: 'Entry', price: 18 },
-  { key: 'midSlots',   name: 'Mid',   price: 25 },
-  { key: 'topSlots',   name: 'Top',   price: 45 },
+  { key: 'entrySlots', name: TIER_LABELS.entry, price: TIER_PRICING.entry },
+  { key: 'midSlots',   name: TIER_LABELS.mid,   price: TIER_PRICING.mid },
+  { key: 'topSlots',   name: TIER_LABELS.top,   price: TIER_PRICING.top },
 ]
 
 export default function UpgradeScreen() {

@@ -171,13 +171,19 @@ sequenceDiagram
 
 Each processor in `ingestion/processors/` is independent and runs in sequence per packet:
 
-- **`telemetry.ts`** — inserts the raw record into the `telemetry` hypertable.
-- **`geofence.ts`** — PostGIS `ST_Contains` against each active geofence for the vehicle's
-  company; raises `geofence_events` + optional alerts on enter/exit.
+- **`telemetry.ts`** — inserts the raw record into the `telemetry` hypertable. AVL IO elements
+  are normalised (e.g. mV → V, metres → km) and stored in the `extras` JSONB (including AVL ID 252
+  `unplug` for tamper detection).
+- **`geofence.ts`** — PostGIS `ST_Contains` against each active geofence for the vehicle's company.
+  Logs enter/exit events and attaches the zone's per-event alert flags (`alertOnEntry`,
+  `alertOnExit`, `activeHoursOnly`) to the event row for `alerts.ts` to consume.
 - **`driver-events.ts`** — flags crash/harsh-braking/harsh-acceleration/harsh-cornering/speeding
-  from the packet's CAN data.
-- **`alerts.ts`** — matches the packet + any events above against the company's `alert_rules`,
-  dual-dispatches (socket + push) on match.
+  from the packet's CAN data; logs to `driver_events` for safety scoring.
+- **`alerts.ts`** — evaluates the packet + any events above against a company's alert rules
+  (merged from both `alert_rules` DB rows AND defaults if a rule type was never configured), fires
+  alerts for: afterHours, speeding, engineFault, lowBattery, **geofenceBreach** (with per-zone
+  enter/exit/hours control), towing, **crash**, **tamper** (unplug or power cut <4V). Dual-dispatches
+  (socket + push) on match; SMS for critical alerts.
 - **`trip-builder.ts`** — maintains an open trip row in Postgres (self-healing on restart — trip
   state is a durable row, not an in-memory/Redis flag) and classifies it (`fbt-classifier.ts`) on
   close.
@@ -424,7 +430,7 @@ npm run dev:api            # :3000
 npm run dev:tcp-listener   # :5027 device port, :4001 internal command relay
 npm run dev:ingestion      # :3001 socket.io
 
-npm run db:generate && npm run db:migrate   # Drizzle schema push (run 0001_telemetry_hypertable.sql once, separately, for Timescale/PostGIS setup)
+npm run db:generate && npm run db:migrate   # Drizzle schema push; note: 0001_telemetry_hypertable.sql (hand-written Timescale/PostGIS setup) is still run separately if migrating a fresh database
 npm run create-admin       # seed a superadmin user
 npm run create-demo-user   # seed a demo company + companyAdmin (demo@demo.com / Demo@12345)
 npm run seed-demo-fleet    # seed demo vehicles/drivers/trips for that company, for a populated dashboard
@@ -472,3 +478,22 @@ wire contracts between old and new code, not just porting them as-is):
   `GOOGLE_CLIENT_ID` at module load) until fixed.
 - Mobile's JWT decode would have crashed at runtime — Hermes has no global `atob`; replaced with a
   dependency-free base64url decoder.
+
+**Recent improvements (Aug 2026):**
+
+- Pricing model reverted to a single three-tier breakdown (`$9/$25/$45` per van/month) with a
+  shared constant in both web and mobile frontends to prevent drift.
+- Geofence alerts were completely dead (no alerts ever fired) — now gate on per-zone `alertOnEntry`
+  / `alertOnExit` / `activeHoursOnly` flags (read from the `geofences` table), and reuse the
+  canonical FBT business-hours classifier to avoid divergence (a second hand-rolled comparison here
+  would just repeat the bug that broke FBT classification in the first place).
+- Alert rules evaluation had a silent dependency on DB rows existing — a company that never opened
+  Settings → Alerts got zero alerts even for types the UI labelled "Always on" (engineFault,
+  lowBattery, towing, crash). Now merged with defaults: DB rows override defaults but defaults
+  cover any type not explicitly configured.
+- New alert types: **tamper** (tracker unplugged — AVL ID 252 — or power cut <4V, critical),
+  **crash** (was only logged to `driver_events`, never alerted).
+- Both are critical alerts (SMS on fire if SMS configured). Tamper threshold (4V) sits well below
+  lowBattery's 11.5V default, so the two checks never collide.
+- Drizzle auto-generated migration for `tamper` enum value, renamed to `0002_add_tamper_alert_type.sql`
+  to avoid colliding with the hand-written `0001_telemetry_hypertable.sql`.

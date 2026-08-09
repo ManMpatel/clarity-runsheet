@@ -9,7 +9,7 @@ const SEVERITY_COLORS= { critical: '#dc2626', warning: '#d97706', info: colors.p
 const TYPE_LABELS = {
   afterHours: 'After Hours', speeding: 'Speeding', engineFault: 'Engine Fault',
   lowBattery: 'Low Battery', geofenceBreach: 'Geofence Breach', towing: 'Towing Detected',
-  crash: 'Crash Detected', maintenanceDue: 'Maintenance Due',
+  crash: 'Crash Detected', maintenanceDue: 'Maintenance Due', tamper: 'Tamper / Power Cut',
 }
 
 export default function AlertsScreen() {

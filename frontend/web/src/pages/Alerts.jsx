@@ -16,6 +16,7 @@ const TYPE_LABELS = {
   geofenceBreach: 'Geofence Breach',
   towing:         'Towing Detected',
   crash:          'Crash Detected',
+  tamper:         'Tamper / Power Cut',
 }
 
 export default function Alerts() {
@@ -83,7 +84,7 @@ export default function Alerts() {
       </div>
 
       <div className='flex gap-2 mb-5 flex-wrap'>
-        {['all', 'unread', 'critical', 'speeding', 'geofenceBreach', 'engineFault'].map(f => (
+        {['all', 'unread', 'critical', 'speeding', 'geofenceBreach', 'engineFault', 'tamper'].map(f => (
           <button
             key={f}
             onClick={() => setFilter(f)}

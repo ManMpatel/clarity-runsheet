@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import api from '../lib/api'
+import { TIER_PRICING } from '../lib/pricing'
 
 export default function Billing() {
   const [status,   setStatus]   = useState(null)
@@ -73,16 +74,16 @@ export default function Billing() {
       <div className='border border-gray-200 rounded-xl p-5 mb-6'>
         <div className='flex items-start justify-between mb-3'>
           <div>
-            <p className='text-base font-semibold text-gray-800'>Clarity Fleet</p>
-            <p className='text-xs text-gray-400 mt-0.5'>All features included</p>
+            <p className='text-base font-semibold text-gray-800'>Clarity Fleet — Entry plan</p>
+            <p className='text-xs text-gray-400 mt-0.5'>Need Driver Behaviour, Geofences, FBT or Vehicle Health? Upgrade a van's tier from Settings → Plan</p>
           </div>
           <div className='text-right'>
-            <p className='text-xl font-bold text-gray-800'>$19.99</p>
+            <p className='text-xl font-bold text-gray-800'>${TIER_PRICING.entry}</p>
             <p className='text-xs text-gray-400'>per van / month</p>
           </div>
         </div>
         <ul className='space-y-1.5 mb-4'>
-          {['Live GPS tracking','Trip history & replay','Remote engine cut','Driver behaviour scoring','Geofence alerts','FBT logbook','Maintenance scheduler'].map(f => (
+          {['Live GPS tracking 24/7','Theft & tamper alerts','Speed & geo-fence alerts','Trip history & mileage reports','Mobile app + desktop access','Remote engine cut','FBT logbook'].map(f => (
             <li key={f} className='flex items-center gap-2 text-sm text-gray-600'>
               <span className='text-teal-500'>✓</span> {f}
             </li>
@@ -103,7 +104,7 @@ export default function Billing() {
             </div>
             <div className='flex items-center justify-between text-xs text-gray-400 mb-3'>
               <span>Total per month</span>
-              <span className='font-semibold text-gray-700'>${(quantity * 19.99).toFixed(2)} AUD</span>
+              <span className='font-semibold text-gray-700'>${(quantity * TIER_PRICING.entry).toFixed(2)} AUD</span>
             </div>
             <button onClick={handleSubscribe} disabled={loading}
               className='w-full h-11 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition disabled:opacity-50'>
