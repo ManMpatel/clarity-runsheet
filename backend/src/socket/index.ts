@@ -12,10 +12,26 @@ let io = null
 function init() {
   const httpServer = http.createServer()
 
+  // Same origin allowlist as the api entrypoint: comma-separated env lists, plus any localhost
+  // port outside production (Vite moves to 5174+ when 5173 is taken).
+  const allowedOrigins = [process.env.CORS_ORIGINS, process.env.WEB_URL, process.env.DASHBOARD_URL]
+    .filter(Boolean)
+    .flatMap((v) => v.split(','))
+    .map((v) => v.trim().replace(/\/$/, ''))
+    .filter(Boolean)
+  const isProd = process.env.NODE_ENV === 'production'
+  const localhostOrigin = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.DASHBOARD_URL || 'http://localhost:5173',
-      methods: ['GET', 'POST']
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true)
+        if (allowedOrigins.includes(origin.replace(/\/$/, ''))) return callback(null, true)
+        if (!isProd && localhostOrigin.test(origin)) return callback(null, true)
+        return callback(new Error(`Origin not allowed by CORS: ${origin}`))
+      },
+      methods: ['GET', 'POST'],
+      credentials: true
     }
   })
 

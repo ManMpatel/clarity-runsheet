@@ -42,10 +42,31 @@ import reportsAsyncRoutes from '../modules/fleet/routes/reports-async'
 const app = express()
 const PORT = process.env.PORT || 3000
 
-// CORS scoped to the web origin only — mobile requests aren't subject to CORS at all, that's a
+// CORS scoped to the web origins only — mobile requests aren't subject to CORS at all, that's a
 // browser-only mechanism. `credentials: true` is required for the httpOnly refresh cookie to be
 // sent/received cross-origin from the dashboard's dev server.
-app.use(cors({ origin: process.env.WEB_URL || process.env.DASHBOARD_URL || 'http://localhost:5173', credentials: true }))
+//
+// WEB_URL/DASHBOARD_URL/CORS_ORIGINS each accept a comma-separated list. Outside production we also
+// allow any localhost/127.0.0.1 port, because Vite hops to 5174+ whenever 5173 is already taken.
+const allowedOrigins = [process.env.CORS_ORIGINS, process.env.WEB_URL, process.env.DASHBOARD_URL]
+  .filter((v): v is string => Boolean(v))
+  .flatMap((v) => v.split(','))
+  .map((v) => v.trim().replace(/\/$/, ''))
+  .filter(Boolean)
+
+const isProd = process.env.NODE_ENV === 'production'
+const localhostOrigin = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // No Origin header: same-origin, curl, or a native app — nothing for CORS to police.
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin.replace(/\/$/, ''))) return callback(null, true)
+    if (!isProd && localhostOrigin.test(origin)) return callback(null, true)
+    return callback(new Error(`Origin not allowed by CORS: ${origin}`))
+  },
+  credentials: true
+}))
 app.use(cookieParser())
 
 // Stripe's webhook needs the raw body for signature verification — must be registered before
