@@ -36,14 +36,18 @@ function getClient() {
 async function pushToQueue(parsedRecords, imei) {
   const redis = getClient()
 
+  // Pipelined instead of one `await lpush` per record — a batch of N records
+  // was N sequential round trips; this is one round trip regardless of N.
+  const pipeline = redis.pipeline()
   for (const record of parsedRecords) {
     const payload = JSON.stringify({
       imei,
       ...record,
       receivedAt: Date.now()
     })
-    await redis.lpush('telemetry_queue', payload)
+    pipeline.lpush('telemetry_queue', payload)
   }
+  await pipeline.exec()
 }
 
 module.exports = { getClient, pushToQueue }

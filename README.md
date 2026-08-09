@@ -13,6 +13,7 @@ what changed and why).
 - [System overview](#system-overview)
 - [Repo structure](#repo-structure)
 - [Backend: one codebase, three deployables](#backend-one-codebase-three-deployables)
+- [TCP re-write: cutting cellular data usage](#tcp-re-write-cutting-cellular-data-usage)
 - [Telemetry pipeline](#telemetry-pipeline)
 - [Database](#database)
 - [Auth](#auth)
@@ -134,6 +135,79 @@ relocation of the original — zero logic diff, only import paths changed. The o
 change inside `tcp-listener` is how outbound commands reach it (Redis pub/sub → internal HTTP,
 see [Redis's one job](#rediss-one-job)), because Redis was scoped down to a single purpose
 elsewhere in the migration.
+
+## TCP re-write: cutting cellular data usage
+
+**Problem:** Each FTC921 device ships with a 500MB SIM allowance for 5 years (~273 KB/day sustainable budget). Real-world usage measured **~10 MB/day** — **37x** the budget, exhausting the allowance in ~7 weeks. The root cause is not the backend parsing or buffering (tcp-listener receives already-transmitted bytes), but device-side reporting configuration: the FTC921 likely ships with a flat reporting profile (no distinction between driving/idle/parked) or too-aggressive a fixed interval.
+
+**Solution:** A tiered rewrite across two fronts:
+
+1. **Device-side configuration** — enable the FTC921's native mode switching (Moving / Stopped / Parked) with tiered reporting profiles via Teltonika's built-in parameters (Min Saving Period, Min Angle, Min Distance):
+   - **Driving** (ignition on + movement): 30s floor, angle + distance triggers (whichever fires first)
+   - **Idle** (ignition on, stationary): 5–10 min
+   - **Parked** (ignition off): 60 min, with instant wake-on-movement for theft detection
+   - Projected usage: ~43 KB/day (16% of budget, comfortable headroom for overhead/reconnects)
+
+2. **Backend efficiency** — Phase 0/1 code changes to measure real usage and eliminate waste:
+
+### Phase 0 — Usage Metrics (Instrumentation)
+
+New module `backend/src/modules/tcp-listener/metrics/usage.ts` collects per-IMEI counters in-memory:
+- **Bytes received**: total wire usage per device (cumulative)
+- **Records received**: total Codec 8/8E records processed
+- **Packets received**: total TCP packet batches decoded
+- **CRC failures**: count of packets that failed CRC16 verification
+- **Reconnects**: count of IMEI registrations (connection events)
+
+Exposed via **`GET /internal/metrics`** on the existing internal HTTP server (port 4001) — hit this after 24–48h with real traffic to answer: *How many bytes/record is each device actually sending?* and *Are CRC failures forcing retransmissions?* This data drives Phase 2's tuning.
+
+### Phase 1 — Code Efficiency (Low-hanging fruit)
+
+**BufferStitcher.feed() in `parser/buffer.ts`** — was doing `Buffer.concat(this.incomplete, chunk)` on **every** TCP segment, copying the entire accumulated buffer repeatedly. Replaced with append-then-concat-once: chunks accumulate in a list, concatenated only when a complete packet is ready. Same resync/partial/complete logic, zero behavior change, removes the O(n²) pattern.
+
+**Redis pipeline in `queue/redis.ts`** — was doing `await redis.lpush()` per record, so a 10-record batch was 10 sequential round-trips. Replaced with `pipeline.lpush().lpush()...exec()` — same 10 records, one round trip regardless of batch size.
+
+**CRC failure handling in `tcp-listener.ts`** — was silently skipping corrupt packets with only a `console.warn`. Now incremented into the usage metrics so CRC failure rates are visible. Silent drops that don't send the expected 4-byte ack can trigger device retransmissions (burning SIM data twice). Metrics make this observable; Phase 4 includes alerting if failure rates spike.
+
+### Phase 2 — Device Configuration (Manual, then Automated)
+
+Apply a static baseline profile to each FTC921 via Teltonika Configurator (USB/SMS/FOTA):
+- Disable transmission of unused AVL I/O elements (cross-reference the 40+ mapped IDs in `avl-ids.ts` against the ~17 fields actually persisted in `telemetry.ts`'s `normaliseRecord()` — everything else lands unused in `extras` jsonb)
+- Set Min Saving Period, Min Angle, Min Distance per mode (exact parameter IDs pulled from live Configurator, not guessed from wiki — wiki pages 403'd)
+- Confirm motion/ignition wake-on fires instant out-of-cycle record (standard Teltonika behavior, must verify on this specific model)
+
+Deliverable: versioned profile doc listing exact parameter values (e.g. `docs/ftc921-reporting-profile.md`), reusable for manual rollout and Phase 3's remote-push.
+
+### Phase 3 — Remote Config Channel (Upcoming)
+
+Extend the existing `commands.ts` Codec 12 infrastructure (already used for relay cut/restore) to accept `configure` actions alongside `cut`/`restore`. Same ack/status lifecycle, same internal HTTP endpoint pattern:
+
+```
+POST /internal/commands/{imei}
+{ "action": "configure", "profile": "default-v1" }
+```
+
+Profile names map to Phase 2's exact parameters, preventing arbitrary-command injection. No continuous polling — the device's native mode logic (Phase 2) handles real-time switching on its own. Config pushes are rare (initial rollout, periodic tuning from Phase 4 data).
+
+Mirror existing pattern in `modules/fleet/routes/vehicles.ts` to expose admin endpoints for pushing profiles to a single vehicle, a set, or the whole fleet.
+
+### Phase 4 — Monitoring & Alerting (Upcoming)
+
+Persist the Phase 0 per-IMEI counters to a daily rollup table (`device_usage_daily`: imei, date, bytes, records, reconnects, crc_failures). Build a dashboard view of MB/day per vehicle against the 273 KB/day target. Alert threshold: any device averaging >150% of budget over 2+ consecutive days gets flagged, so a misconfigured device is caught within days, not years.
+
+### Verification path
+
+1. **Phase 0**: Run for 24–48h, hit `/internal/metrics`, inspect actual bytes/record and determine current device profile aggressiveness.
+2. **Phase 1**: Confirm no behavioral regressions (BufferStitcher still handles fragmented packets correctly, Redis still delivers all records to the queue, CRC counts are recorded).
+3. **Phase 2/3**: Push new profile to a single test device, measure its daily usage with Phase 0/4 counters over 24–48h, confirm drop toward ~43 KB/day estimate before fleet rollout.
+4. **Phase 4**: Confirm daily rollup and alerting work, catch a deliberately misconfigured test device, then enable for production monitoring.
+
+**Implementation status (Aug 2026):**
+- ✅ Phase 0: Metrics collection wired into `tcp-listener.ts`, `/internal/metrics` endpoint live
+- ✅ Phase 1: BufferStitcher and Redis pipelining optimized, CRC metrics instrumented
+- ⏳ Phase 2: Awaiting live device + Configurator to pull exact FTC921 parameter IDs
+- ⏳ Phase 3: Ready to build once Phase 2 profile is finalized
+- ⏳ Phase 4: Awaiting Phase 2/3 rollout to define alert thresholds from real data
 
 ## Telemetry pipeline
 

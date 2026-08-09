@@ -13,6 +13,7 @@
 const http = require('http')
 const socketRegistry = require('../registry/sockets')
 const { encodeRelayCommand } = require('../parser/codec12')
+const { getUsageSnapshot } = require('../metrics/usage')
 
 const INTERNAL_PORT = process.env.TCP_INTERNAL_PORT || 4001
 const RESPONSE_TTL_MS = 60 * 1000
@@ -39,6 +40,15 @@ function startCommandListener() {
 function handleRequest(req, res) {
   const url = new URL(req.url, `http://localhost:${INTERNAL_PORT}`)
   const parts = url.pathname.split('/').filter(Boolean) // ['internal','commands',':imei', ...]
+
+  // Rolling per-IMEI byte/record/CRC-failure counters — see metrics/usage.ts.
+  // Diagnostic snapshot for confirming actual SIM data usage per device, not a
+  // billing record (in-memory, resets on restart).
+  if (req.method === 'GET' && parts[0] === 'internal' && parts[1] === 'metrics' && parts.length === 2) {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify(getUsageSnapshot()))
+    return
+  }
 
   if (parts[0] !== 'internal' || parts[1] !== 'commands' || !parts[2]) {
     res.writeHead(404, { 'Content-Type': 'application/json' })

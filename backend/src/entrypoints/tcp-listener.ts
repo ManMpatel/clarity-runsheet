@@ -11,6 +11,7 @@ const { pushToQueue } = require('../modules/tcp-listener/queue/redis')
 const socketRegistry = require('../modules/tcp-listener/registry/sockets')
 const { startCommandListener, recordResponse } = require('../modules/tcp-listener/queue/commands')
 const { decodeResponse } = require('../modules/tcp-listener/parser/codec12')
+const usageMetrics = require('../modules/tcp-listener/metrics/usage')
 
 const PORT = process.env.TCP_PORT || 5027
 
@@ -28,6 +29,8 @@ const server = net.createServer((socket) => {
         if (imei) {
           console.log(`[TCP] Device identified: ${imei}`)
           socketRegistry.register(imei, socket)
+          usageMetrics.recordReconnect(imei)
+          usageMetrics.recordBytes(imei, chunk.length)
           socket.write(Buffer.from([0x01]))
         } else {
           console.warn(`[TCP] IMEI parse failed — buffer length: ${chunk.length}`)
@@ -35,11 +38,14 @@ const server = net.createServer((socket) => {
         return
       }
 
+      usageMetrics.recordBytes(imei, chunk.length)
+
       const packets = stitcher.feed(chunk)
 
       for (const packet of packets) {
         if (!verifyCRC(packet)) {
           console.warn(`[TCP] CRC check failed for IMEI ${imei}`)
+          usageMetrics.recordCrcFailure(imei)
           continue
         }
 
@@ -61,6 +67,8 @@ const server = net.createServer((socket) => {
           console.warn(`[TCP] Unknown codec ${codecId} for IMEI ${imei}`)
           continue
         }
+
+        usageMetrics.recordPacket(imei, records.length)
 
         if (records.length === 0) continue
 
