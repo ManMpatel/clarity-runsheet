@@ -1,55 +1,64 @@
-import { useEffect, useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
+import { useUiStore } from '../../store/uiStore'
 import Sidebar from './Sidebar'
-import Header from './Header'
+import Topbar from './Topbar'
+import MobileNavDrawer from './MobileNavDrawer'
 import MobileBottomNav from './MobileBottomNav'
-import api from '../../lib/api'
+import VerificationBanner from './VerificationBanner'
+import CommandPalette from './CommandPalette'
+import ErrorBoundary from './ErrorBoundary'
+import { useFleetSocket } from '../../hooks/useSocket'
+import { useAlertStore } from '../../store/alertStore'
 
 export default function AppShell() {
-  const [unverified, setUnverified] = useState(false)
-  const [dismissed, setDismissed]   = useState(false)
-  const [resending, setResending]   = useState(false)
+  const collapsed = useUiStore(s => s.sidebarCollapsed)
+  const { pathname } = useLocation()
+  const addAlert = useAlertStore(s => s.addAlert)
 
-  useEffect(() => {
-    api.get('/auth/me').then(res => {
-      if (!res.data.emailVerified) setUnverified(true)
-    }).catch(() => {})
-  }, [])
-
-  async function resend() {
-    setResending(true)
-    try {
-      await api.post('/auth/resend-verification')
-      setDismissed(true)
-    } catch (err) {
-      console.error(err.message)
-    } finally { setResending(false) }
-  }
+  // `alert:new` has been broadcast by the backend since the alerts pipeline was written, with no
+  // client ever listening. Subscribing once here — rather than per-page — is what makes the
+  // notification bell live everywhere, not just on whichever page happens to fetch alerts.
+  useFleetSocket({ onAlert: addAlert })
 
   return (
-    <div className='min-h-screen bg-gray-50 dark:bg-gray-950'>
+    <div
+      className='min-h-svh bg-canvas text-fg'
+      style={{
+        '--sidebar-w': collapsed ? '4rem' : '15rem',
+        '--topbar-h': '3.5rem',
+        // Consumed by LiveMap and GeofenceManager, which need to fill exactly the space below
+        // the sticky topbar. Previously both hardcoded `h-[calc(100vh-60px)] md:h-screen`, which
+        // assumed a non-sticky, viewport-fixed header — a sticky topbar in flow overflows that.
+        '--content-h': 'calc(100svh - var(--topbar-h))',
+      }}
+    >
+      <a
+        href='#main'
+        className='sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[70]
+                   focus:px-3 focus:py-2 focus:rounded-control focus:bg-accent focus:text-fg-on-accent
+                   focus:text-sm focus:font-medium'
+      >
+        Skip to content
+      </a>
+
       <Sidebar />
-      <Header />
-      <main className='md:ml-60 pt-[60px] md:pt-0 pb-20 md:pb-0 min-h-screen'>
-        {unverified && !dismissed && (
-          <div className='bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between'>
-            <p className='text-sm text-amber-700'>
-              ⚠ Your email is not verified. Some features may be limited.
-            </p>
-            <div className='flex items-center gap-3'>
-              <button onClick={resend} disabled={resending}
-                className='text-xs text-amber-700 font-semibold underline hover:no-underline'>
-                {resending ? 'Sending...' : 'Resend verification email'}
-              </button>
-              <button onClick={() => setDismissed(true)}
-                className='text-xs text-amber-500 hover:text-amber-700'>
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
-        <Outlet />
-      </main>
+      <MobileNavDrawer />
+      <CommandPalette />
+
+      <div className='flex min-h-svh flex-col transition-[padding-left] duration-200 ease-out md:pl-(--sidebar-w)'>
+        <Topbar />
+        <VerificationBanner />
+        <main
+          id='main'
+          tabIndex={-1}
+          className='flex-1 outline-none pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0'
+        >
+          <ErrorBoundary key={pathname}>
+            <Outlet />
+          </ErrorBoundary>
+        </main>
+      </div>
+
       <MobileBottomNav />
     </div>
   )

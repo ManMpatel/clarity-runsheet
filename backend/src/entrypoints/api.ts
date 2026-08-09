@@ -24,6 +24,7 @@ import billingRoutes from '../modules/billing/routes/billing'
 import upgradeRoutes from '../modules/billing/routes/upgrade'
 import vehicleRoutes from '../modules/fleet/routes/vehicles'
 import telemetryRoutes from '../modules/fleet/routes/telemetry'
+import dashboardRoutes from '../modules/fleet/routes/dashboard'
 import tripRoutes from '../modules/fleet/routes/trips'
 import driverRoutes from '../modules/fleet/routes/drivers'
 import geofenceRoutes from '../modules/fleet/routes/geofences'
@@ -98,6 +99,7 @@ v1.use('/auth/google', mobileGoogleRouter)
 v1.use('/admin/auth', adminAuthRoutes)
 v1.use('/vehicles', vehicleRoutes)
 v1.use('/telemetry', telemetryRoutes)
+v1.use('/dashboard', dashboardRoutes)
 v1.use('/trips', tripRoutes)
 v1.use('/drivers', driverRoutes)
 v1.use('/alerts', alertRoutes)

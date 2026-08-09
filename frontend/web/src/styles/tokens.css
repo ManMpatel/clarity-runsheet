@@ -1,0 +1,105 @@
+/*
+ * Design tokens — raw values only. The Tailwind mapping lives in index.css's `@theme inline`
+ * block; this file is deliberately plain CSS so it can be read without knowing Tailwind v4.
+ *
+ * Rule: nothing here redefines a stock Tailwind name. Every token is a NEW name, which is what
+ * makes adding this layer incapable of changing how the ~35 pages that still use `bg-white` /
+ * `text-gray-900` render in light mode.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- surfaces ---- */
+  --canvas:        #f8fafc;   /* app background, behind cards */
+  --surface:       #ffffff;   /* cards, sidebar, topbar */
+  --surface-2:     #f1f5f9;   /* hover fills, skeleton base, chart grid bands */
+  --surface-3:     #e2e8f0;   /* pressed states, progress tracks */
+  --overlay:       rgb(15 23 42 / 0.40);   /* modal scrim */
+
+  /* ---- borders ---- */
+  --border:        #e2e8f0;   /* the hairline default everywhere */
+  --border-strong: #cbd5e1;   /* inputs, hovered/focused cards */
+
+  /* ---- text ---- */
+  --fg:            #0f172a;
+  --fg-muted:      #475569;   /* 7.4:1 on --surface — safe for body copy */
+  --fg-subtle:     #94a3b8;   /* decorative/tertiary ONLY — ~2.9:1, never essential text */
+  --fg-on-accent:  #ffffff;
+
+  /* ---- accent: exactly one ---- */
+  --accent:        #4f46e5;
+  --accent-hover:  #4338ca;
+  --accent-fg:     #4338ca;   /* accent-coloured text sitting on --accent-soft */
+  --accent-soft:   color-mix(in oklab, #4f46e5 9%, #ffffff);
+  --ring:          #6366f1;
+
+  /* ---- semantic ---- */
+  --success:    #059669;  --success-fg: #047857;
+  --warning:    #d97706;  --warning-fg: #b45309;
+  --danger:     #dc2626;  --danger-fg:  #b91c1c;
+  --info:       #0284c7;  --info-fg:    #0369a1;
+
+  --success-soft: color-mix(in oklab, #059669 11%, #ffffff);
+  --warning-soft: color-mix(in oklab, #d97706 12%, #ffffff);
+  --danger-soft:  color-mix(in oklab, #dc2626 10%, #ffffff);
+  --info-soft:    color-mix(in oklab, #0284c7 11%, #ffffff);
+
+  /* ---- fleet status: the single source of truth for vehicle-state colour ---- */
+  --status-moving:  #059669;
+  --status-idle:    #d97706;
+  --status-stopped: #64748b;
+  --status-offline: #a855f7;
+
+  /* ---- elevation: restrained, Linear-style ---- */
+  --shadow-xs-v: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm-v: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+  --shadow-md-v: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg-v: 0 16px 40px -12px rgb(15 23 42 / 0.18);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --canvas:        #09090b;
+  --surface:       #111114;
+  --surface-2:     #18181b;
+  --surface-3:     #27272a;
+  --overlay:       rgb(0 0 0 / 0.65);
+
+  --border:        #27272a;
+  --border-strong: #3f3f46;
+
+  --fg:            #fafafa;
+  --fg-muted:      #a1a1aa;   /* 7.0:1 on --surface */
+  --fg-subtle:     #71717a;
+  --fg-on-accent:  #ffffff;
+
+  --accent:        #6366f1;
+  --accent-hover:  #818cf8;
+  --accent-fg:     #a5b4fc;
+  --accent-soft:   color-mix(in oklab, #6366f1 16%, #111114);
+  --ring:          #818cf8;
+
+  --success:    #10b981;  --success-fg: #34d399;
+  --warning:    #f59e0b;  --warning-fg: #fbbf24;
+  --danger:     #ef4444;  --danger-fg:  #f87171;
+  --info:       #38bdf8;  --info-fg:    #7dd3fc;
+
+  --success-soft: color-mix(in oklab, #10b981 18%, #111114);
+  --warning-soft: color-mix(in oklab, #f59e0b 18%, #111114);
+  --danger-soft:  color-mix(in oklab, #ef4444 18%, #111114);
+  --info-soft:    color-mix(in oklab, #38bdf8 18%, #111114);
+
+  --status-moving:  #10b981;
+  --status-idle:    #f59e0b;
+  --status-stopped: #71717a;
+  --status-offline: #c084fc;
+
+  /* Shadows read as almost nothing on dark surfaces; the border tokens carry separation instead.
+     Kept non-zero so overlays still detach from the page. */
+  --shadow-xs-v: 0 1px 2px 0 rgb(0 0 0 / 0.30);
+  --shadow-sm-v: 0 1px 3px 0 rgb(0 0 0 / 0.40);
+  --shadow-md-v: 0 4px 12px -2px rgb(0 0 0 / 0.50);
+  --shadow-lg-v: 0 16px 40px -12px rgb(0 0 0 / 0.65);
+}

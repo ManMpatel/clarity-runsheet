@@ -242,14 +242,17 @@ export default function Maintenance() {
 
 function SummaryCard({ label, value, color }) {
   const colors = {
-    red:   'text-red-600 bg-red-50',
-    amber: 'text-amber-600 bg-amber-50',
-    teal:  'text-teal-600 bg-teal-50',
-    gray:  'text-gray-600 bg-gray-50',
+    red:   'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950',
+    amber: 'text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950',
+    teal:  'text-teal-600 bg-teal-50 dark:text-teal-400 dark:bg-teal-950',
+    gray:  'text-gray-600 bg-gray-50 dark:text-gray-400 dark:bg-gray-800',
   }
   return (
+    // bg-white/border-gray-200 here are already covered by the neutral dark-mode compat shim
+    // (styles/compat-dark.css) — only the colour-tinted badge below needs its own dark: variant,
+    // since the shim deliberately never touches coloured classes.
     <div className='bg-white rounded-xl border border-gray-200 p-4 text-center'>
-      <p className={`text-2xl font-bold ${colors[color]}`}>{value}</p>
+      <p className={`text-2xl font-bold rounded-lg ${colors[color]}`}>{value}</p>
       <p className='text-xs text-gray-500 mt-1'>{label}</p>
     </div>
   )

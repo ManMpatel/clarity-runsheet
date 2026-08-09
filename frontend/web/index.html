@@ -4,7 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>dashboard</title>
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+    <title>Clarity Fleet</title>
+    <!--
+      Blocking, unbundled, and deliberately first: this must run before the stylesheet paints.
+      main.jsx is a deferred ES module, so doing this there lets `body { background: var(--canvas) }`
+      paint light for a frame before React mounts — a visible white flash for dark-mode users on a
+      slow connection. Mirrors lib/theme.js; keep the two in sync.
+    -->
+    <script>
+      (function () {
+        try {
+          var s = (JSON.parse(localStorage.getItem('clarity-ui') || '{}').state) || {}
+          var t = s.theme || (s.darkMode ? 'dark' : 'light')
+          var d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+          var r = document.documentElement
+          r.classList.toggle('dark', d)
+          r.style.colorScheme = d ? 'dark' : 'light'
+        } catch (e) { /* corrupt localStorage — fall through to light */ }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

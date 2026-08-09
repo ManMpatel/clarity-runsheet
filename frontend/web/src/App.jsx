@@ -6,7 +6,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-import Dashboard from './pages/Dashboard'
+import Dashboard from './pages/dashboard/Dashboard'
 import RegisterDevice from './pages/garage/RegisterDevice'
 import LiveMap from './pages/LiveMap'
 import TripsHistory from './pages/TripsHistory'
@@ -37,6 +37,7 @@ import Drivers from './pages/Drivers'
 import Privacy from './pages/Privacy'
 import Terms   from './pages/Terms'
 import DeleteAccount from './pages/DeleteAccount';
+import ThemeEffect from './components/ThemeEffect'
 
 
 function TierGate({ tier, children }) {
@@ -83,6 +84,8 @@ export default function App() {
   if (hydrating) return null
 
   return (
+    <>
+    <ThemeEffect />
     <Routes>
       <Route path='/login'               element={<Login />} />
       <Route path='/signup'              element={<Signup />} />
@@ -144,5 +147,6 @@ export default function App() {
       </Route>
 
     </Routes>
+    </>
   )
 }

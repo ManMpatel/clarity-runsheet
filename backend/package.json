@@ -16,7 +16,8 @@
     "db:studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit",
     "create-admin": "tsx scripts/create-admin.ts",
-    "create-demo-user": "tsx scripts/create-demo-user.ts"
+    "create-demo-user": "tsx scripts/create-demo-user.ts",
+    "seed-demo-fleet": "tsx scripts/seed-demo-fleet.ts"
   },
   "dependencies": {
     "axios": "^1.16.1",

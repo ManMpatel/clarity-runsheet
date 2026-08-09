@@ -252,7 +252,7 @@ export default function GeofenceManager() {
     : `${form.radiusMetres} m`
 
   return (
-    <div className='flex h-[calc(100vh-60px)] md:h-screen'>
+    <div className='flex h-(--content-h)'>
 
       {/* Left Panel */}
       <div className='hidden md:flex flex-col w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800'>

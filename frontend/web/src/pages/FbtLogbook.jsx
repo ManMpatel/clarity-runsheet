@@ -92,7 +92,7 @@ export default function FbtLogbook() {
                     {vehicles.find(v => v.id === trip.vehicleId)?.name || trip.vehicleId}
                   </p>
                   <p className='text-xs text-gray-400 mt-0.5'>
-                    {formatDate(trip.startTime)} — {trip.distanceKm?.toFixed(1) ?? '--'} km
+                    {formatDate(trip.startTime)} — {trip.distanceKm != null ? Number(trip.distanceKm).toFixed(1) : '--'} km
                   </p>
                 </div>
                 <div className='flex gap-2'>
@@ -128,7 +128,7 @@ export default function FbtLogbook() {
                     {vehicles.find(v => v.id === trip.vehicleId)?.name || trip.vehicleId}
                   </p>
                   <p className='text-xs text-gray-400 mt-0.5'>
-                    {formatDate(trip.startTime)} — {trip.distanceKm?.toFixed(1) ?? '--'} km
+                    {formatDate(trip.startTime)} — {trip.distanceKm != null ? Number(trip.distanceKm).toFixed(1) : '--'} km
                   </p>
                 </div>
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${

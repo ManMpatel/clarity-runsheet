@@ -1,3 +1,151 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "./styles/tokens.css";
+@import "./styles/compat-dark.css";
 
 @variant dark (&:where(.dark, .dark *));
+
+/*
+ * `@theme inline` — NOT plain `@theme`. This matters more than it looks.
+ *
+ * With plain `@theme { --color-surface: var(--surface) }`, Tailwind emits the declaration at
+ * :root, so the value is resolved there and a `.dark` override further down the tree cannot
+ * reach it. `@theme inline` inlines the value into the utility itself —
+ * `.bg-surface { background-color: var(--surface) }` — which resolves at the consuming element
+ * and therefore honours any `.dark` ancestor. Swap the keyword out and the whole theme layer
+ * silently stops flipping while still looking correct in light mode.
+ */
+@theme inline {
+  --color-canvas:        var(--canvas);
+  --color-surface:       var(--surface);
+  --color-surface-2:     var(--surface-2);
+  --color-surface-3:     var(--surface-3);
+  --color-overlay:       var(--overlay);
+
+  --color-border:        var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-fg:            var(--fg);
+  --color-fg-muted:      var(--fg-muted);
+  --color-fg-subtle:     var(--fg-subtle);
+  --color-fg-on-accent:  var(--fg-on-accent);
+
+  --color-accent:        var(--accent);
+  --color-accent-hover:  var(--accent-hover);
+  --color-accent-fg:     var(--accent-fg);
+  --color-accent-soft:   var(--accent-soft);
+  --color-ring:          var(--ring);
+
+  --color-success:      var(--success);
+  --color-success-fg:   var(--success-fg);
+  --color-success-soft: var(--success-soft);
+  --color-warning:      var(--warning);
+  --color-warning-fg:   var(--warning-fg);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger:       var(--danger);
+  --color-danger-fg:    var(--danger-fg);
+  --color-danger-soft:  var(--danger-soft);
+  --color-info:         var(--info);
+  --color-info-fg:      var(--info-fg);
+  --color-info-soft:    var(--info-soft);
+
+  --color-moving:  var(--status-moving);
+  --color-idle:    var(--status-idle);
+  --color-stopped: var(--status-stopped);
+  --color-offline: var(--status-offline);
+
+  /* New radius names rather than redefining rounded-lg/xl, so legacy pages are untouched. */
+  --radius-control: 0.5rem;
+  --radius-card:    0.75rem;
+  --radius-modal:   1rem;
+
+  --shadow-card:    var(--shadow-sm-v);
+  --shadow-popover: var(--shadow-md-v);
+  --shadow-modal:   var(--shadow-lg-v);
+
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system,
+               'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+@layer base {
+  /* Tailwind v4's default border-color is currentColor. Every existing file names its border
+     colour explicitly, so pinning the default to our token is safe here and means new code can
+     write a bare `border` and get the right hairline in both themes. */
+  *, ::before, ::after {
+    border-color: var(--border);
+  }
+
+  html {
+    font-family: var(--font-sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--fg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--surface-3);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background-color: var(--border-strong); background-clip: content-box; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Referenced via arbitrary animation utilities in the overlay primitives, e.g.
+   `motion-safe:animate-[slide-in-left_180ms_ease-out]`. All are motion-safe-gated at the call
+   site, and the reduced-motion block above neutralises anything that slips through. */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slide-in-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.97) translateY(-2px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+/* One-shot highlight for rows that just changed via a socket push. */
+@keyframes row-flash {
+  from { background-color: var(--accent-soft); }
+  to   { background-color: transparent; }
+}

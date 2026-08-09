@@ -78,20 +78,29 @@ export default function SettingsLayout() {
     load()
   }, [])
 
-  function handleLogout() {
+  async function handleLogout() {
+    // Was `setDone(true)` — an undefined reference that threw a ReferenceError before the
+    // redirect could run, leaving the user on a logged-out-but-still-rendered Settings page.
+    try {
+      await api.post('/auth/logout')
+    } catch (err) {
+      console.error(err.message)
+    }
     logout()
-    setDone(true)
+    navigate('/login')
   }
 
   const sharedProps = { me, setMe, company, setCompany, vehicles, setVehicles, users, setUsers, slots, loading }
 
   return (
     <div className='flex flex-col'>
-      <div className='h-[60px] border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center px-6'>
-        <span className='text-base font-bold text-blue-600'>Settings</span>
-      </div>
+      {/* This page's own "Settings" header bar was removed here — the shell's sticky Topbar now
+          shows the page title (see components/layout/nav-config.js), so this would have doubled
+          up. min-h-screen on the aside below was also swapped for the shell's --content-h token;
+          under the old fixed-position Header, min-h-screen was correct, but the Topbar now sits
+          in normal flow, so min-h-screen overshoots by one topbar height on every route. */}
       <div className='flex flex-1'>
-      <aside className='w-56 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 min-h-screen flex flex-col'>
+      <aside className='w-56 flex-shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 min-h-(--content-h) flex flex-col'>
         {me && (
           <div className='p-4 border-b border-gray-200 dark:border-gray-800'>
             <div className='flex items-center gap-2.5'>

@@ -113,7 +113,7 @@ export default function LiveMap() {
   })
 
   return (
-    <div className='flex h-[calc(100vh-60px)] md:h-screen'>
+    <div className='flex h-(--content-h)'>
 
       <div className='hidden md:flex flex-col w-72 bg-white border-r border-gray-200 overflow-y-auto'>
         <div className='p-4 border-b border-gray-200'>

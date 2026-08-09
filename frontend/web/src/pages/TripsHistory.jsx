@@ -185,7 +185,7 @@ export default function TripsHistory() {
                       {formatDate(trip.endTime)}
                     </td>
                     <td className='px-4 py-3 text-gray-600'>
-                      {trip.distanceKm ? `${trip.distanceKm.toFixed(1)} km` : '--'}
+                      {trip.distanceKm ? `${Number(trip.distanceKm).toFixed(1)} km` : '--'}
                     </td>
                     <td className='px-4 py-3 text-gray-600'>
                       {formatDuration(trip.durationMinutes)}
@@ -226,7 +226,7 @@ export default function TripsHistory() {
                   <div>
                     <p className='text-sm font-semibold text-gray-800'>{selected.vehicleName || 'Trip replay'}</p>
                     <p className='text-xs text-gray-400'>
-                      {formatDate(selected.startTime)} · {selected.distanceKm?.toFixed(1)} km · {formatDuration(selected.durationMinutes)}
+                      {formatDate(selected.startTime)} · {Number(selected.distanceKm ?? 0).toFixed(1)} km · {formatDuration(selected.durationMinutes)}
                     </p>
                   </div>
                   <div className='flex items-center gap-2'>
@@ -254,7 +254,7 @@ export default function TripsHistory() {
                   <DetailRow label='Vehicle'  value={selected.vehicleName || selected.vehicleId} />
                   <DetailRow label='Start'    value={formatDate(selected.startTime)} />
                   <DetailRow label='End'      value={formatDate(selected.endTime)} />
-                  <DetailRow label='Distance' value={selected.distanceKm ? `${selected.distanceKm.toFixed(1)} km` : '--'} />
+                  <DetailRow label='Distance' value={selected.distanceKm ? `${Number(selected.distanceKm).toFixed(1)} km` : '--'} />
                   <DetailRow label='Duration' value={formatDuration(selected.durationMinutes)} />
                   <DetailRow label='FBT'      value={selected.classification || 'Unclassified'} />
                 </div>
