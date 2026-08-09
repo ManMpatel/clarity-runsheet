@@ -74,7 +74,7 @@ backend/                     One codebase, three deployable entrypoints
       auth/                    Tokens, passwords, Passport (web), google-auth-library (mobile)
       fleet/                   Vehicles, drivers, trips, telemetry, geofences, maintenance, FBT, alerts, IMEI
       admin/                   Superadmin console, reports, settings, support, referrals
-      billing/                 Stripe billing + upgrade requests
+      billing/                 Stripe billing (optional — degrades gracefully if unconfigured) + upgrade requests
       notifications/           Push (Expo/FCM), email, SMS, device registration
     db/
       schema/                  Drizzle table definitions (source of truth for columns/FKs)
@@ -83,12 +83,13 @@ backend/                     One codebase, three deployable entrypoints
     contracts/                 Shared enums/types (e.g. alert types)
     middleware/                 Response envelope, auth guard, rate limiting, platform header
     socket/                     Socket.io setup (hosted by the ingestion entrypoint)
+    scripts/                   create-admin, create-demo-user, seed-demo-fleet (one-off npm run tasks)
 
 frontend/
-  web/                        React dashboard (Vite)
+  web/                        React dashboard (Vite), Dockerfile + nginx.conf for prod builds
   mobile/                     Expo / React Native app
 
-docker-compose.yml            postgres+timescale+postgis, redis, api, tcp-listener, ingestion
+docker-compose.yml            postgres+timescale+postgis, redis, api, tcp-listener, ingestion, web
 ```
 
 ## Backend: one codebase, three deployables
@@ -111,13 +112,21 @@ flowchart TB
     APIS["api :3000"]
     TCPS["tcp-listener :5027 / :4001"]
     INGS["ingestion :3001"]
+    WEBS["web :5173 → nginx :80<br/>static Vite build"]
   end
   APIS --> PGD
   APIS -. "cut / restore" .-> TCPS
   TCPS --> RD
   INGS --> RD
   INGS --> PGD
+  WEBS -. "/api/v1/* + Socket.io" .-> APIS
 ```
+
+`web` is a multi-stage build (`frontend/web/Dockerfile`): Vite build baked with build-time
+`VITE_API_URL`/`VITE_SOCKET_URL`/`VITE_MAPBOX_TOKEN` args, then served as static files by nginx
+(`nginx.conf`). Unlike the three backend services it isn't part of the shared TypeScript package —
+it's included in `docker-compose.yml` purely so `docker compose up` gives a complete, one-command
+local stack.
 
 **Hard constraint honored during the migration:** `tcp-listener`'s decode/parse logic
 (`parser/buffer.ts`, `codec8.ts`, `codec8e.ts`, `crc16.ts`, `codec12.ts`) is a byte-for-byte
@@ -261,6 +270,11 @@ same-site cookie jar.
 Refresh tokens are stored **hashed** (sha256) in `refresh_tokens` — a database read alone can't be
 replayed as a session. Every refresh rotates the token (old one revoked, new one issued).
 
+Because the web access token lives only in a JS variable, a page reload always starts with none —
+`App.jsx` blocks the initial render on one `silentRefresh()` call (trading the httpOnly cookie for a
+fresh access token) before `ProtectedRoute` ever checks it, otherwise an already-logged-in user got
+bounced to `/login` on every refresh.
+
 ```mermaid
 sequenceDiagram
   participant Web as frontend/web
@@ -328,6 +342,7 @@ redirect flow, not JSON) intentionally lives *outside* `/api/v1` — see [Auth](
 | `/auth`, `/auth/google` | `modules/auth` | Login/signup/refresh/verify-email/password-reset, Google OAuth (both flows) |
 | `/admin/auth` | `modules/auth` | Superadmin login + TOTP |
 | `/vehicles`, `/telemetry`, `/trips`, `/drivers`, `/alerts`, `/geofences`, `/maintenance`, `/fbt`, `/imei` | `modules/fleet` | Core fleet CRUD + live telemetry reads |
+| `/dashboard` | `modules/fleet` | Aggregate stats for the web dashboard home screen (`routes/dashboard.ts`) — five queries total (no per-vehicle N+1), replacing client-side-derived stats that had drifted from the actual data (see [Migration history](#migration-history)) |
 | `/reports` | `modules/fleet` + `modules/admin` | Sync report endpoints + async job submit/poll (`reports-async.ts`) |
 | `/admin`, `/referrals`, `/settings`, `/support` | `modules/admin` | Superadmin console, garage-owner referrals, support tickets |
 | `/billing`, `/upgrade` | `modules/billing` | Stripe checkout/webhook, manual-billing upgrade requests |
@@ -335,6 +350,18 @@ redirect flow, not JSON) intentionally lives *outside* `/api/v1` — see [Auth](
 
 Every route is scoped by `companyId` off the authenticated user's JWT — there is no endpoint that
 returns cross-tenant data by omission.
+
+**CORS** is an allowlist, not a single hardcoded origin: `WEB_URL`, `DASHBOARD_URL`, and
+`CORS_ORIGINS` (comma-separated, for a staging domain or preview deploy) are merged into one list,
+checked with `credentials: true` so the httpOnly refresh cookie still round-trips cross-origin.
+Outside `NODE_ENV=production` any `localhost`/`127.0.0.1` port is also allowed, since Vite hops to
+`5174+` whenever `5173` is already taken — otherwise a second local dashboard instance would fail
+CORS for no reason. The Socket.io server (`socket/index.ts`) applies the identical allowlist logic
+independently, since it has its own `cors` option.
+
+Stripe billing (`modules/billing`) is optional: if `STRIPE_SECRET_KEY` is unset the client is never
+constructed (constructing it eagerly with an empty key used to crash the whole `api` process at
+import time), and `/billing/checkout`, `/billing/portal`, `/billing/webhook` return `503` instead.
 
 ## Real-time & notifications
 
@@ -388,7 +415,8 @@ mobile-specific backend logic beyond the two auth entrypoints described in [Auth
 
 ```bash
 cp backend/.env.example backend/.env   # fill in secrets (JWT_SECRET, Google, Stripe, Mapbox...)
-docker compose up                       # postgres+timescale+postgis, redis, api, tcp-listener, ingestion
+                                        # Stripe/CORS_ORIGINS are optional — see API section
+docker compose up                       # postgres+timescale+postgis, redis, api, tcp-listener, ingestion, web
 
 # or run backend processes individually, outside Docker:
 cd backend && npm install
@@ -398,6 +426,8 @@ npm run dev:ingestion      # :3001 socket.io
 
 npm run db:generate && npm run db:migrate   # Drizzle schema push (run 0001_telemetry_hypertable.sql once, separately, for Timescale/PostGIS setup)
 npm run create-admin       # seed a superadmin user
+npm run create-demo-user   # seed a demo company + companyAdmin (demo@demo.com / Demo@12345)
+npm run seed-demo-fleet    # seed demo vehicles/drivers/trips for that company, for a populated dashboard
 
 cd frontend/web && npm install && npm run dev
 cd frontend/mobile && npm install && npx expo start
