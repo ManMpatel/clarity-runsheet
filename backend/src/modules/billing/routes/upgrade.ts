@@ -6,11 +6,12 @@ import { db } from '../../../db/client'
 import { companies, upgradeRequests } from '../../../db/schema'
 import { requireAuth, requireCompany } from '../../../middleware/auth-guard'
 import { asyncRoute } from '../../../middleware/response-envelope'
+import { idempotent } from '../../../middleware/idempotency'
 import { sendUpgradeNotification } from '../../notifications/email'
 
 const router = express.Router()
 
-router.post('/request', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+router.post('/request', requireAuth, requireCompany, idempotent, asyncRoute(async (req, res) => {
   const { entrySlots, midSlots, topSlots, message } = req.body
 
   const [company] = await db.select().from(companies).where(eq(companies.id, req.companyId!)).limit(1)

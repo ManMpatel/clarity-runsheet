@@ -10,29 +10,26 @@ import { db } from '../../../db/client'
 import { vehicles, vehicleState, vehicleTierHistory, vehicleImmobiliseHistory, companies } from '../../../db/schema'
 import { requireAuth, requireRole, requireCompany } from '../../../middleware/auth-guard'
 import { asyncRoute } from '../../../middleware/response-envelope'
+import { idempotent } from '../../../middleware/idempotency'
 
 const router = express.Router()
 
 const TCP_INTERNAL_URL = process.env.TCP_INTERNAL_URL || 'http://localhost:4001'
 
-// No poll loop existed in the old Redis-based route (it only did a single state read before
-// publishing) — these constants mirror the tcp-listener's own RESPONSE_TTL_MS (60s) window for
-// a command to be acked, polled every 2s (30 attempts) so we don't hammer the internal server.
-const COMMAND_POLL_INTERVAL_MS = 2000
-const COMMAND_POLL_MAX_ATTEMPTS = 30
-
-async function pollCommandStatus(imei: string) {
-  for (let attempt = 0; attempt < COMMAND_POLL_MAX_ATTEMPTS; attempt++) {
-    await new Promise((resolve) => setTimeout(resolve, COMMAND_POLL_INTERVAL_MS))
-    try {
-      const res = await fetch(`${TCP_INTERNAL_URL}/internal/commands/${imei}/status`)
-      const status: any = await res.json()
-      if (status.status === 'acked' || status.status === 'timeout') return status
-    } catch (err: any) {
-      console.error('[Vehicles] Command poll error:', err.message)
-    }
-  }
-  return { status: 'timeout' }
+// PREVIOUSLY: this route awaited a 2s-interval/30-attempt poll loop (up to 60s) against the
+// tcp-listener's internal command server before responding at all — so `POST /:id/cut` could
+// hang for a full minute. The internal server itself already responds 202 the instant it hands
+// the packet to the device socket (see tcp-listener/queue/commands.ts's `sendCommand`); the poll
+// loop's only job was to wait for the device's async ack before this route replied. Mobile's
+// axios timeout is 10s (frontend/mobile/src/lib/api.js), so that 60s wait made every immobiliser
+// command *appear* to fail on mobile even when it eventually succeeded.
+//
+// Fixed by returning 202 immediately once the command is handed off, and exposing
+// GET /:id/command-status for the client to poll — same total wait, but the client controls its
+// own timeout/cancel/retry UI instead of the connection just hanging.
+async function checkCommandStatus(imei: string) {
+  const res = await fetch(`${TCP_INTERNAL_URL}/internal/commands/${imei}/status`)
+  return res.json() as Promise<{ status: 'pending' | 'acked' | 'timeout' | 'unknown', command?: 'cut' | 'restore' }>
 }
 
 router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
@@ -43,11 +40,13 @@ router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
 }))
 
 router.get('/status', requireAuth, requireCompany, asyncRoute(async (req, res) => {
-  const fleet = await db.select().from(vehicles).where(eq(vehicles.companyId, req.companyId!))
+  // Was one query per vehicle — see the matching fix + comment on GET /telemetry/live above.
+  const rows = await db.select({ id: vehicles.id, updatedAt: vehicleState.updatedAt }).from(vehicles)
+    .leftJoin(vehicleState, eq(vehicleState.vehicleId, vehicles.id))
+    .where(eq(vehicles.companyId, req.companyId!))
 
-  const status = await Promise.all(fleet.map(async (v) => {
-    const [state] = await db.select().from(vehicleState).where(eq(vehicleState.vehicleId, v.id)).limit(1)
-    const lastSeen = state?.updatedAt || null
+  const status = rows.map(({ id, updatedAt }) => {
+    const lastSeen = updatedAt || null
     const ageMs = lastSeen ? Date.now() - new Date(lastSeen).getTime() : null
 
     let vState = 'offline'
@@ -56,8 +55,8 @@ router.get('/status', requireAuth, requireCompany, asyncRoute(async (req, res) =
       else if (ageMs < 15 * 60 * 1000) vState = 'idle'
     }
 
-    return { vehicleId: v.id, lastSeen, state: vState }
-  }))
+    return { vehicleId: id, lastSeen, state: vState }
+  })
 
   return res.success(status)
 }))
@@ -70,7 +69,7 @@ router.get('/:id', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   return res.success(vehicle)
 }))
 
-router.post('/', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
+router.post('/', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), idempotent, asyncRoute(async (req, res) => {
   const { name, imei, registration, make, model, year, driverMobile } = req.body
   if (!name || !imei) return res.fail(null, 'Name and IMEI required')
 
@@ -188,21 +187,45 @@ router.post('/:id/cut', requireAuth, requireCompany, requireRole('companyAdmin',
     return res.fail({ speed: state.speed }, 'Vehicle is moving — cannot cut while in motion', 409)
   }
 
-  await fetch(`${TCP_INTERNAL_URL}/internal/commands/${vehicle.imei}`, {
+  const relay = await fetch(`${TCP_INTERNAL_URL}/internal/commands/${vehicle.imei}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'cut' }),
   })
-  await pollCommandStatus(vehicle.imei)
+  if (relay.status === 409) {
+    return res.fail(null, 'Device is not currently connected', 409)
+  }
 
-  await db.update(vehicles).set({ immobilised: true }).where(eq(vehicles.id, vehicle.id))
+  // Recorded as the command being *issued*, not confirmed — `vehicles.immobilised` only flips
+  // once the client polls /:id/command-status and the device has actually acked.
   await db.insert(vehicleImmobiliseHistory).values({
     vehicleId: vehicle.id,
     action: 'cut',
     triggeredBy: req.user!.userId,
   })
 
-  return res.success(null, 'Cut command sent')
+  return res.status(202).success({ commandId: vehicle.imei }, 'Cut command sent')
+}))
+
+router.get('/:id/command-status', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  const [vehicle] = await db.select().from(vehicles)
+    .where(and(eq(vehicles.id, (req.params.id as string)), eq(vehicles.companyId, req.companyId!)))
+    .limit(1)
+  if (!vehicle) return res.fail(null, 'Vehicle not found', 404)
+  if (!vehicle.imei) return res.fail(null, 'Vehicle has no IMEI registered')
+
+  const status = await checkCommandStatus(vehicle.imei)
+
+  if (status.status === 'acked' && status.command) {
+    const immobilised = status.command === 'cut'
+    // Idempotent — a client that polls repeatedly after the ack shouldn't write on every poll.
+    if (vehicle.immobilised !== immobilised) {
+      await db.update(vehicles).set({ immobilised }).where(eq(vehicles.id, vehicle.id))
+    }
+    return res.success({ status: status.status, immobilised })
+  }
+
+  return res.success({ status: status.status, immobilised: vehicle.immobilised })
 }))
 
 router.post('/:id/restore', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
@@ -212,21 +235,22 @@ router.post('/:id/restore', requireAuth, requireCompany, requireRole('companyAdm
   if (!vehicle) return res.fail(null, 'Vehicle not found', 404)
   if (!vehicle.imei) return res.fail(null, 'Vehicle has no IMEI registered')
 
-  await fetch(`${TCP_INTERNAL_URL}/internal/commands/${vehicle.imei}`, {
+  const relay = await fetch(`${TCP_INTERNAL_URL}/internal/commands/${vehicle.imei}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action: 'restore' }),
   })
-  await pollCommandStatus(vehicle.imei)
+  if (relay.status === 409) {
+    return res.fail(null, 'Device is not currently connected', 409)
+  }
 
-  await db.update(vehicles).set({ immobilised: false }).where(eq(vehicles.id, vehicle.id))
   await db.insert(vehicleImmobiliseHistory).values({
     vehicleId: vehicle.id,
     action: 'restore',
     triggeredBy: req.user!.userId,
   })
 
-  return res.success(null, 'Restore command sent')
+  return res.status(202).success({ commandId: vehicle.imei }, 'Restore command sent')
 }))
 
 export default router

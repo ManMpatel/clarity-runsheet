@@ -2,7 +2,7 @@
 // has a real unique constraint on (companyId, type) — was upserted by that natural key in Mongo
 // with no DB-level guarantee — so the preferences save uses Drizzle's onConflictDoUpdate.
 import express from 'express'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, lt, sql } from 'drizzle-orm'
 import { db } from '../../../db/client'
 import { alerts, alertRules } from '../../../db/schema'
 import { requireAuth, requireCompany } from '../../../middleware/auth-guard'
@@ -10,16 +10,40 @@ import { asyncRoute } from '../../../middleware/response-envelope'
 
 const router = express.Router()
 
+const MAX_PAGE_SIZE = 100
+
 router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
-  const { type, severity, read, page = '1', limit = '20' } = req.query as Record<string, string>
+  const { type, severity, read, page, limit = '20', cursor } = req.query as Record<string, string>
 
   const conditions = [eq(alerts.companyId, req.companyId!)]
   if (type) conditions.push(eq(alerts.type, type as any))
   if (severity) conditions.push(eq(alerts.severity, severity as any))
   if (read !== undefined) conditions.push(eq(alerts.read, read === 'true'))
 
-  const pageNum = parseInt(page)
-  const limitNum = parseInt(limit)
+  const limitNum = Math.min(parseInt(limit) || 20, MAX_PAGE_SIZE)
+
+  const [{ count: unread }] = await db.select({ count: sql<number>`count(*)::int` }).from(alerts)
+    .where(and(eq(alerts.companyId, req.companyId!), eq(alerts.read, false)))
+
+  // Cursor pagination (mobile's infinite-scroll list) — offset pagination shifts every row
+  // whenever a new alert lands mid-scroll, which happens constantly on a live alerts feed. `page`
+  // (web's existing offset UI) still works unchanged so the dashboard needed no rewrite.
+  if (cursor || page === undefined) {
+    if (cursor) conditions.push(lt(alerts.createdAt, new Date(cursor)))
+
+    const list = await db.select().from(alerts)
+      .where(and(...conditions))
+      .orderBy(desc(alerts.createdAt))
+      .limit(limitNum + 1)
+
+    const hasMore = list.length > limitNum
+    const page2 = hasMore ? list.slice(0, limitNum) : list
+    const nextCursor = hasMore ? page2[page2.length - 1].createdAt.toISOString() : null
+
+    return res.success({ alerts: page2, unread, nextCursor })
+  }
+
+  const pageNum = parseInt(page) || 1
 
   const [{ count: total }] = await db.select({ count: sql<number>`count(*)::int` }).from(alerts).where(and(...conditions))
 
@@ -28,9 +52,6 @@ router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
     .orderBy(desc(alerts.createdAt))
     .offset((pageNum - 1) * limitNum)
     .limit(limitNum)
-
-  const [{ count: unread }] = await db.select({ count: sql<number>`count(*)::int` }).from(alerts)
-    .where(and(eq(alerts.companyId, req.companyId!), eq(alerts.read, false)))
 
   return res.success({ alerts: list, total, unread, page: pageNum })
 }))

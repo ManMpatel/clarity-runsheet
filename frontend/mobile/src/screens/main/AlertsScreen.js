@@ -1,145 +1,193 @@
-import { useEffect, useState } from 'react'
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
-import { MaterialIcons } from '@expo/vector-icons'
+import { useEffect, useMemo, useState } from 'react'
+import { View, Text, Pressable, ActivityIndicator } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { FlashList } from '@shopify/flash-list'
+import { BellOff, Gauge, Clock, Wrench, BatteryWarning, MapPinOff, Truck, Siren, Cable } from 'lucide-react-native'
 import api from '../../lib/api'
-import { colors, radius, spacing } from '../../lib/theme'
-import TopBar from '../../components/TopBar'
+import { useTheme } from '../../theme'
+import { EmptyState, ErrorState, Skeleton } from '../../components/ui'
+import { useFleetSocket } from '../../hooks/useSocket'
 
-const SEVERITY_COLORS= { critical: '#dc2626', warning: '#d97706', info: colors.primary }
-const TYPE_LABELS = {
-  afterHours: 'After Hours', speeding: 'Speeding', engineFault: 'Engine Fault',
-  lowBattery: 'Low Battery', geofenceBreach: 'Geofence Breach', towing: 'Towing Detected',
-  crash: 'Crash Detected', maintenanceDue: 'Maintenance Due', tamper: 'Tamper / Power Cut',
+const TYPE_META = {
+  afterHours:     { label: 'After Hours',       icon: Clock,          severity: 'warning' },
+  speeding:       { label: 'Speeding',          icon: Gauge,          severity: 'warning' },
+  engineFault:    { label: 'Engine Fault',      icon: Wrench,         severity: 'critical' },
+  lowBattery:     { label: 'Low Battery',       icon: BatteryWarning, severity: 'warning' },
+  geofenceBreach: { label: 'Geofence Breach',   icon: MapPinOff,      severity: 'warning' },
+  towing:         { label: 'Towing Detected',   icon: Truck,          severity: 'critical' },
+  crash:          { label: 'Crash Detected',    icon: Siren,          severity: 'critical' },
+  maintenanceDue: { label: 'Maintenance Due',   icon: Wrench,         severity: 'info' },
+  tamper:         { label: 'Tamper / Power Cut',icon: Cable,          severity: 'critical' },
+}
+
+function dayLabel(dateStr) {
+  const d = new Date(dateStr)
+  const today = new Date()
+  const yesterday = new Date(Date.now() - 86400000)
+  if (d.toDateString() === today.toDateString()) return 'Today'
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday'
+  return d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'short' })
 }
 
 export default function AlertsScreen() {
-  const [alerts, setAlerts]   = useState([])
+  const { colors, space, radius, type } = useTheme()
+  const insets = useSafeAreaInsets()
+
+  const [alerts, setAlerts] = useState([])
+  const [unread, setUnread] = useState(0)
+  const [cursor, setCursor] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error, setError] = useState(null)
 
   useEffect(() => { load() }, [])
 
+  // Live alerts arrive over the socket while the app's open (backend broadcasts both a socket
+  // emit and a push for every fired alert — see fireAlert in processors/alerts.ts) — prepend them
+  // rather than waiting for the next pull-to-refresh.
+  useFleetSocket({
+    onAlert: (alert) => {
+      setAlerts((list) => [alert, ...list])
+      setUnread((u) => u + 1)
+    },
+  })
+
   async function load() {
+    setLoading(true)
+    setError(null)
     try {
-      const res = await api.get('/alerts?limit=50')
+      const res = await api.get('/alerts?limit=25')
       setAlerts(res.data.alerts || [])
+      setUnread(res.data.unread || 0)
+      setCursor(res.data.nextCursor || null)
     } catch (err) {
-      setError(err.response?.data?.error || 'Could not load alerts')
+      setError(err.response?.data?.message || 'Could not load alerts')
     } finally {
       setLoading(false)
     }
   }
 
+  async function loadMore() {
+    if (!cursor || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const res = await api.get(`/alerts?limit=25&cursor=${encodeURIComponent(cursor)}`)
+      setAlerts((list) => [...list, ...(res.data.alerts || [])])
+      setCursor(res.data.nextCursor || null)
+    } catch (err) {
+      console.log(err.message)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
   async function markRead(id) {
+    setAlerts((list) => list.map((a) => (a.id === id ? { ...a, read: true } : a)))
+    setUnread((u) => Math.max(0, u - 1))
     try {
       await api.put(`/alerts/${id}/read`)
-      setAlerts(a => a.map(x => x.id === id ? { ...x, read: true } : x))
     } catch (err) {
       console.log(err.message)
     }
   }
 
   async function markAllRead() {
+    setAlerts((list) => list.map((a) => ({ ...a, read: true })))
+    setUnread(0)
     try {
       await api.put('/alerts/read-all')
-      setAlerts(a => a.map(x => ({ ...x, read: true })))
     } catch (err) {
       console.log(err.message)
     }
   }
 
-  function formatDate(date) {
-    return new Date(date).toLocaleString('en-AU', { day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit' })
-  }
+  const grouped = useMemo(() => {
+    const groups = []
+    let currentDay = null
+    for (const alert of alerts) {
+      const day = new Date(alert.createdAt).toDateString()
+      if (day !== currentDay) {
+        currentDay = day
+        groups.push({ type: 'header', id: `h-${day}`, label: dayLabel(alert.createdAt) })
+      }
+      groups.push({ type: 'alert', id: alert.id, alert })
+    }
+    return groups
+  }, [alerts])
 
-  const unreadCount = alerts.filter(a => !a.read).length
-
-  if (loading) {
-    return <View style={styles.center}><ActivityIndicator size='large' color={colors.primary} /></View>
-  }
-
-  if (error) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.errorTitle}>Couldn't load alerts</Text>
-        <Text style={styles.errorSub}>{error}</Text>
-      </View>
-    )
-  }
+  if (error) return <ErrorState message={error} onRetry={load} />
 
   return (
-    <View style={styles.container}>
-      <TopBar />
-      <View style={styles.header}>
+    <View style={{ flex: 1, backgroundColor: colors.canvas, paddingTop: insets.top }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: space.lg, paddingBottom: space.md }}>
         <View>
-          <Text style={styles.headerTitle}>Alerts</Text>
-          {unreadCount > 0 && <Text style={styles.headerSub}>{unreadCount} new</Text>}
+          <Text style={[type.title1, { color: colors.fg }]}>Alerts</Text>
+          {unread > 0 && <Text style={[type.caption, { color: colors.fgMuted, marginTop: 2 }]}>{unread} new</Text>}
         </View>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={markAllRead}>
-            <Text style={styles.markAllText}>Mark all read</Text>
-          </TouchableOpacity>
+        {unread > 0 && (
+          <Pressable onPress={markAllRead} hitSlop={8} style={{ marginTop: space.xs }}>
+            <Text style={[type.captionMedium, { color: colors.accent }]}>Mark all read</Text>
+          </Pressable>
         )}
       </View>
 
-      <FlatList
-        data={alerts}
-        keyExtractor={(item, i) => item.id || String(i)}
-        ListEmptyComponent={
-          <View style={styles.center}>
-            <View style={styles.emptyIcon}>
-              <MaterialIcons name='check-circle-outline' size={28} color={colors.textSecondary} />
-            </View>
-            <Text style={styles.errorTitle}>All caught up</Text>
-            <Text style={styles.errorSub}>You're all caught up</Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.row, !item.read && styles.unreadRow]}
-            onPress={() => !item.read && markRead(item.id)}
-          >
-            <View style={[styles.dot, { backgroundColor: SEVERITY_COLORS[item.severity] || SEVERITY_COLORS.info }]} />
-            <View style={styles.rowContent}>
-              <View style={styles.rowTop}>
-                <Text style={styles.type}>{TYPE_LABELS[item.type] || item.type}</Text>
-                <Text style={styles.date}>{formatDate(item.createdAt)}</Text>
-              </View>
-              <Text style={styles.message}>{item.message}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
+      {loading ? (
+        <View style={{ paddingHorizontal: space.lg }}>
+          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} height={64} radius={radius.md} style={{ marginBottom: space.sm }} />)}
+        </View>
+      ) : (
+        <FlashList
+          data={grouped}
+          keyExtractor={(item) => item.id}
+          estimatedItemSize={76}
+          contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space['5xl'] }}
+          onEndReachedThreshold={0.4}
+          onEndReached={loadMore}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accent} style={{ marginVertical: space.md }} /> : null}
+          ListEmptyComponent={<EmptyState icon={<BellOff size={36} color={colors.fgSubtle} />} title="You're all caught up" message='New alerts will show up here' />}
+          renderItem={({ item }) =>
+            item.type === 'header' ? (
+              <Text style={[type.captionMedium, { color: colors.fgMuted, marginTop: space.md, marginBottom: space.sm }]}>{item.label}</Text>
+            ) : (
+              <AlertRow alert={item.alert} onPress={() => !item.alert.read && markRead(item.alert.id)} />
+            )
+          }
+        />
+      )}
     </View>
   )
 }
 
-const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-    paddingHorizontal: spacing.margin, paddingTop: 12, paddingBottom: 12,
-  },
-  headerTitle: { fontSize: 24, fontWeight: '700', color: colors.textPrimary },
-  headerSub:   { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  markAllText: { fontSize: 13, color: colors.primary, fontWeight: '600', marginTop: 6 },
-  center:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  emptyIcon: {
-    width: 56, height: 56, borderRadius: radius.lg, backgroundColor: colors.surface,
-    alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  errorTitle:  { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 6 },
-  errorSub:    { fontSize: 13, color: colors.textSecondary, textAlign: 'center', paddingHorizontal: 24 },
-  row: {
-    flexDirection: 'row', paddingHorizontal: spacing.margin, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: colors.border, alignItems: 'flex-start',
-  },
-  unreadRow:   { backgroundColor: '#eff4ff' },
-  dot:         { width: 10, height: 10, borderRadius: 5, marginTop: 5, marginRight: 12 },
-  rowContent:  { flex: 1 },
-  rowTop:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 },
-  type:        { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
-  date:        { fontSize: 12, color: colors.textSecondary },
-  message:     { fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
-})
+function AlertRow({ alert, onPress }) {
+  const { colors, space, radius, type } = useTheme()
+  const meta = TYPE_META[alert.type] || { label: alert.type, icon: BellOff, severity: 'info' }
+  const Icon = meta.icon
+  const railColor = { critical: colors.danger, warning: colors.warning, info: colors.info }[alert.severity || meta.severity]
+
+  return (
+    <Pressable onPress={onPress} style={{ marginBottom: space.sm }}>
+      <View style={{
+        flexDirection: 'row', backgroundColor: alert.read ? colors.surface : colors.accentSoft,
+        borderRadius: radius.md, overflow: 'hidden',
+      }}>
+        <View style={{ width: 4, backgroundColor: railColor }} />
+        <View style={{ flex: 1, flexDirection: 'row', padding: space.md, alignItems: 'flex-start' }}>
+          <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: railColor + '1F', alignItems: 'center', justifyContent: 'center', marginRight: space.md }}>
+            <Icon size={16} color={railColor} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={[type.bodySemibold, { color: colors.fg }]}>{meta.label}</Text>
+              <Text style={[type.micro, { color: colors.fgSubtle }]}>
+                {new Date(alert.createdAt).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' })}
+              </Text>
+            </View>
+            <Text style={[type.caption, { color: colors.fgMuted, marginTop: 2 }]}>{alert.message}</Text>
+          </View>
+          {!alert.read && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent, marginLeft: space.sm, marginTop: 6 }} />}
+        </View>
+      </View>
+    </Pressable>
+  )
+}

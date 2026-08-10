@@ -6,19 +6,22 @@
 // 'done'/'failed' with resultUrl/error/completedAt when it finishes.
 //
 // GAP (flagged for the user): there's no blob/file storage service wired up anywhere else in
-// this migration (no S3 client, no static-file route registered in entrypoints/api.ts — which is
-// out of scope for this port). Report output is written as JSON to a local
-// backend/storage/reports/ directory and `resultUrl` is set to that relative path. This works for
-// a single-instance deployment but won't survive a restart/redeploy or work across multiple API
-// instances, and nothing currently serves that directory over HTTP — wiring an actual
-// static-file/download route is a follow-up outside this file's scope.
+// this migration (no S3 client). Report output is written as JSON to a local
+// backend/storage/reports/ directory. This works for a single-instance deployment but won't
+// survive a restart/redeploy or work across multiple API instances.
+//
+// `resultUrl` is an authenticated API path (`GET /api/v1/reports/:id/download`, see
+// routes/reports-async.ts), not a static file path — the directory used to be served directly
+// via `express.static` with no auth check at all, which let anyone who guessed/observed a job's
+// UUID download another tenant's report. The download route re-checks req.companyId against the
+// job's companyId before streaming the file.
 import fs from 'fs'
 import path from 'path'
 import { and, eq, gte, lte } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { reportJobs, safetyScores, telemetry, trips, vehicles, vehicleState } from '../../db/schema'
 
-const REPORTS_DIR = path.join(__dirname, '..', '..', '..', 'storage', 'reports')
+export const REPORTS_DIR = path.join(__dirname, '..', '..', '..', 'storage', 'reports')
 
 function ensureReportsDir() {
   fs.mkdirSync(REPORTS_DIR, { recursive: true })
@@ -53,7 +56,7 @@ async function runReport(jobId: string, type: string, companyId: string, params:
 
     await db.update(reportJobs).set({
       status: 'done',
-      resultUrl: `/storage/reports/${filename}`,
+      resultUrl: `/api/v1/reports/${jobId}/download`,
       completedAt: new Date(),
     }).where(eq(reportJobs.id, jobId))
   } catch (err: any) {

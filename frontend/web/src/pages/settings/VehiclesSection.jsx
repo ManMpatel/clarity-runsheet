@@ -49,17 +49,18 @@ function KebabMenu({ onEdit, onDelete }) {
   )
 }
 
-function EngineToggle({ immobilised, onCut, onRestore }) {
+function EngineToggle({ immobilised, pending, onCut, onRestore }) {
   return (
     <button
+      disabled={!!pending}
       onClick={(e) => { e.stopPropagation(); immobilised ? onRestore() : onCut() }}
-      className={`relative w-14 h-7 rounded-full transition-colors ${immobilised ? 'bg-green-500' : 'bg-red-500'}`}>
+      className={`relative w-14 h-7 rounded-full transition-colors ${immobilised ? 'bg-green-500' : 'bg-red-500'} ${pending ? 'opacity-50 cursor-wait' : ''}`}>
       <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${immobilised ? '' : 'translate-x-7'}`} />
     </button>
   )
 }
 
-function VehicleDrawer({ vehicle, status, onClose, onCut, onRestore }) {
+function VehicleDrawer({ vehicle, status, pending, onClose, onCut, onRestore }) {
   if (!vehicle) return null
   const s = status || { state: 'offline', lastSeen: null }
 
@@ -95,10 +96,13 @@ function VehicleDrawer({ vehicle, status, onClose, onCut, onRestore }) {
           <div className='flex items-center justify-between'>
             <div>
               <p className='text-sm font-semibold text-gray-900 dark:text-white'>Engine power</p>
-              <p className='text-xs text-gray-400'>{vehicle.immobilised ? 'Running normally' : 'Fuel currently cut'}</p>
+              <p className='text-xs text-gray-400'>
+                {pending ? `Confirming ${pending} with device…` : vehicle.immobilised ? 'Running normally' : 'Fuel currently cut'}
+              </p>
             </div>
             <EngineToggle
               immobilised={vehicle.immobilised}
+              pending={pending}
               onCut={() => onCut(vehicle.id)}
               onRestore={() => onRestore(vehicle.id)}
             />
@@ -116,6 +120,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
   const [form, setForm]         = useState({ name: '', imei: '', registration: '', make: '', model: '', year: '' })
   const [status, setStatus]     = useState({})
   const [toast, setToast]       = useState(null)
+  const [pendingCommand, setPendingCommand] = useState({}) // { [vehicleId]: 'cut' | 'restore' | null }
 
   useEffect(() => {
     if (vehicles.length === 0) return
@@ -155,24 +160,60 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
     setSelected(s => s && s.id === id ? { ...s, immobilised } : s)
   }
 
+  // POST /:id/cut|restore now returns 202 the instant the command is handed to the device socket
+  // — it used to block the whole request for up to 60s waiting for the device to ack (backend/src/
+  // modules/fleet/routes/vehicles.ts). This polls the new status endpoint client-side instead, so
+  // the UI can show a pending state rather than an unresponsive button, and only flips the switch
+  // once the device has actually confirmed — an optimistic flip here would lie if the device never
+  // acks (e.g. it's out of signal).
+  const COMMAND_POLL_INTERVAL_MS = 2000
+  const COMMAND_POLL_MAX_ATTEMPTS = 30
+
+  async function pollCommandStatus(id) {
+    for (let attempt = 0; attempt < COMMAND_POLL_MAX_ATTEMPTS; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, COMMAND_POLL_INTERVAL_MS))
+      const res = await api.get(`/vehicles/${id}/command-status`)
+      if (res.data.status === 'acked' || res.data.status === 'timeout') return res.data
+    }
+    return { status: 'timeout' }
+  }
+
   async function cutVehicle(id) {
     if (!confirm('This will cut fuel/ignition on this vehicle. Are you sure?')) return
+    setPendingCommand(p => ({ ...p, [id]: 'cut' }))
     try {
       await api.post(`/vehicles/${id}/cut`)
-      updateImmobilised(id, true)
-      setToast({ message: 'Cut command sent', type: 'success' })
+      setToast({ message: 'Cut command sent — confirming with device…', type: 'success' })
+      const result = await pollCommandStatus(id)
+      if (result.status === 'acked') {
+        updateImmobilised(id, true)
+        setToast({ message: 'Vehicle immobilised', type: 'success' })
+      } else {
+        setToast({ message: 'Device did not confirm the cut command — it may be out of signal', type: 'error' })
+      }
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Failed to send cut command', type: 'error' })
+    } finally {
+      setPendingCommand(p => ({ ...p, [id]: null }))
     }
   }
 
   async function restoreVehicle(id) {
+    setPendingCommand(p => ({ ...p, [id]: 'restore' }))
     try {
       await api.post(`/vehicles/${id}/restore`)
-      updateImmobilised(id, false)
-      setToast({ message: 'Restore command sent', type: 'success' })
+      setToast({ message: 'Restore command sent — confirming with device…', type: 'success' })
+      const result = await pollCommandStatus(id)
+      if (result.status === 'acked') {
+        updateImmobilised(id, false)
+        setToast({ message: 'Vehicle restored', type: 'success' })
+      } else {
+        setToast({ message: 'Device did not confirm the restore command — it may be out of signal', type: 'error' })
+      }
     } catch (err) {
       setToast({ message: err.response?.data?.error || 'Failed to send restore command', type: 'error' })
+    } finally {
+      setPendingCommand(p => ({ ...p, [id]: null }))
     }
   }
 
@@ -268,6 +309,7 @@ export default function VehiclesSection({ vehicles, setVehicles, loading }) {
       <VehicleDrawer
         vehicle={selected}
         status={selected ? status[selected.id] : null}
+        pending={selected ? pendingCommand[selected.id] : null}
         onClose={() => setSelected(null)}
         onCut={cutVehicle}
         onRestore={restoreVehicle}

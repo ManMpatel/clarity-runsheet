@@ -1,109 +1,170 @@
 import { useEffect } from 'react'
-import { ActivityIndicator, View } from 'react-native'
-import { MaterialIcons } from '@expo/vector-icons'
+import { View, ActivityIndicator, StyleSheet } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { BlurView } from 'expo-blur'
+import { MapPin, Route as RouteIcon, Bell, CircleUserRound } from 'lucide-react-native'
 import { useAuthStore } from '../stores/authStore'
+import { useTheme } from '../theme'
+import { useUnreadAlertCount } from '../hooks/useUnreadAlertCount'
+import { useNotificationDeepLink } from '../hooks/useNotificationDeepLink'
 
+import WelcomeScreen from '../screens/auth/WelcomeScreen'
+import LoginScreen from '../screens/auth/LoginScreen'
+import SignupScreen from '../screens/auth/SignupScreen'
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen'
 
-import LoginScreen    from '../screens/auth/LoginScreen'
-import SignupScreen   from '../screens/auth/SignupScreen'
-import HomeScreen     from '../screens/main/HomeScreen'
-import TripsScreen    from '../screens/main/TripsScreen'
-import AlertsScreen   from '../screens/main/AlertsScreen'
-import ScoreScreen    from '../screens/main/ScoreScreen'
-import SettingsScreen from '../screens/main/SettingsScreen'
-import DriversScreen     from '../screens/main/DriversScreen'
-import MaintenanceScreen from '../screens/main/MaintenanceScreen'
-import ProfileScreen     from '../screens/main/ProfileScreen'
-import CompanyScreen     from '../screens/main/CompanyScreen'
-import VehiclesScreen    from '../screens/main/VehiclesScreen'
-import UsersScreen       from '../screens/main/UsersScreen'
-import FbtLogbookScreen  from '../screens/main/FbtLogbookScreen'
-import GeofenceScreen      from '../screens/main/GeofenceScreen'
-import VehicleHealthScreen from '../screens/main/VehicleHealthScreen'
-import DashcamScreen       from '../screens/main/DashcamScreen'
-import MyPlanScreen        from '../screens/main/MyPlanScreen'
-import ReportsScreen       from '../screens/main/ReportsScreen'
-import UpgradeScreen       from '../screens/main/UpgradeScreen'
-import BillingScreen       from '../screens/main/BillingScreen'
+import MapScreen from '../screens/main/MapScreen'
+import ActivityScreen from '../screens/main/ActivityScreen'
+import TripReplayScreen from '../screens/main/TripReplayScreen'
+import AlertsScreen from '../screens/main/AlertsScreen'
 
-const Stack = createNativeStackNavigator()
-const Tab   = createBottomTabNavigator()
+import AccountHomeScreen from '../screens/account/AccountHomeScreen'
+import ProfileScreen from '../screens/account/ProfileScreen'
+import CompanyScreen from '../screens/account/CompanyScreen'
+import VehiclesScreen from '../screens/account/VehiclesScreen'
+import DriversScreen from '../screens/account/DriversScreen'
+import UsersScreen from '../screens/account/UsersScreen'
+import MaintenanceScreen from '../screens/account/MaintenanceScreen'
+import GeofenceScreen from '../screens/account/GeofenceScreen'
+import VehicleHealthScreen from '../screens/account/VehicleHealthScreen'
+import DashcamScreen from '../screens/account/DashcamScreen'
+import ReportsScreen from '../screens/account/ReportsScreen'
+import MyPlanScreen from '../screens/account/MyPlanScreen'
+import UpgradeScreen from '../screens/account/UpgradeScreen'
+import BillingScreen from '../screens/account/BillingScreen'
+import AppearanceScreen from '../screens/account/AppearanceScreen'
 
-function MainTabs() {
+const RootStack = createNativeStackNavigator()
+const AuthStack = createNativeStackNavigator()
+const Tab = createBottomTabNavigator()
+const AccountStack = createNativeStackNavigator()
+
+function AuthNavigator() {
+  return (
+    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStack.Screen name='Welcome' component={WelcomeScreen} />
+      <AuthStack.Screen name='Login' component={LoginScreen} />
+      <AuthStack.Screen name='Signup' component={SignupScreen} />
+      <AuthStack.Screen name='ForgotPassword' component={ForgotPasswordScreen} />
+    </AuthStack.Navigator>
+  )
+}
+
+// Uber's floating translucent tab bar — position:absolute + a blurred background instead of the
+// RN default opaque bar glued to the bottom edge. `tabBarBackground` is the supported extension
+// point for this in @react-navigation/bottom-tabs v6.
+function TabBarBackground() {
+  const { scheme } = useTheme()
+  return (
+    <BlurView
+      intensity={80}
+      tint={scheme === 'dark' ? 'dark' : 'light'}
+      style={StyleSheet.absoluteFill}
+    />
+  )
+}
+
+function AppTabs() {
+  const { colors, space, radius } = useTheme()
+  const unread = useUnreadAlertCount()
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
-          const icons = {
-            Map:      'map',
-            Trips:    'route',
-            Alerts:   'notifications',
-            Score:    'speed',
-            Settings: 'settings',
-          }
-          return <MaterialIcons name={icons[route.name]} size={size} color={color} />
-        },
-        tabBarActiveTintColor:   '#2563eb',
-        tabBarInactiveTintColor: '#9ca3af',
         headerShown: false,
+        tabBarShowLabel: true,
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.fgSubtle,
+        tabBarBackground: () => <TabBarBackground />,
+        tabBarStyle: {
+          position: 'absolute',
+          left: space.lg,
+          right: space.lg,
+          bottom: space.lg,
+          height: 64,
+          borderRadius: radius.xl,
+          borderTopWidth: 0,
+          overflow: 'hidden',
+          elevation: 8,
+          shadowColor: '#000',
+          shadowOpacity: 0.15,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
+        },
+        tabBarItemStyle: { paddingTop: 8 },
+        tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+        tabBarIcon: ({ color, size, focused }) => {
+          const props = { color, size: size - 2, strokeWidth: focused ? 2.4 : 2 }
+          if (route.name === 'Map') return <MapPin {...props} />
+          if (route.name === 'Activity') return <RouteIcon {...props} />
+          if (route.name === 'Alerts') return <Bell {...props} />
+          if (route.name === 'Account') return <CircleUserRound {...props} />
+          return null
+        },
+        tabBarBadge: route.name === 'Alerts' && unread > 0 ? unread : undefined,
+        tabBarBadgeStyle: { backgroundColor: colors.danger, fontFamily: 'Inter_600SemiBold', fontSize: 10 },
       })}
     >
-      <Tab.Screen name='Map'      component={HomeScreen} />
-      <Tab.Screen name='Trips'    component={TripsScreen} />
-      <Tab.Screen name='Alerts'   component={AlertsScreen} />
-      <Tab.Screen name='Score'    component={ScoreScreen} />
-      <Tab.Screen name='Settings' component={SettingsStack} />
+      <Tab.Screen name='Map' component={MapScreen} />
+      <Tab.Screen name='Activity' component={ActivityScreen} />
+      <Tab.Screen name='Alerts' component={AlertsScreen} />
+      <Tab.Screen name='Account' component={AccountNavigator} />
     </Tab.Navigator>
   )
 }
 
-function SettingsStack() {
+// Every screen here renders `headerShown:false` and draws its own <Header/> (see components/ui/
+// Header.js) so the back chevron, title, and safe-area padding are identical everywhere —
+// AccountHomeScreen is the one exception, which draws its own large-title layout instead since
+// it's a tab root with no back button.
+function AccountNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: true }}>
-      <Stack.Screen name='SettingsHome' component={SettingsScreen} options={{ title: 'Settings' }} />
-      <Stack.Screen name='Profile' component={ProfileScreen} options={{ title: 'Profile' }} />
-      <Stack.Screen name='Company' component={CompanyScreen} options={{ title: 'Company' }} />
-      <Stack.Screen name='Vehicles' component={VehiclesScreen} options={{ title: 'Vehicles' }} />
-      <Stack.Screen name='Drivers' component={DriversScreen} options={{ title: 'Drivers' }} />
-      <Stack.Screen name='Users' component={UsersScreen} options={{ title: 'Users' }} />
-      <Stack.Screen name='Maintenance' component={MaintenanceScreen} options={{ title: 'Maintenance' }} />
-      <Stack.Screen name='FbtLogbook' component={FbtLogbookScreen} options={{ title: 'FBT Logbook' }} />
-      <Stack.Screen name='Geofence' component={GeofenceScreen} options={{ title: 'Geofence Manager' }} />
-      <Stack.Screen name='VehicleHealth' component={VehicleHealthScreen} options={{ title: 'Vehicle Health' }} />
-      <Stack.Screen name='Dashcam' component={DashcamScreen} options={{ title: 'Dashcam' }} />
-      <Stack.Screen name='MyPlan' component={MyPlanScreen} options={{ title: 'My Plan' }} />
-      <Stack.Screen name='Reports' component={ReportsScreen} options={{ title: 'Reports' }} />
-      <Stack.Screen name='Upgrade' component={UpgradeScreen} options={{ title: 'Upgrade' }} />
-      <Stack.Screen name='Billing' component={BillingScreen} options={{ title: 'Billing' }} />
-    </Stack.Navigator>
+    <AccountStack.Navigator screenOptions={{ headerShown: false }}>
+      <AccountStack.Screen name='AccountHome' component={AccountHomeScreen} />
+      <AccountStack.Screen name='Profile' component={ProfileScreen} />
+      <AccountStack.Screen name='Company' component={CompanyScreen} />
+      <AccountStack.Screen name='Vehicles' component={VehiclesScreen} />
+      <AccountStack.Screen name='Drivers' component={DriversScreen} />
+      <AccountStack.Screen name='Users' component={UsersScreen} />
+      <AccountStack.Screen name='Maintenance' component={MaintenanceScreen} />
+      <AccountStack.Screen name='Geofence' component={GeofenceScreen} />
+      <AccountStack.Screen name='VehicleHealth' component={VehicleHealthScreen} />
+      <AccountStack.Screen name='Dashcam' component={DashcamScreen} />
+      <AccountStack.Screen name='Reports' component={ReportsScreen} />
+      <AccountStack.Screen name='MyPlan' component={MyPlanScreen} />
+      <AccountStack.Screen name='Upgrade' component={UpgradeScreen} />
+      <AccountStack.Screen name='Billing' component={BillingScreen} />
+      <AccountStack.Screen name='Appearance' component={AppearanceScreen} />
+    </AccountStack.Navigator>
   )
 }
 
 export default function RootNavigator() {
+  const { colors } = useTheme()
   const { user, loading, init } = useAuthStore()
 
   useEffect(() => { init() }, [])
+  useNotificationDeepLink()
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size='large' color='#2563eb' />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas }}>
+        <ActivityIndicator size='large' color={colors.accent} />
       </View>
     )
   }
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
       {user ? (
-        <Stack.Screen name='Main' component={MainTabs} />
-      ) : (
         <>
-          <Stack.Screen name='Login' component={LoginScreen} />
-          <Stack.Screen name='Signup' component={SignupScreen} />
+          <RootStack.Screen name='Tabs' component={AppTabs} />
+          <RootStack.Screen name='TripReplay' component={TripReplayScreen} options={{ presentation: 'modal' }} />
         </>
+      ) : (
+        <RootStack.Screen name='Auth' component={AuthNavigator} />
       )}
-    </Stack.Navigator>
+    </RootStack.Navigator>
   )
 }

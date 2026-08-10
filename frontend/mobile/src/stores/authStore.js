@@ -12,14 +12,37 @@ import api, {
 
 const USER_KEY = 'user'
 
-export const useAuthStore = create((set) => ({
+// {locked:0, entry:1, mid:2, top:3} — mirrors frontend/web/src/components/layout/nav-config.js's
+// hasTier(), which itself mirrors the backend's requireTier ranking (auth-guard.ts). Kept here
+// (not a shared package — see lib/pricing.js's same comment) so mobile's tier gates
+// (components/ui/TierGate.js) show/hide the exact same screens the API will actually allow.
+const TIER_LEVELS = { locked: 0, entry: 1, mid: 2, top: 3 }
+
+// Every login path (password, Google, cold-start refresh) needs the same four claims pulled off
+// the same JWT payload — factored out so a fifth claim never gets added to three of the four call
+// sites and forgotten in the last one.
+function claimsFromToken(accessToken) {
+  const payload = decodeJwt(accessToken)
+  return {
+    companyId: payload.companyId || null,
+    role: payload.role || null,
+    subscriptionTier: payload.subscriptionTier || null,
+    accountType: payload.accountType || null,
+  }
+}
+
+export const useAuthStore = create((set, get) => ({
   user:    null,
   loading: true,
 
   // Populated from the decoded access token so screens can read companyId/role without each
-  // one re-decoding the JWT themselves (used by HomeScreen.js's socket wiring, for one).
+  // one re-decoding the JWT themselves (used by hooks/useSocket.js, for one).
   companyId: null,
   role:      null,
+  subscriptionTier: null,
+  accountType:      null,
+
+  hasTier: (minTier) => (TIER_LEVELS[get().subscriptionTier || 'entry'] || 0) >= (TIER_LEVELS[minTier] || 0),
 
   // On cold start there's no access token in memory (it was never persisted), only the refresh
   // token in SecureStore. Exchange it for a fresh access token immediately; if that fails
@@ -40,19 +63,13 @@ export const useAuthStore = create((set) => ({
 
       const userStr = await SecureStore.getItemAsync(USER_KEY)
       const user = userStr ? JSON.parse(userStr) : null
-      const payload = decodeJwt(accessToken)
 
-      set({
-        user,
-        companyId: payload.companyId || null,
-        role:      payload.role || null,
-        loading:   false,
-      })
+      set({ user, ...claimsFromToken(accessToken), loading: false })
     } catch {
       clearAccessToken()
       await setRefreshToken(null)
       await SecureStore.deleteItemAsync(USER_KEY)
-      set({ user: null, companyId: null, role: null, loading: false })
+      set({ user: null, companyId: null, role: null, subscriptionTier: null, accountType: null, loading: false })
     }
   },
 
@@ -64,8 +81,7 @@ export const useAuthStore = create((set) => ({
     await setRefreshToken(refreshToken)
     await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user))
 
-    const payload = decodeJwt(accessToken)
-    set({ user, companyId: payload.companyId || null, role: payload.role || null })
+    set({ user, ...claimsFromToken(accessToken) })
 
     registerForPushNotifications().catch(console.warn)
     return user
@@ -79,8 +95,7 @@ export const useAuthStore = create((set) => ({
     await setRefreshToken(refreshToken)
     await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user))
 
-    const payload = decodeJwt(accessToken)
-    set({ user, companyId: payload.companyId || null, role: payload.role || null })
+    set({ user, ...claimsFromToken(accessToken) })
 
     registerForPushNotifications().catch(console.warn)
     return user
@@ -96,7 +111,7 @@ export const useAuthStore = create((set) => ({
     clearAccessToken()
     await setRefreshToken(null)
     await SecureStore.deleteItemAsync(USER_KEY)
-    set({ user: null, companyId: null, role: null })
+    set({ user: null, companyId: null, role: null, subscriptionTier: null, accountType: null })
   },
 }))
 
@@ -105,5 +120,5 @@ export const useAuthStore = create((set) => ({
 // comment above registerLogoutHandler in lib/api.js for why.
 registerLogoutHandler(() => {
   SecureStore.deleteItemAsync(USER_KEY).catch(() => {})
-  useAuthStore.setState({ user: null, companyId: null, role: null })
+  useAuthStore.setState({ user: null, companyId: null, role: null, subscriptionTier: null, accountType: null })
 })

@@ -7,6 +7,7 @@ import { db } from '../../../db/client'
 import { drivers, driverHistory, safetyScores } from '../../../db/schema'
 import { requireAuth, requireRole, requireCompany } from '../../../middleware/auth-guard'
 import { asyncRoute } from '../../../middleware/response-envelope'
+import { idempotent } from '../../../middleware/idempotency'
 
 const router = express.Router()
 
@@ -42,7 +43,7 @@ router.get('/:id/history', requireAuth, requireCompany, asyncRoute(async (req, r
   return res.success(history)
 }))
 
-router.post('/', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), asyncRoute(async (req, res) => {
+router.post('/', requireAuth, requireCompany, requireRole('companyAdmin', 'superAdmin'), idempotent, asyncRoute(async (req, res) => {
   const { name, email, mobile, licenceNumber, licenceExpiry, vehicleId } = req.body
   if (!name || !mobile || !email) {
     return res.fail(null, 'Name, email and mobile required')

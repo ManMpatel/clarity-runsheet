@@ -8,10 +8,10 @@
 // GOOGLE_CLIENT_ID from process.env at module-load time. Being the first import guarantees env
 // vars are loaded before anything else that depends on them at import time.
 import 'dotenv/config'
-import path from 'path'
 import express from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import compression from 'compression'
 import passport from '../modules/auth/passport'
 import { responseEnvelope, errorHandler } from '../middleware/response-envelope'
 import { platform } from '../middleware/platform'
@@ -43,6 +43,12 @@ import reportsAsyncRoutes from '../modules/fleet/routes/reports-async'
 const app = express()
 const PORT = process.env.PORT || 3000
 
+// Required for express-rate-limit / req.ip to resolve the real client IP instead of the reverse
+// proxy's (nginx sits in front in every deployed environment per VPS migration plan.txt) — without
+// this every request behind the proxy resolved to the same IP and the whole user base shared one
+// rate-limit bucket. `1` trusts exactly one hop (the proxy), not an arbitrary X-Forwarded-For chain.
+app.set('trust proxy', 1)
+
 // CORS scoped to the web origins only — mobile requests aren't subject to CORS at all, that's a
 // browser-only mechanism. `credentials: true` is required for the httpOnly refresh cookie to be
 // sent/received cross-origin from the dashboard's dev server.
@@ -69,6 +75,9 @@ app.use(cors({
   credentials: true
 }))
 app.use(cookieParser())
+// Cellular data is the scarce resource here (see README's TCP re-write section on SIM data
+// budgets) — gzip everything so the same concern extends to the REST responses mobile pulls.
+app.use(compression())
 
 // Stripe's webhook needs the raw body for signature verification — must be registered before
 // express.json() touches the request. Same ordering constraint as the original.
@@ -83,10 +92,10 @@ app.use(passport.initialize())
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }))
 
-// Serves the async report-job output written by fleet/reports-queue.ts. Single-instance-only —
-// flagged there as a follow-up to move to real blob storage (S3 etc.) if this is ever
-// horizontally scaled; this is the minimal fix so resultUrl actually resolves to something today.
-app.use('/storage/reports', express.static(path.join(__dirname, '..', '..', 'storage', 'reports')))
+// The async report-job output (fleet/reports-queue.ts) used to be served here via
+// `express.static` with zero auth — any client that guessed/observed a job UUID could download
+// another tenant's report. Replaced by an authenticated, company-scoped route:
+// GET /api/v1/reports/:id/download (see fleet/routes/reports-async.ts).
 
 // Web Google OAuth stays outside /api/v1 — it's a browser redirect flow, not a JSON API call.
 app.use('/auth/google', webGoogleRouter)

@@ -19,6 +19,7 @@ import { db } from '../../../db/client'
 import { companies } from '../../../db/schema'
 import { requireAuth, requireCompany } from '../../../middleware/auth-guard'
 import { asyncRoute } from '../../../middleware/response-envelope'
+import { idempotent } from '../../../middleware/idempotency'
 
 // Stripe billing is optional in dev/self-hosted setups — constructing the client eagerly with an
 // empty key throws at import time and takes the whole API process down, so only instantiate it
@@ -51,7 +52,7 @@ router.get('/status', requireAuth, requireCompany, asyncRoute(async (req, res) =
   })
 }))
 
-router.post('/checkout', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+router.post('/checkout', requireAuth, requireCompany, idempotent, asyncRoute(async (req, res) => {
   if (!stripe) return res.fail(null, 'Billing is not configured', 503)
   const { quantity = 1 } = req.body
   const session = await stripe.checkout.sessions.create({

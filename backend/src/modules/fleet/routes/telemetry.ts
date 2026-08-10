@@ -12,21 +12,24 @@ import { asyncRoute } from '../../../middleware/response-envelope'
 const router = express.Router()
 
 router.get('/live', requireAuth, requireCompany, asyncRoute(async (req, res) => {
-  const fleet = await db.select().from(vehicles)
+  // Was one query per vehicle (fleet.map(async v => db.select()...)) — a real fleet-sized N+1
+  // that both frontends poll/socket-refresh constantly. One LEFT JOIN instead, same pattern
+  // already proven in fleet/routes/dashboard.ts's fleetRows query.
+  const rows = await db.select({ vehicle: vehicles, state: vehicleState }).from(vehicles)
+    .leftJoin(vehicleState, eq(vehicleState.vehicleId, vehicles.id))
     .where(and(eq(vehicles.companyId, req.companyId!), eq(vehicles.active, true)))
 
-  const states = await Promise.all(
-    fleet.map(async (v) => {
-      const [state] = await db.select().from(vehicleState).where(eq(vehicleState.vehicleId, v.id)).limit(1)
-      // Both frontend/web and frontend/mobile read state.latitude/state.longitude (a wire-format
-      // contract predating this migration) — see ingestion/processors/enrichment.ts's matching
-      // comment for why the DB columns themselves stay lat/lng.
-      const aliased = state ? { ...state, latitude: state.lat, longitude: state.lng } : null
-      return { vehicle: v, state: aliased }
-    })
-  )
+  const states = rows.map(({ vehicle, state }) => ({
+    vehicle,
+    // Both frontend/web and frontend/mobile read state.latitude/state.longitude (a wire-format
+    // contract predating this migration) — see ingestion/processors/enrichment.ts's matching
+    // comment for why the DB columns themselves stay lat/lng.
+    state: state ? { ...state, latitude: state.lat, longitude: state.lng } : null,
+  }))
   return res.success(states)
 }))
+
+const HISTORY_MAX_LIMIT = 1000
 
 router.get('/history', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   const { vehicleId, from, to, limit = '1000' } = req.query as Record<string, string>
@@ -34,7 +37,22 @@ router.get('/history', requireAuth, requireCompany, asyncRoute(async (req, res) 
     return res.fail(null, 'vehicleId, from, to required')
   }
 
-  const records = await db.select().from(telemetry)
+  // Was `select()` (every column, incl. the `extras` JSONB blob) with an unenforced client-
+  // supplied `limit` — a caller could pass limit=1000000 and get an unbounded, oversized
+  // response. Explicit columns + a hard server-side cap.
+  const records = await db.select({
+    time: telemetry.time,
+    vehicleId: telemetry.vehicleId,
+    lat: telemetry.lat,
+    lng: telemetry.lng,
+    speed: telemetry.speed,
+    angle: telemetry.angle,
+    ignition: telemetry.ignition,
+    odometer: telemetry.odometer,
+    fuelLevel: telemetry.fuelLevel,
+    batteryVoltage: telemetry.batteryVoltage,
+    externalVoltage: telemetry.externalVoltage,
+  }).from(telemetry)
     .where(and(
       eq(telemetry.companyId, req.companyId!),
       eq(telemetry.vehicleId, vehicleId),
@@ -42,7 +60,7 @@ router.get('/history', requireAuth, requireCompany, asyncRoute(async (req, res) 
       lte(telemetry.time, new Date(to)),
     ))
     .orderBy(asc(telemetry.time))
-    .limit(parseInt(limit))
+    .limit(Math.min(parseInt(limit) || HISTORY_MAX_LIMIT, HISTORY_MAX_LIMIT))
 
   return res.success(records)
 }))

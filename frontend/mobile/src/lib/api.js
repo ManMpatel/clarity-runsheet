@@ -31,6 +31,11 @@ export function setAccessToken(token) {
 export function clearAccessToken() {
   accessToken = null
 }
+// Used by hooks/useSocket.js to put the current token on the socket.io handshake — the socket
+// connection lives outside this module and has no other way to read it.
+export function getAccessToken() {
+  return accessToken
+}
 
 // --- Refresh token: persisted in SecureStore -----------------------------------------------
 // Mobile has no cookie jar, so unlike web (httpOnly cookie) the refresh token has to travel in

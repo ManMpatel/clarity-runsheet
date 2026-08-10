@@ -6,6 +6,7 @@
 // for the closed-app path.
 const { Server } = require('socket.io')
 const http = require('http')
+const { verifyAccessToken } = require('../modules/auth/services/tokens')
 
 let io = null
 
@@ -35,13 +36,35 @@ function init() {
     }
   })
 
-  io.on('connection', (socket) => {
-    console.log('[Socket.io] Client connected:', socket.id)
+  // SECURITY: the room a socket joins used to be whatever `companyId` the client passed to
+  // `join:company` — completely unauthenticated, so any client could stream any tenant's live
+  // GPS positions and alerts just by guessing/enumerating a UUID. The room is now derived from
+  // a verified access token at handshake time and joined server-side; the client can no longer
+  // choose which company's data it receives.
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token
+      || socket.handshake.headers?.authorization?.replace(/^Bearer\s+/i, '')
 
-    socket.on('join:company', (companyId) => {
-      socket.join(`company:${companyId}`)
-      console.log(`[Socket.io] ${socket.id} joined company:${companyId}`)
-    })
+    if (!token) return next(new Error('Authentication required'))
+
+    try {
+      const decoded = verifyAccessToken(token)
+      if (!decoded.companyId) return next(new Error('No company context'))
+      socket.companyId = decoded.companyId
+      socket.userId = decoded.userId
+      next()
+    } catch {
+      next(new Error('Invalid or expired token'))
+    }
+  })
+
+  io.on('connection', (socket) => {
+    console.log(`[Socket.io] Client connected: ${socket.id} (company:${socket.companyId})`)
+    socket.join(`company:${socket.companyId}`)
+
+    // Kept as a no-op for backward compatibility with older clients that still emit this on
+    // connect — the room is already joined above from the token, so the argument is ignored.
+    socket.on('join:company', () => {})
 
     socket.on('disconnect', () => {
       console.log('[Socket.io] Client disconnected:', socket.id)

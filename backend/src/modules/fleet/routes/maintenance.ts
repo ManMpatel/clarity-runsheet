@@ -5,6 +5,7 @@ import { db } from '../../../db/client'
 import { maintenance } from '../../../db/schema'
 import { requireAuth, requireRole, requireCompany } from '../../../middleware/auth-guard'
 import { asyncRoute } from '../../../middleware/response-envelope'
+import { idempotent } from '../../../middleware/idempotency'
 
 const router = express.Router()
 
@@ -22,7 +23,7 @@ router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
   return res.success(records)
 }))
 
-router.post('/', requireAuth, requireCompany, requireRole('companyAdmin', 'fleetManager', 'superAdmin'), asyncRoute(async (req, res) => {
+router.post('/', requireAuth, requireCompany, requireRole('companyAdmin', 'fleetManager', 'superAdmin'), idempotent, asyncRoute(async (req, res) => {
   const { vehicleId, type, dueDate, dueOdometer, notes } = req.body
   if (!vehicleId || !type) {
     return res.fail(null, 'Vehicle and type required')

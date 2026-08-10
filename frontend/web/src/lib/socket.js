@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client'
+import { useAuthStore } from '../store/authStore'
 
 /**
  * Ref-counted socket.io singleton.
@@ -38,14 +39,14 @@ export function getSocket() {
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10000,
+    // The server now authenticates the handshake and derives the room from the token itself
+    // (see backend/src/socket/index.ts) rather than trusting a client-supplied companyId. `auth`
+    // is re-evaluated by socket.io-client on every (re)connect attempt, so a token refreshed
+    // between disconnects is picked up automatically without any extra wiring here.
+    auth: (cb) => cb({ token: useAuthStore.getState().accessToken }),
   })
 
-  socket.on('connect', () => {
-    setStatus('connected')
-    // Re-join on every (re)connect: rooms are per-connection server-side, so a reconnect that
-    // skipped this would silently stop delivering updates.
-    if (joinedCompanyId) socket.emit('join:company', joinedCompanyId)
-  })
+  socket.on('connect', () => setStatus('connected'))
   socket.on('disconnect', () => setStatus('disconnected'))
   socket.io.on('reconnect_attempt', () => setStatus('connecting'))
   socket.on('connect_error', () => setStatus('disconnected'))
@@ -53,11 +54,10 @@ export function getSocket() {
   return socket
 }
 
+// Retained only so existing call sites don't need to change; the room is now derived
+// server-side from the authenticated token, so this no longer needs to emit anything.
 export function joinCompany(companyId) {
-  if (!companyId) return
   joinedCompanyId = companyId
-  const s = getSocket()
-  if (s.connected) s.emit('join:company', companyId)
 }
 
 /** Subscribe to a server event. Returns an unsubscribe function. */

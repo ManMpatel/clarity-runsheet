@@ -22,6 +22,7 @@ import { enrichAndSaveVanState } from '../modules/ingestion/processors/enrichmen
 import { startSafetyScoreCron } from '../modules/ingestion/cron/safety-scores'
 import { startMaintenanceCron } from '../modules/ingestion/cron/maintenance-flags'
 import { startLicenceExpiryCron } from '../modules/ingestion/cron/licence-expiry'
+import { startPushReceiptCron } from '../modules/ingestion/cron/push-receipts'
 
 const QUEUE_KEY = 'telemetry_queue'
 const POLL_INTERVAL = 100
@@ -31,6 +32,7 @@ async function start() {
   startSafetyScoreCron()
   startMaintenanceCron()
   startLicenceExpiryCron()
+  startPushReceiptCron()
 
   const redis = getClient()
   console.log('[Ingestion] Started — polling queue')

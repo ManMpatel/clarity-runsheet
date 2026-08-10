@@ -1,0 +1,346 @@
+openapi: 3.1.0
+info:
+  title: Clarity Fleet API
+  version: "1.0.0"
+  description: |
+    Fleet telemetry API serving the web dashboard and the React Native mobile app from one
+    backend. Every `/api/v1/*` response is wrapped in the envelope described below; there is no
+    other documentation of this API today (no prior spec existed), so this file describes the
+    contract as implemented rather than as originally designed.
+
+    ## Auth
+    Bearer JWT access tokens (~15min) in `Authorization: Bearer <token>`, obtained from
+    `/auth/login`, `/auth/google/token`, or rotated via `/auth/refresh`. Refresh tokens are
+    delivered as an httpOnly cookie on web and in the JSON body on mobile (no cookie jar) — see
+    `/auth/refresh` for both shapes.
+
+    ## Realtime
+    Not covered by this REST spec: Socket.IO on a separate port (`SOCKET_PORT`, default 3001).
+    Handshake requires `auth: { token: <access token> }`; the server derives the tenant room from
+    the token and joins it server-side. Events: `van:update`, `alert:new`, both scoped to
+    `company:{companyId}`.
+servers:
+  - url: https://api.clarity-software.com.au/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  headers:
+    IdempotencyKey:
+      description: >
+        Client-generated UUID, one per logical submit. Recognised on mutating POST endpoints
+        (vehicles, drivers, maintenance, geofences, upgrade requests, billing checkout). A retry
+        with the same key + same user replays the first response instead of re-executing.
+      schema:
+        type: string
+  schemas:
+    Envelope:
+      type: object
+      description: Every /api/v1/* response, success or failure, has this shape.
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+        data: {}
+        errors: {}
+      required: [success, message, data, errors]
+    Vehicle:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        companyId: { type: string, format: uuid }
+        name: { type: string }
+        imei: { type: string }
+        registration: { type: string, nullable: true }
+        make: { type: string, nullable: true }
+        model: { type: string, nullable: true }
+        year: { type: integer, nullable: true }
+        tier: { type: string, enum: [entry, mid, top] }
+        active: { type: boolean }
+        immobilised: { type: boolean }
+    VehicleState:
+      type: object
+      properties:
+        vehicleId: { type: string, format: uuid }
+        updatedAt: { type: string, format: date-time }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        speed: { type: integer, nullable: true }
+        ignition: { type: boolean, nullable: true }
+        status: { type: string, enum: [moving, idle, stopped], nullable: true }
+        address: { type: string, nullable: true }
+        todayKm: { type: number, nullable: true }
+    Alert:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [afterHours, speeding, engineFault, lowBattery, geofenceBreach, towing, crash, maintenanceDue, tamper]
+        severity: { type: string, enum: [info, warning, critical] }
+        message: { type: string }
+        read: { type: boolean }
+        createdAt: { type: string, format: date-time }
+    Trip:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        vehicleId: { type: string, format: uuid }
+        vehicleName: { type: string, nullable: true }
+        startTime: { type: string, format: date-time }
+        endTime: { type: string, format: date-time, nullable: true }
+        distanceKm: { type: number, nullable: true }
+        durationMinutes: { type: integer, nullable: true }
+        classification: { type: string, enum: [business, personal], nullable: true }
+  parameters:
+    Page: { name: page, in: query, schema: { type: integer, default: 1 } }
+    Limit: { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+    Cursor:
+      name: cursor
+      in: query
+      description: ISO timestamp cursor from a previous page's `nextCursor`. Takes precedence over `page` when present.
+      schema: { type: string, format: date-time }
+
+paths:
+  /health:
+    get:
+      summary: Liveness check (outside /api/v1, no envelope, no auth)
+      security: []
+      responses:
+        '200': { description: OK }
+
+  /auth/login:
+    post:
+      summary: Email + password login
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties: { email: { type: string }, password: { type: string } }
+      responses:
+        '200':
+          description: accessToken + refreshToken (mobile also gets it in the body) + user
+  /auth/signup:
+    post:
+      summary: Creates a company + companyAdmin user, sends a verification email
+      security: []
+  /auth/refresh:
+    post:
+      summary: Rotates the refresh token, issues a new access token
+      description: Cookie first (web), falls back to `refreshToken` in the request body (mobile).
+      security: []
+  /auth/logout:
+    post:
+      summary: Revokes the current refresh token
+      security: []
+  /auth/me:
+    get:
+      summary: Current user (password hash omitted)
+  /auth/google/token:
+    post:
+      summary: Mobile native Google sign-in — verifies a Google ID token, auto-provisions the user
+      security: []
+  /auth/forgot-password:
+    post: { summary: Non-enumerating password reset email, security: [] }
+  /auth/reset-password:
+    post: { summary: Consumes a reset token, security: [] }
+  /auth/verify-email:
+    get: { summary: Verifies email and logs the user in (returns a token pair), security: [] }
+
+  /vehicles:
+    get:
+      summary: List the company's fleet
+      responses: { '200': { description: "Vehicle[]" } }
+    post:
+      summary: Register a vehicle
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      security: [{ bearerAuth: [] }]
+  /vehicles/status:
+    get:
+      summary: Per-vehicle online/idle/offline bucket derived from vehicle_state age
+  /vehicles/{id}:
+    get: { summary: Get one vehicle }
+    put: { summary: Update a vehicle }
+  /vehicles/{id}/cut:
+    post:
+      summary: Immobilise a vehicle (blocks the fuel/ignition relay)
+      description: >
+        Returns 202 immediately with `{commandId}` once the command is handed to the device
+        socket — it does NOT wait for the device to ack. Refuses (409) if the vehicle is moving
+        or its last telemetry is stale. Poll `/vehicles/{id}/command-status` for the outcome.
+      responses: { '202': { description: Command handed off } }
+  /vehicles/{id}/restore:
+    post: { summary: Restore a previously cut vehicle, responses: { '202': { description: Command handed off } } }
+  /vehicles/{id}/command-status:
+    get:
+      summary: Poll the outcome of the most recent cut/restore command for this vehicle
+      responses:
+        '200':
+          description: "{ status: 'pending'|'acked'|'timeout'|'unknown', immobilised }"
+
+  /telemetry/live:
+    get:
+      summary: Current position + state for every active vehicle in the fleet
+      responses: { '200': { description: "Array of { vehicle: Vehicle, state: VehicleState|null }" } }
+  /telemetry/history:
+    get:
+      summary: Raw telemetry points for one vehicle over a time range (max 1000 rows)
+      parameters:
+        - { name: vehicleId, in: query, required: true, schema: { type: string } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, schema: { type: integer, maximum: 1000 } }
+
+  /dashboard/summary:
+    get:
+      summary: Fleet KPI aggregate — counts, status breakdown, trend, alerts, attention lists
+      parameters: [{ name: days, in: query, schema: { type: integer, minimum: 1, maximum: 30 } }]
+
+  /trips:
+    get:
+      summary: Trip history, paginated
+      description: Cursor pagination (`cursor`/`nextCursor`) when `page` is omitted; offset pagination (`page`) otherwise.
+      parameters:
+        - { name: vehicleId, in: query, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses: { '200': { description: "{ trips: Trip[], total?, page?, nextCursor? }" } }
+  /trips/{id}:
+    get: { summary: Get one trip }
+  /trips/{id}/replay:
+    get:
+      summary: Trip + decimated telemetry points for map replay (server-capped at 2000 points)
+      responses: { '200': { description: "{ trip: Trip, points: [{time,lat,lng,speed,angle}] }" } }
+
+  /drivers:
+    get: { summary: List drivers }
+    post: { summary: Register a driver, parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }] }
+  /drivers/{id}: { get: { summary: Get one driver } }
+  /drivers/{id}/score: { get: { summary: Last 12 weekly safety scores } }
+  /drivers/{id}/history: { get: { summary: Permanent vehicle-assignment history log } }
+  /drivers/{id}/assign-vehicle: { put: { summary: Assign/unassign a driver's vehicle } }
+
+  /alerts:
+    get:
+      summary: List alerts, paginated
+      description: Cursor pagination (`cursor`/`nextCursor`) when `page` is omitted; offset pagination (`page`) otherwise.
+      parameters:
+        - { name: type, in: query, schema: { type: string } }
+        - { name: severity, in: query, schema: { type: string } }
+        - { name: read, in: query, schema: { type: boolean } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - { $ref: '#/components/parameters/Cursor' }
+      responses: { '200': { description: "{ alerts: Alert[], unread, total?, page?, nextCursor? }" } }
+  /alerts/{id}/read: { put: { summary: Mark one alert read } }
+  /alerts/read-all: { put: { summary: Mark every alert read } }
+  /alerts/preferences:
+    get: { summary: Company-wide alert type toggles + thresholds }
+    post: { summary: Save alert preferences }
+
+  /geofences:
+    get: { summary: List zones }
+    post: { summary: Create a zone, parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }] }
+  /geofences/{id}:
+    get: { summary: Get one zone }
+    put: { summary: Update a zone }
+    delete: { summary: Delete a zone }
+  /geofences/{id}/events: { get: { summary: Entry/exit event log for a zone } }
+
+  /maintenance:
+    get: { summary: List maintenance records }
+    post: { summary: Schedule a service, parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }] }
+  /maintenance/{id}/complete: { put: { summary: Mark a record complete } }
+  /maintenance/due: { get: { summary: Records due within 7 days } }
+
+  /fbt:
+    get: { summary: FBT logbook trip list }
+  /fbt/{id}/classify: { put: { summary: "Classify a trip business/personal" } }
+  /fbt/summary: { get: { summary: Business/personal km + unclassified count for the current period } }
+  /fbt/settings:
+    get: { summary: Business hours/days config }
+    put: { summary: Save FBT settings }
+
+  /reports/driver-scores: { get: { summary: Synchronous report — weekly safety scores } }
+  /reports/fuel-idle: { get: { summary: "Synchronous report — idle time (mid tier+), capped at 5000 rows" } }
+  /reports/trip-summary: { get: { summary: Synchronous report — trip totals, capped at 5000 rows } }
+  /reports/vehicle-health: { get: { summary: "Synchronous report — latest telemetry per vehicle (mid tier+)" } }
+  /reports:
+    post:
+      summary: Queue an async report job (driver-scores | fuel-idle | trip-summary | vehicle-health)
+      responses: { '200': { description: "{ jobId }" } }
+  /reports/{id}: { get: { summary: Poll async report job status } }
+  /reports/{id}/download:
+    get:
+      summary: Download a completed async report's output
+      description: Company-scoped — replaces the old unauthenticated `/storage/reports` static mount.
+
+  /settings/company:
+    get: { summary: Company profile }
+    put: { summary: Update company profile }
+  /settings/users:
+    get: { summary: List company users }
+    post: { summary: Invite a user }
+  /settings/users/{id}/role: { put: { summary: Change a user's role } }
+  /settings/onboarding-complete: { put: { summary: Mark onboarding done } }
+
+  /upgrade/request:
+    post: { summary: Submit a manual plan-upgrade request, parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }] }
+  /upgrade/my-requests: { get: { summary: This company's upgrade request history } }
+
+  /billing/status: { get: { summary: Subscription status + slot counts } }
+  /billing/checkout:
+    post: { summary: Create a Stripe Checkout session, parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }] }
+  /billing/portal: { post: { summary: Create a Stripe Billing Portal session } }
+  /billing/webhook:
+    post:
+      summary: Stripe webhook (signature-verified, raw body)
+      security: []
+
+  /notifications/register-device:
+    post:
+      summary: Register an Expo push token for this user + platform
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [platform, token]
+              properties: { platform: { type: string, enum: [ios, android, web] }, token: { type: string } }
+
+  /imei/check: { get: { summary: "Check an IMEI's registration status (garage referral flow)" } }
+  /imei/register: { post: { summary: Register a device against a garage's referral code } }
+  /imei/my-devices: { get: { summary: Devices this garage has registered } }
+
+  /referrals/summary: { get: { summary: Garage referral commission summary } }
+  /referrals/settlements: { get: { summary: Settlement history } }
+
+  /support/ticket:
+    post:
+      summary: Submit a support ticket
+      security: []
+  /admin/auth/login: { post: { summary: "Superadmin login, stage 1 — returns a 5min tempToken", security: [] } }
+  /admin/auth/verify-totp: { post: { summary: "Superadmin login, stage 2 — returns an 8h admin JWT" } }
+
+  /admin/companies:
+    get:
+      summary: Superadmin console — companies, devices, upgrade requests (17 routes total)
+      description: >
+        Representative path only. All 17 routes under /api/v1/admin/* (companies CRUD,
+        /companies/{id}/tier|slots|account-type|revoke|set-role|billing|devices|vehicles|users,
+        /devices, /upgrade-requests + /{id}/action) require requireSuperAdmin — a role check plus
+        a TOTP-verified JWT claim, set only by the /admin/auth/verify-totp step. Not enumerated
+        individually here — see backend/src/modules/admin/routes/admin.ts.
+      security: [{ bearerAuth: [] }]

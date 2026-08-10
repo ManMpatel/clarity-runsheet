@@ -1,38 +1,46 @@
-import { useEffect, useRef } from 'react'
-import { io } from 'socket.io-client'
+import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '../stores/authStore'
+import { retainSocket, releaseSocket, onSocketEvent, onConnectionStatus, getSocketStatus } from '../lib/socket'
 
-// Mirrors frontend/web/src/hooks/useSocket.js — same server, same events (`join:company` on
-// connect, `van:update` payloads), just company id sourced from the mobile authStore instead of
-// the web one. The socket.io broadcaster runs as its own standalone server (backend/src/socket/
-// index.ts, default port 3001), separate from the REST API's origin/port, so it needs its own
-// env var rather than reusing EXPO_PUBLIC_API_URL.
-let socket = null
+/**
+ * Subscribes to the company's realtime room for the lifetime of the calling component. Mirrors
+ * frontend/web/src/hooks/useSocket.js's useFleetSocket — same events (`van:update`, `alert:new`),
+ * same ref-counted retain/release pattern so multiple screens (Map, the Alerts tab badge) can
+ * hold the connection open simultaneously without one unmounting and killing it for the other.
+ */
+export function useFleetSocket({ onVanUpdate, onAlert } = {}) {
+  const companyId = useAuthStore((s) => s.companyId)
+  const [status, setStatus] = useState(getSocketStatus)
 
-export function useSocket(onVanUpdate) {
-  const companyId   = useAuthStore(s => s.companyId)
-  const callbackRef = useRef(onVanUpdate)
+  const vanRef = useRef(onVanUpdate)
+  const alertRef = useRef(onAlert)
+  useEffect(() => { vanRef.current = onVanUpdate })
+  useEffect(() => { alertRef.current = onAlert })
 
   useEffect(() => {
-    callbackRef.current = onVanUpdate
-  })
+    if (!companyId) return undefined
 
-  useEffect(() => {
-    if (!companyId) return
+    retainSocket()
 
-    socket = io(process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3001')
-
-    socket.on('connect', () => {
-      socket.emit('join:company', companyId)
-    })
-
-    socket.on('van:update', (data) => {
-      if (callbackRef.current) callbackRef.current(data)
-    })
+    const offStatus = onConnectionStatus(setStatus)
+    const offVan = onSocketEvent('van:update', (data) => vanRef.current?.(data))
+    const offAlert = onSocketEvent('alert:new', (data) => alertRef.current?.(data))
 
     return () => {
-      socket?.disconnect()
-      socket = null
+      offStatus()
+      offVan()
+      offAlert()
+      releaseSocket()
     }
   }, [companyId])
+
+  return status
 }
+
+// Back-compat single-callback form, kept because it reads slightly better at Map screen call
+// sites that only care about van updates.
+export function useSocket(onVanUpdate) {
+  return useFleetSocket({ onVanUpdate })
+}
+
+export default useSocket

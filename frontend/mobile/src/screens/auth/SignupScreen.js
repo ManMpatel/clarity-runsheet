@@ -1,10 +1,15 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native'
-import { MaterialIcons } from '@expo/vector-icons'
+import { View, Text, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { ChevronLeft, MailCheck, Check } from 'lucide-react-native'
 import api from '../../lib/api'
-import { colors, radius, spacing } from '../../lib/theme'
+import { useTheme } from '../../theme'
+import { Field, Button } from '../../components/ui'
 
 export default function SignupScreen({ navigation }) {
+  const { colors, space, radius, type } = useTheme()
+  const insets = useSafeAreaInsets()
+
   const [companyName, setCompanyName] = useState('')
   const [name, setName]               = useState('')
   const [email, setEmail]             = useState('')
@@ -39,7 +44,7 @@ export default function SignupScreen({ navigation }) {
       await api.post('/auth/signup', { companyName, name, email, password, driverConsent })
       setDone(true)
     } catch (err) {
-      setError(err.response?.data?.error || 'Signup failed')
+      setError(err.response?.data?.message || 'Signup failed')
     } finally {
       setLoading(false)
     }
@@ -47,88 +52,65 @@ export default function SignupScreen({ navigation }) {
 
   if (done) {
     return (
-      <View style={styles.center}>
-        <View style={styles.successIcon}>
-          <MaterialIcons name='mark-email-read' size={32} color={colors.primary} />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas, padding: space['2xl'] }}>
+        <View style={{ width: 64, height: 64, borderRadius: radius.lg, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: space.lg }}>
+          <MailCheck size={28} color={colors.accent} />
         </View>
-        <Text style={styles.doneTitle}>Check your inbox</Text>
-        <Text style={styles.doneSub}>We sent a verification link to {email}</Text>
-        <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.linkText}>Back to login</Text>
-        </TouchableOpacity>
+        <Text style={[type.title2, { color: colors.fg }]}>Check your inbox</Text>
+        <Text style={[type.body, { color: colors.fgMuted, textAlign: 'center', marginTop: space.xs, marginBottom: space.xl }]}>
+          We sent a verification link to {email}
+        </Text>
+        <Button label='Back to login' variant='secondary' fullWidth={false} onPress={() => navigation.navigate('Login')} style={{ paddingHorizontal: space['2xl'] }} />
       </View>
     )
   }
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Your details</Text>
-      <Text style={styles.subtitle}>Create your Clarity Fleet account</Text>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.canvas }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={{ paddingTop: insets.top }} keyboardShouldPersistTaps='handled'>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ padding: space.lg, alignSelf: 'flex-start' }}>
+          <ChevronLeft size={26} color={colors.fg} />
+        </Pressable>
 
-      <View style={styles.card}>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={{ paddingHorizontal: space['2xl'], paddingBottom: space['3xl'] }}>
+          <Text style={[type.title1, { color: colors.fg }]}>Create your account</Text>
+          <Text style={[type.body, { color: colors.fgMuted, marginTop: space.xs, marginBottom: space['2xl'] }]}>
+            Set up your company on Clarity Fleet
+          </Text>
 
-        <Text style={styles.label}>Company Name</Text>
-        <TextInput style={styles.input} value={companyName} onChangeText={setCompanyName} placeholder='e.g. Acme Logistics' placeholderTextColor={colors.placeholder} autoCapitalize='words' />
+          {!!error && (
+            <View style={{ backgroundColor: colors.dangerSoft, borderRadius: radius.md, padding: space.md, marginBottom: space.lg }}>
+              <Text style={[type.caption, { color: colors.dangerFg }]}>{error}</Text>
+            </View>
+          )}
 
-        <Text style={styles.label}>Your Name</Text>
-        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder='John Doe' placeholderTextColor={colors.placeholder} autoCapitalize='words' />
+          <Field label='Company name' value={companyName} onChangeText={setCompanyName} placeholder='e.g. Acme Logistics' autoCapitalize='words' />
+          <Field label='Your name' value={name} onChangeText={setName} placeholder='John Doe' autoCapitalize='words' />
+          <Field label='Email address' value={email} onChangeText={setEmail} placeholder='john.doe@acmelogistics.com' autoCapitalize='none' keyboardType='email-address' />
+          <Field label='Password' value={password} onChangeText={setPassword} placeholder='At least 8 characters' secureTextEntry />
+          <Field label='Confirm password' value={confirmPassword} onChangeText={setConfirmPassword} placeholder='Re-enter password' secureTextEntry />
 
-        <Text style={styles.label}>Email Address</Text>
-        <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder='john.doe@acmelogistics.com' placeholderTextColor={colors.placeholder} autoCapitalize='none' keyboardType='email-address' />
+          <Pressable
+            onPress={() => setDriverConsent(v => !v)}
+            style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: space.lg }}
+          >
+            <View style={{
+              width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, marginTop: 1, marginRight: space.sm,
+              borderColor: driverConsent ? colors.accent : colors.border,
+              backgroundColor: driverConsent ? colors.accent : 'transparent',
+              alignItems: 'center', justifyContent: 'center',
+            }}>
+              {driverConsent && <Check size={13} color={colors.fgOnAccent} />}
+            </View>
+            <Text style={[type.caption, { flex: 1, color: colors.fgMuted, lineHeight: 18 }]}>
+              I confirm all drivers have been informed their vehicle is tracked
+            </Text>
+          </Pressable>
 
-        <Text style={styles.label}>Password</Text>
-        <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder='At least 8 characters' placeholderTextColor={colors.placeholder} secureTextEntry />
-
-        <Text style={styles.label}>Confirm Password</Text>
-        <TextInput style={styles.input} value={confirmPassword} onChangeText={setConfirmPassword} placeholder='Re-enter password' placeholderTextColor={colors.placeholder} secureTextEntry />
-
-        <TouchableOpacity style={styles.consentRow} onPress={() => setDriverConsent(!driverConsent)}>
-          <View style={[styles.checkbox, driverConsent && styles.checkboxChecked]}>
-            {driverConsent && <MaterialIcons name='check' size={14} color={colors.onPrimary} />}
-          </View>
-          <Text style={styles.consentText}>I confirm all drivers have been informed their vehicle is tracked</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-          {loading ? <ActivityIndicator color={colors.onPrimary} /> : <Text style={styles.buttonText}>Create account</Text>}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+          <Button label='Create account' loading={loading} onPress={handleSubmit} />
+          <Button label='Cancel' variant='ghost' onPress={() => navigation.navigate('Login')} style={{ marginTop: space.sm }} />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
-
-const styles = StyleSheet.create({
-  page:    { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.margin, paddingTop: 60 },
-  title:    { fontSize: 24, fontWeight: '700', color: colors.textPrimary, textAlign: 'center' },
-  subtitle: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 6, marginBottom: spacing.lg },
-  card: {
-    backgroundColor: colors.surface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.border, padding: spacing.lg,
-  },
-  error:  { color: colors.error, fontSize: 13, marginBottom: spacing.sm },
-  label:  { fontSize: 13, fontWeight: '600', color: colors.textPrimary, marginBottom: 6, marginTop: spacing.sm },
-  input:  { height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 14, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface },
-  consentRow: { flexDirection: 'row', alignItems: 'flex-start', marginTop: spacing.lg, marginBottom: spacing.sm },
-  checkbox: {
-    width: 20, height: 20, borderRadius: 4, borderWidth: 1.5, borderColor: colors.border,
-    alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm, marginTop: 1,
-  },
-  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
-  consentText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
-  button: { height: 52, backgroundColor: colors.primary, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md },
-  buttonText: { color: colors.onPrimary, fontSize: 15, fontWeight: '600' },
-  cancelButton: { height: 48, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: spacing.sm },
-  cancelText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.margin, backgroundColor: colors.background },
-  successIcon: { width: 64, height: 64, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
-  doneTitle: { fontSize: 20, fontWeight: '700', color: colors.textPrimary, marginBottom: 8 },
-  doneSub: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.lg },
-  linkButton: { paddingVertical: 10 },
-  linkText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
-})
