@@ -3,6 +3,7 @@
     "name": "Clarity Fleet",
     "slug": "mobile",
     "version": "1.0.0",
+    "scheme": "claritydriver",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

@@ -56,7 +56,7 @@ export default function ActivityScreen() {
       ])
       setTrips(tripsRes.data.trips || [])
       setFbtTrips(fbtRes.data || [])
-      setFbtSummary(summaryRes.data?.summary || null)
+      setFbtSummary(summaryRes.data || null)
     } catch (err) {
       setError(err.response?.data?.message || 'Could not load activity')
     } finally {

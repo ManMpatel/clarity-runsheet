@@ -27,8 +27,8 @@ export default function MyPlanScreen({ navigation }) {
     }
   }
 
-  const slots = company?.slots || { entrySlots: 0, midSlots: 0, topSlots: 0 }
-  const totalSlots = (slots.entrySlots || 0) + (slots.midSlots || 0) + (slots.topSlots || 0)
+  const slots = { entrySlots: company?.entrySlots || 0, midSlots: company?.midSlots || 0, topSlots: company?.topSlots || 0 }
+  const totalSlots = slots.entrySlots + slots.midSlots + slots.topSlots
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
