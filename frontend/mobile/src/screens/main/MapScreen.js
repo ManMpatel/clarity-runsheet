@@ -9,9 +9,16 @@ import { useToast, Button, Card, StatTile, StatusDot, Skeleton, ErrorState } fro
 import VehicleMarker from '../../components/map/VehicleMarker'
 import { useSocket } from '../../hooks/useSocket'
 import { mapStyleLight, mapStyleDark } from '../../lib/mapStyle'
+import { num, formatKm, formatVolts } from '../../lib/format'
 import api from '../../lib/api'
 
 const SYDNEY = { latitude: -33.8688, longitude: 151.2093, latitudeDelta: 0.2, longitudeDelta: 0.2 }
+
+// How often to re-pull /telemetry/live while the socket is NOT connected. The socket is the
+// primary path; this exists so a dropped connection (or an unreachable socket host) degrades to a
+// slower map instead of a silently frozen one — which is exactly what shipped before, since
+// EXPO_PUBLIC_SOCKET_URL was never set and the socket therefore never connected at all.
+const POLL_INTERVAL_MS = 30000
 
 function deriveStatus(v) {
   if (v.speed > 0) return 'moving'
@@ -30,24 +37,35 @@ export default function MapScreen() {
   const [selectedId, setSelectedId] = useState(null)
   const [activeFilter, setActiveFilter] = useState('all')
   const [query, setQuery] = useState('')
-  const [secondsAgo, setSecondsAgo] = useState(0)
+  // A timestamp, not a counter — the "Ns ago" ticker lives in <FreshnessPill/> below so that a
+  // once-per-second re-render doesn't drag the whole screen (and every map marker) with it.
+  const [lastUpdate, setLastUpdate] = useState(() => Date.now())
   const [commandBusy, setCommandBusy] = useState(false)
 
   const mapRef = useRef(null)
   const sheetRef = useRef(null)
   const hasFitOnce = useRef(false)
+  const mountedRef = useRef(true)
 
   const snapPoints = useMemo(() => ['16%', '45%', '92%'], [])
 
   useEffect(() => {
+    mountedRef.current = true
     load()
-    const interval = setInterval(() => setSecondsAgo((s) => s + 1), 1000)
-    return () => clearInterval(interval)
+    return () => { mountedRef.current = false }
   }, [])
 
-  // Merges live position/status changes in place — the initial load() below is a one-shot
-  // snapshot, everything after arrives over `van:update` (backend/src/socket/index.ts).
-  useSocket(handleVanUpdate)
+  // Merges live position/status changes in place — load() is a one-shot snapshot, everything
+  // after arrives over `van:update` (backend/src/socket/index.ts).
+  const socketStatus = useSocket(handleVanUpdate)
+
+  // Fallback path: while the socket is down, re-pull the snapshot on an interval so the map stays
+  // roughly current instead of freezing. Cleared as soon as the socket reconnects.
+  useEffect(() => {
+    if (socketStatus === 'connected') return undefined
+    const id = setInterval(() => load({ silent: true }), POLL_INTERVAL_MS)
+    return () => clearInterval(id)
+  }, [socketStatus])
 
   function handleVanUpdate(data) {
     setVehicles((prev) => {
@@ -62,20 +80,22 @@ export default function MapScreen() {
           speed: data.speed ?? v.speed,
           ignition: data.ignition ?? v.ignition,
           address: data.address ?? v.address,
-          todayKm: data.todayKm != null ? Number(data.todayKm) : v.todayKm,
+          todayKm: data.todayKm != null ? num(data.todayKm) : v.todayKm,
           stateChangedAt: data.stateChangedAt ?? v.stateChangedAt,
-          gsmSignal: data.gsmSignal ?? v.gsmSignal,
-          odometer: data.odometer ?? v.odometer,
-          batteryVoltage: data.batteryVoltage ?? v.batteryVoltage,
-          externalVoltage: data.externalVoltage ?? v.externalVoltage,
+          gsmSignal: data.gsmSignal != null ? num(data.gsmSignal) : v.gsmSignal,
+          odometer: data.odometer != null ? num(data.odometer) : v.odometer,
+          batteryVoltage: data.batteryVoltage != null ? num(data.batteryVoltage) : v.batteryVoltage,
+          externalVoltage: data.externalVoltage != null ? num(data.externalVoltage) : v.externalVoltage,
         }
       })
       return matched ? next : prev
     })
-    setSecondsAgo(0)
+    setLastUpdate(Date.now())
   }
 
-  async function load() {
+  // `silent` is used by the polling fallback — a background refresh that fails shouldn't replace a
+  // working map with a full-screen error; the freshness pill going stale is signal enough.
+  async function load({ silent = false } = {}) {
     try {
       const res = await api.get('/telemetry/live')
       const mapped = (res.data || [])
@@ -90,23 +110,28 @@ export default function MapScreen() {
           speed: item.state.speed || 0,
           ignition: item.state.ignition || false,
           address: item.state.address || null,
-          todayKm: item.state.todayKm ?? null,
+          // These four are Postgres `numeric` columns and arrive as strings — normalise here so
+          // the load path and the socket merge path below agree on their types (see lib/format.js).
+          todayKm: num(item.state.todayKm),
           stateChangedAt: item.state.stateChangedAt || null,
-          gsmSignal: item.state.gsmSignal ?? null,
-          odometer: item.state.odometer ?? null,
-          batteryVoltage: item.state.batteryVoltage ?? null,
-          externalVoltage: item.state.externalVoltage ?? null,
+          gsmSignal: num(item.state.gsmSignal),
+          odometer: num(item.state.odometer),
+          batteryVoltage: num(item.state.batteryVoltage),
+          externalVoltage: num(item.state.externalVoltage),
         }))
+      if (!mountedRef.current) return
       setVehicles(mapped)
-      setSecondsAgo(0)
+      setLastUpdate(Date.now())
       if (!hasFitOnce.current && mapped.length > 0) {
         hasFitOnce.current = true
         requestAnimationFrame(() => fitToFleet(mapped))
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not load vehicle data')
+      if (!silent && mountedRef.current) {
+        setError(err.response?.data?.message || 'Could not load vehicle data')
+      }
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }
 
@@ -151,9 +176,12 @@ export default function MapScreen() {
     setActiveFilter((cur) => (cur === f ? 'all' : f))
   }
 
+  // Up to 60s of polling. Bails the moment the screen unmounts — otherwise navigating away
+  // mid-immobilise leaves this running for a full minute and then calls setState on a dead tree.
   async function pollCommand(id) {
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 2000))
+      if (!mountedRef.current) return { status: 'cancelled' }
       try {
         const res = await api.get(`/vehicles/${id}/command-status`)
         if (res.data.status === 'acked' || res.data.status === 'timeout') return res.data
@@ -170,6 +198,7 @@ export default function MapScreen() {
       await api.post(`/vehicles/${v.id}/${action}`)
       toast.show(`${action === 'cut' ? 'Cut' : 'Restore'} command sent — confirming…`, 'info')
       const result = await pollCommand(v.id)
+      if (result.status === 'cancelled') return
       if (result.status === 'acked') {
         setVehicles((prev) => prev.map((x) => x.id === v.id ? { ...x, immobilised: action === 'cut' } : x))
         toast.show(action === 'cut' ? 'Vehicle immobilised' : 'Vehicle restored', 'success')
@@ -179,7 +208,7 @@ export default function MapScreen() {
     } catch (err) {
       toast.show(err.response?.data?.message || 'Command failed', 'error')
     } finally {
-      setCommandBusy(false)
+      if (mountedRef.current) setCommandBusy(false)
     }
   }
 
@@ -214,9 +243,7 @@ export default function MapScreen() {
         ))}
       </MapView>
 
-      <View style={[styles.topPill, { top: insets.top + space.sm, backgroundColor: colors.surface + 'F2', borderColor: colors.border }, shadow('sm')]}>
-        <Text style={[type.captionMedium, { color: colors.fgMuted }]}>Updated {secondsAgo}s ago</Text>
-      </View>
+      <FreshnessPill since={lastUpdate} socketStatus={socketStatus} top={insets.top + space.sm} />
 
       <Pressable
         onPress={() => fitToFleet()}
@@ -286,6 +313,35 @@ export default function MapScreen() {
   )
 }
 
+// Owns the once-per-second tick so MapScreen itself doesn't re-render (and re-diff every marker)
+// every second just to advance a label. Also doubles as the socket-health indicator: if the socket
+// isn't connected the map is running on the 30s polling fallback, and the user should be able to
+// tell that from the screen rather than wondering why nothing is moving.
+function FreshnessPill({ since, socketStatus, top }) {
+  const { colors, space, type, shadow } = useTheme()
+  const [, forceTick] = useState(0)
+
+  useEffect(() => {
+    const id = setInterval(() => forceTick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  const seconds = Math.max(0, Math.round((Date.now() - since) / 1000))
+  const live = socketStatus === 'connected'
+  const label = socketStatus === 'connecting'
+    ? 'Reconnecting…'
+    : live
+      ? `Updated ${seconds}s ago`
+      : `Offline · updated ${seconds < 60 ? `${seconds}s` : `${Math.round(seconds / 60)}m`} ago`
+
+  return (
+    <View style={[styles.topPill, { top, backgroundColor: colors.surface + 'F2', borderColor: colors.border }, shadow('sm')]}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, marginRight: space.xs, backgroundColor: live ? colors.statusMoving : colors.statusIdle }} />
+      <Text style={[type.captionMedium, { color: colors.fgMuted }]}>{label}</Text>
+    </View>
+  )
+}
+
 function VehicleRow({ vehicle, onPress }) {
   const { colors, space, radius, type } = useTheme()
   return (
@@ -345,8 +401,8 @@ function VehicleDetail({ vehicle, busy, onClose, onToggleImmobilise, onNavigate 
 
       <View style={[styles.detailGrid, { backgroundColor: colors.surface2, borderRadius: radius.lg }]}>
         <StatRow icon={<Gauge size={16} color={colors.fgMuted} />} label='Speed' value={`${vehicle.speed} km/h`} />
-        <StatRow icon={<Fuel size={16} color={colors.fgMuted} />} label='Today' value={vehicle.todayKm != null ? `${vehicle.todayKm} km` : '—'} />
-        <StatRow icon={<BatteryMedium size={16} color={colors.fgMuted} />} label='Voltage' value={vehicle.externalVoltage ? `${vehicle.externalVoltage}V` : '—'} />
+        <StatRow icon={<Fuel size={16} color={colors.fgMuted} />} label='Today' value={formatKm(vehicle.todayKm)} />
+        <StatRow icon={<BatteryMedium size={16} color={colors.fgMuted} />} label='Voltage' value={formatVolts(vehicle.externalVoltage)} />
         <StatRow icon={<SignalHigh size={16} color={colors.fgMuted} />} label='Since' value={sinceLabel(vehicle.stateChangedAt)} />
       </View>
 
@@ -381,7 +437,7 @@ function VehicleDetail({ vehicle, busy, onClose, onToggleImmobilise, onNavigate 
 }
 
 const styles = StyleSheet.create({
-  topPill: { position: 'absolute', alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
+  topPill: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1 },
   fab: { position: 'absolute', right: 16, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   statRow: { flexDirection: 'row', marginTop: 4 },
   searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginTop: 8 },

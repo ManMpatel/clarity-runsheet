@@ -31,7 +31,11 @@ yarn-error.*
 *.pem
 
 # local env files
+# .env holds a developer's LAN IP and (once filled in) a Maps API key — never commit it.
+# .env.example is the tracked template.
+.env
 .env*.local
+!.env.example
 
 # typescript
 *.tsbuildinfo

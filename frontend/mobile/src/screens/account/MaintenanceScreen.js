@@ -4,7 +4,7 @@ import { FlashList } from '@shopify/flash-list'
 import { Wrench, Plus, X, CheckCircle2, TriangleAlert, CalendarClock } from 'lucide-react-native'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
-import { Header, Card, Field, Button, Chip, Badge, EmptyState, ErrorState, Skeleton } from '../../components/ui'
+import { Header, Card, Field, Button, Chip, Badge, EmptyState, ErrorState, Skeleton, useToast } from '../../components/ui'
 
 function statusInfo(record, colors) {
   if (record.status === 'completed') return { label: 'Completed', tone: 'neutral', icon: CheckCircle2, color: colors.fgMuted }
@@ -17,6 +17,7 @@ function statusInfo(record, colors) {
 
 export default function MaintenanceScreen({ navigation }) {
   const { colors, space, radius, type } = useTheme()
+  const toast = useToast()
   const [records, setRecords]   = useState([])
   const [vehicles, setVehicles] = useState([])
   const [loading, setLoading]   = useState(true)
@@ -60,8 +61,10 @@ export default function MaintenanceScreen({ navigation }) {
     try {
       const res = await api.put(`/maintenance/${id}/complete`, { completedDate: new Date().toISOString() })
       setRecords((r) => r.map((rec) => (rec.id === id ? res.data : rec)))
+      toast.show('Service marked complete', 'success')
     } catch (err) {
-      console.log(err.message)
+      // Was a silent console.log — tapping a record did nothing visible when the write failed.
+      toast.show(err.response?.data?.message || 'Could not update this record', 'error')
     }
   }
 
@@ -100,7 +103,6 @@ export default function MaintenanceScreen({ navigation }) {
         <FlashList
           data={records}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={84}
           contentContainerStyle={{ padding: space.lg, paddingBottom: space['4xl'] }}
           ListEmptyComponent={!showAdd && <EmptyState icon={<Wrench size={36} color={colors.fgSubtle} />} title='No maintenance records yet' message='Tap + to schedule your first service' />}
           renderItem={({ item }) => {

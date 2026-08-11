@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useTheme } from '../theme'
 import { useUnreadAlertCount } from '../hooks/useUnreadAlertCount'
 import { useNotificationDeepLink } from '../hooks/useNotificationDeepLink'
+import { TAB_BAR_HEIGHT, useTabBarBottomOffset } from './tabBarLayout'
 
 import WelcomeScreen from '../screens/auth/WelcomeScreen'
 import LoginScreen from '../screens/auth/LoginScreen'
@@ -68,6 +69,9 @@ function TabBarBackground() {
 function AppTabs() {
   const { colors, space, radius } = useTheme()
   const unread = useUnreadAlertCount()
+  // Clears the iOS home indicator. At a flat 16pt the bar sat inside the home-indicator gesture
+  // area, so a swipe near a tab was ambiguous between switching tabs and going home.
+  const bottomOffset = useTabBarBottomOffset()
 
   return (
     <Tab.Navigator
@@ -81,8 +85,8 @@ function AppTabs() {
           position: 'absolute',
           left: space.lg,
           right: space.lg,
-          bottom: space.lg,
-          height: 64,
+          bottom: bottomOffset,
+          height: TAB_BAR_HEIGHT,
           borderRadius: radius.xl,
           borderTopWidth: 0,
           overflow: 'hidden',

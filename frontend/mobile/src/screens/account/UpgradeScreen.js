@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, ScrollView } from 'react-native'
+import { View, Text, ScrollView, Pressable } from 'react-native'
 import { Minus, Plus, CheckCircle2 } from 'lucide-react-native'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
@@ -61,9 +61,9 @@ export default function UpgradeScreen({ navigation }) {
                 <Text style={[type.caption, { color: colors.fgMuted, marginTop: 2 }]}>${p.price}/van/month</Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Stepper icon={<Minus size={14} color={colors.fg} />} onPress={() => adjust(p.key, -1)} />
+                <Stepper icon={<Minus size={14} color={colors.fg} />} label={`Remove one ${p.name} slot`} onPress={() => adjust(p.key, -1)} />
                 <Text style={[type.tabularBody, { color: colors.fg, minWidth: 24, textAlign: 'center' }]}>{form[p.key]}</Text>
-                <Stepper icon={<Plus size={14} color={colors.fg} />} onPress={() => adjust(p.key, 1)} />
+                <Stepper icon={<Plus size={14} color={colors.fg} />} label={`Add one ${p.name} slot`} onPress={() => adjust(p.key, 1)} />
               </View>
             </Card>
           ))}
@@ -91,14 +91,23 @@ export default function UpgradeScreen({ navigation }) {
   )
 }
 
-function Stepper({ icon, onPress }) {
+// Was a bare <View onTouchEnd>, which gives no press feedback, no accessibility role, and
+// unreliable hit handling inside a scroll view. Everything else in the app uses Pressable.
+function Stepper({ icon, onPress, label }) {
   const { colors, radius } = useTheme()
   return (
-    <View
-      onTouchEnd={onPress}
-      style={{ width: 30, height: 30, borderRadius: radius.full, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole='button'
+      accessibilityLabel={label}
+      style={({ pressed }) => ({
+        width: 30, height: 30, borderRadius: radius.full,
+        backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center',
+        opacity: pressed ? 0.6 : 1,
+      })}
     >
       {icon}
-    </View>
+    </Pressable>
   )
 }

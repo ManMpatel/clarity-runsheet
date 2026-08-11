@@ -33,8 +33,16 @@ async function checkCommandStatus(imei: string) {
 }
 
 router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
+  // DELETE /vehicles/:id is a soft delete (sets active:false) but this listing had no matching
+  // filter — so a removed vehicle vanished from the UI's local state and then reappeared on the
+  // next fetch. `?includeInactive=true` is there for any admin view that genuinely wants the
+  // archived rows; the default is the live fleet, which is what every caller actually means.
+  const includeInactive = (req.query.includeInactive as string) === 'true'
+  const conditions = [eq(vehicles.companyId, req.companyId!)]
+  if (!includeInactive) conditions.push(eq(vehicles.active, true))
+
   const fleet = await db.select().from(vehicles)
-    .where(eq(vehicles.companyId, req.companyId!))
+    .where(and(...conditions))
     .orderBy(vehicles.name)
   return res.success(fleet)
 }))

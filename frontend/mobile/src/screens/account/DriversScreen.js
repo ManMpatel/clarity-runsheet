@@ -3,11 +3,13 @@ import { View, Text, Pressable } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { IdCard, Plus, X, UserRound } from 'lucide-react-native'
 import api from '../../lib/api'
+import { useAuthStore } from '../../stores/authStore'
 import { useTheme } from '../../theme'
 import { Header, Card, Field, Button, EmptyState, ErrorState, Skeleton } from '../../components/ui'
 
 export default function DriversScreen({ navigation }) {
   const { colors, space, radius, type } = useTheme()
+  const canManage = useAuthStore((s) => s.canManage())
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
@@ -50,9 +52,9 @@ export default function DriversScreen({ navigation }) {
       <Header
         title='Drivers'
         onBack={() => navigation.goBack()}
-        right={<Pressable onPress={() => setShowAdd((s) => !s)} hitSlop={8}>{showAdd ? <X size={20} color={colors.fg} /> : <Plus size={20} color={colors.fg} />}</Pressable>}
+        right={canManage ? <Pressable onPress={() => setShowAdd((s) => !s)} hitSlop={8}>{showAdd ? <X size={20} color={colors.fg} /> : <Plus size={20} color={colors.fg} />}</Pressable> : null}
       />
-      {showAdd && (
+      {canManage && showAdd && (
         <Card style={{ marginHorizontal: space.lg, marginBottom: space.md }}>
           {!!formError && <Text style={[type.caption, { color: colors.danger, marginBottom: space.sm }]}>{formError}</Text>}
           <Field placeholder='Name' value={form.name} onChangeText={(t) => setForm((f) => ({ ...f, name: t }))} />
@@ -71,9 +73,8 @@ export default function DriversScreen({ navigation }) {
         <FlashList
           data={drivers}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={72}
           contentContainerStyle={{ padding: space.lg, paddingBottom: space['4xl'] }}
-          ListEmptyComponent={!showAdd && <EmptyState icon={<IdCard size={36} color={colors.fgSubtle} />} title='No drivers yet' message='Tap + to register your first driver' />}
+          ListEmptyComponent={!showAdd && <EmptyState icon={<IdCard size={36} color={colors.fgSubtle} />} title='No drivers yet' message={canManage ? 'Tap + to register your first driver' : 'Ask a company admin to register drivers'} />}
           renderItem={({ item }) => (
             <Card style={{ flexDirection: 'row', alignItems: 'center', marginBottom: space.sm }}>
               <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginRight: space.md }}>

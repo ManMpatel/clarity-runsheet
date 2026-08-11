@@ -10,6 +10,7 @@ import RootNavigator from './src/navigation'
 import { navigationRef } from './src/navigation/navigationRef'
 import { ThemeProvider, useTheme, interFonts } from './src/theme'
 import { ToastProvider } from './src/components/ui'
+import ErrorBoundary from './src/components/ErrorBoundary'
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
 
@@ -54,12 +55,16 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
+        {/* Inside ThemeProvider so the crash fallback can use the themed <ErrorState/>, and
+            outside the navigator so a render throw anywhere in any screen is caught. */}
         <ThemeProvider>
-          <BottomSheetModalProvider>
-            <ToastProvider>
-              <Root />
-            </ToastProvider>
-          </BottomSheetModalProvider>
+          <ErrorBoundary>
+            <BottomSheetModalProvider>
+              <ToastProvider>
+                <Root />
+              </ToastProvider>
+            </BottomSheetModalProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

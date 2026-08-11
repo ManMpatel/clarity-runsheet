@@ -17,7 +17,9 @@ export default function FbtLogbook() {
           api.get('/fbt'),
         ])
         setVehicles(vRes.data)
-        setTrips(tRes.data)
+        // GET /fbt is now cursor-paginated and returns {trips, nextCursor} instead of a bare
+        // array — it used to fetch every trip the company had ever recorded on every page load.
+        setTrips(tRes.data.trips || [])
         loadSummary()
       } catch (err) {
         console.error(err.message)

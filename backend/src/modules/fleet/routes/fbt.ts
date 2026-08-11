@@ -7,14 +7,26 @@
 // no explicit classification is supplied in the request body, the trip is re-classified against
 // current company settings rather than requiring the caller to always pass one.
 import express from 'express'
-import { and, desc, eq, gte, lte } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, lt, lte } from 'drizzle-orm'
 import { db } from '../../../db/client'
-import { trips, fbtSettings } from '../../../db/schema'
+import { trips, vehicles, fbtSettings } from '../../../db/schema'
 import { requireAuth, requireCompany } from '../../../middleware/auth-guard'
 import { asyncRoute } from '../../../middleware/response-envelope'
 import { classifyTrip } from '../../ingestion/fbt-classifier'
 
 const router = express.Router()
+
+const MAX_PAGE_SIZE = 100
+
+// Same enrichment GET /trips does — mobile's FBT tab reads `vehicleName` off each row and was
+// falling back to the literal string "Vehicle" for every trip because this endpoint returned raw
+// trip rows with no join.
+async function enrich(list: (typeof trips.$inferSelect)[]) {
+  const vIds = [...new Set(list.map((t) => t.vehicleId).filter(Boolean))]
+  const vDocs = vIds.length ? await db.select().from(vehicles).where(inArray(vehicles.id, vIds)) : []
+  const vMap = Object.fromEntries(vDocs.map((v) => [v.id, v.name]))
+  return list.map((t) => ({ ...t, vehicleName: vMap[t.vehicleId] || null }))
+}
 
 function settingsResponse(companyId: string, settings?: typeof fbtSettings.$inferSelect | null) {
   if (!settings) {
@@ -33,8 +45,16 @@ function settingsResponse(companyId: string, settings?: typeof fbtSettings.$infe
   }
 }
 
+// PREVIOUSLY: no limit and no cursor at all — this returned every trip the company had ever
+// recorded, on every call, to both frontends. A fleet with a year of history blows mobile's 10s
+// axios timeout (frontend/mobile/src/lib/api.js) and the Activity tab just errors out.
+//
+// Now shaped exactly like GET /trips: cursor pagination over startTime, hard-capped page size,
+// and the same vehicleName enrichment. Response is `{trips, nextCursor}` rather than a bare
+// array — that's a breaking change for callers, and frontend/web/src/pages/FbtLogbook.jsx was
+// updated in the same commit.
 router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
-  const { vehicleId, from, to, classification } = req.query as Record<string, string>
+  const { vehicleId, from, to, classification, limit = '50', cursor } = req.query as Record<string, string>
 
   const conditions = [eq(trips.companyId, req.companyId!)]
   if (vehicleId) conditions.push(eq(trips.vehicleId, vehicleId))
@@ -43,12 +63,20 @@ router.get('/', requireAuth, requireCompany, asyncRoute(async (req, res) => {
     conditions.push(gte(trips.startTime, new Date(from)))
     conditions.push(lte(trips.startTime, new Date(to)))
   }
+  if (cursor) conditions.push(lt(trips.startTime, new Date(cursor)))
+
+  const limitNum = Math.min(parseInt(limit) || 50, MAX_PAGE_SIZE)
 
   const list = await db.select().from(trips)
     .where(and(...conditions))
     .orderBy(desc(trips.startTime))
+    .limit(limitNum + 1)
 
-  return res.success(list)
+  const hasMore = list.length > limitNum
+  const page = hasMore ? list.slice(0, limitNum) : list
+  const nextCursor = hasMore ? page[page.length - 1].startTime.toISOString() : null
+
+  return res.success({ trips: await enrich(page), nextCursor })
 }))
 
 router.put('/:id/classify', requireAuth, requireCompany, asyncRoute(async (req, res) => {

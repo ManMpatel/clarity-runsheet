@@ -11,7 +11,7 @@
 // reconsideration if there's a concrete reason to want raw FCM (e.g. a future non-Expo mobile
 // build).
 import { Expo } from 'expo-server-sdk'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { deviceTokens } from '../../db/schema'
 
@@ -23,6 +23,13 @@ export async function registerDeviceToken(userId: string, platform: string, toke
       target: [deviceTokens.userId, deviceTokens.platform, deviceTokens.token],
       set: { updatedAt: new Date() },
     })
+}
+
+// Logout counterpart. Scoped to (userId, token) rather than token alone so a caller can only ever
+// remove their own registration.
+export async function unregisterDeviceToken(userId: string, token: string) {
+  await db.delete(deviceTokens)
+    .where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.token, token)))
 }
 
 // Expo's send call only confirms Expo *accepted* the message — it returns a receipt ID per

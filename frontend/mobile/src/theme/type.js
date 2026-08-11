@@ -1,7 +1,15 @@
 // Inter Variable is web's typeface (--font-sans in frontend/web/src/index.css). Variable fonts
 // aren't supported the same way in React Native — @expo-google-fonts ships discrete weights
 // instead — so this loads the specific Inter cuts the scale below actually uses.
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter'
+//
+// Imported by per-weight SUBPATH, not from the package root. The root index.js is a barrel of 18
+// top-level `require()` calls (every weight, plus every italic); Metro can't tree-shake those, so
+// importing four names from it pulled all 18 .ttf files — ~6.2 MB — into the bundle. These four
+// are the only cuts the scale below references.
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular'
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium'
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold'
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold'
 
 export const interFonts = { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
 

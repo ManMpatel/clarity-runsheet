@@ -26,11 +26,21 @@ export function getSocketStatus() {
   return status
 }
 
+// The socket server is a SEPARATE process/port from the REST API — it's the `ingestion`
+// entrypoint on SOCKET_PORT (3001), not the api entrypoint on 3000 — so it needs its own env var
+// and can't be derived from EXPO_PUBLIC_API_URL.
+//
+// The fallback used to be `http://localhost:3001`, which on a phone means the phone itself: with
+// EXPO_PUBLIC_SOCKET_URL undefined (it was never set anywhere) every build silently had no
+// realtime at all — no live map, no live alerts, no unread badge. Fallback is now the production
+// host, matching how lib/api.js handles its own default.
+const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'wss://socket.clarity-software.com.au'
+
 export function getSocket() {
   if (socket) return socket
 
   setStatus('connecting')
-  socket = io(process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
+  socket = io(SOCKET_URL, {
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,

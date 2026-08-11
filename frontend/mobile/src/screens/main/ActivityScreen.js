@@ -1,25 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
-import { View, Text, Pressable } from 'react-native'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
 import { Truck, MapPinned } from 'lucide-react-native'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
-import { Card, SegmentedControl, Skeleton, EmptyState, ErrorState } from '../../components/ui'
+import { formatKm, formatNumber, formatDuration } from '../../lib/format'
+import { useTabBarClearance } from '../../navigation/tabBarLayout'
+import { Card, SegmentedControl, Skeleton, EmptyState, ErrorState, useToast } from '../../components/ui'
 
 function formatTimeRange(start, end) {
   const opts = { hour: 'numeric', minute: '2-digit' }
   const s = new Date(start).toLocaleTimeString('en-AU', opts)
   const e = end ? new Date(end).toLocaleTimeString('en-AU', opts) : 'now'
   return `${s} – ${e}`
-}
-
-function formatDuration(mins) {
-  if (!mins) return '—'
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  return h > 0 ? `${h}h ${m}m` : `${m} min`
 }
 
 function dayLabel(dateStr) {
@@ -35,41 +30,81 @@ export default function ActivityScreen() {
   const { colors, space, radius, type } = useTheme()
   const insets = useSafeAreaInsets()
   const navigation = useNavigation()
+  const toast = useToast()
+  const tabBarClearance = useTabBarClearance()
 
   const [tab, setTab] = useState('trips')
   const [trips, setTrips] = useState([])
   const [fbtTrips, setFbtTrips] = useState([])
   const [fbtSummary, setFbtSummary] = useState(null)
+  // Both endpoints are cursor-paginated; null means "no more pages".
+  const [tripsCursor, setTripsCursor] = useState(null)
+  const [fbtCursor, setFbtCursor] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => { load() }, [])
 
-  async function load() {
-    setLoading(true)
+  async function load({ isRefresh = false } = {}) {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
     setError(null)
     try {
       const [tripsRes, fbtRes, summaryRes] = await Promise.all([
-        api.get('/trips'),
-        api.get('/fbt'),
+        api.get('/trips?limit=25'),
+        api.get('/fbt?limit=25'),
         api.get('/fbt/summary'),
       ])
       setTrips(tripsRes.data.trips || [])
-      setFbtTrips(fbtRes.data || [])
+      setTripsCursor(tripsRes.data.nextCursor || null)
+      setFbtTrips(fbtRes.data.trips || [])
+      setFbtCursor(fbtRes.data.nextCursor || null)
       setFbtSummary(summaryRes.data || null)
     } catch (err) {
       setError(err.response?.data?.message || 'Could not load activity')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
+  // Both tabs page the same way; which one is driven by whichever list hit its end. Previously
+  // neither did — the backend returned a nextCursor and this screen ignored it, so the list was
+  // permanently capped at the first page and never refreshed after mount.
+  const loadMore = useCallback(async () => {
+    const cursor = tab === 'trips' ? tripsCursor : fbtCursor
+    if (!cursor || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const path = tab === 'trips' ? '/trips' : '/fbt'
+      const res = await api.get(`${path}?limit=25&cursor=${encodeURIComponent(cursor)}`)
+      const page = res.data.trips || []
+      if (tab === 'trips') {
+        setTrips((list) => [...list, ...page])
+        setTripsCursor(res.data.nextCursor || null)
+      } else {
+        setFbtTrips((list) => [...list, ...page])
+        setFbtCursor(res.data.nextCursor || null)
+      }
+    } catch (err) {
+      toast.show(err.response?.data?.message || 'Could not load more trips', 'error')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [tab, tripsCursor, fbtCursor, loadingMore])
+
   async function classify(tripId, classification) {
+    // Optimistic — the chip should respond to the tap immediately; roll back if the write fails.
+    const previous = fbtTrips
+    setFbtTrips((list) => list.map((t) => (t.id === tripId ? { ...t, classification } : t)))
     try {
       const res = await api.put(`/fbt/${tripId}/classify`, { classification })
-      setFbtTrips((list) => list.map((t) => (t.id === tripId ? res.data : t)))
+      setFbtTrips((list) => list.map((t) => (t.id === tripId ? { ...res.data, vehicleName: t.vehicleName } : t)))
     } catch (err) {
-      console.log(err.message)
+      setFbtTrips(previous)
+      toast.show(err.response?.data?.message || 'Could not classify this trip', 'error')
     }
   }
 
@@ -110,8 +145,11 @@ export default function ActivityScreen() {
         <FlashList
           data={groupedTrips}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={80}
-          contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space['5xl'] }}
+          contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: tabBarClearance }}
+          onEndReachedThreshold={0.4}
+          onEndReached={loadMore}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load({ isRefresh: true })} tintColor={colors.fgMuted} />}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accent} style={{ marginVertical: space.md }} /> : null}
           ListEmptyComponent={<EmptyState icon={<Truck size={36} color={colors.fgSubtle} />} title='No trips yet' message='Trips show up here once a vehicle starts moving' />}
           renderItem={({ item }) => item.type === 'header' ? (
             <Text style={[type.captionMedium, { color: colors.fgMuted, marginTop: space.md, marginBottom: space.sm }]}>{item.label}</Text>
@@ -125,7 +163,7 @@ export default function ActivityScreen() {
                   <Text style={[type.bodySemibold, { color: colors.fg }]} numberOfLines={1}>{item.trip.vehicleName || 'Vehicle'}</Text>
                   <Text style={[type.caption, { color: colors.fgMuted, marginTop: 2 }]}>{formatTimeRange(item.trip.startTime, item.trip.endTime)} · {formatDuration(item.trip.durationMinutes)}</Text>
                 </View>
-                <Text style={[type.tabularBody, { color: colors.fg }]}>{item.trip.distanceKm ? `${item.trip.distanceKm.toFixed(1)} km` : '—'}</Text>
+                <Text style={[type.tabularBody, { color: colors.fg }]}>{formatKm(item.trip.distanceKm)}</Text>
               </Card>
             </Pressable>
           )}
@@ -134,12 +172,15 @@ export default function ActivityScreen() {
         <FlashList
           data={fbtTrips}
           keyExtractor={(item, i) => item.id || String(i)}
-          estimatedItemSize={80}
-          contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space['5xl'] }}
+          contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: tabBarClearance }}
+          onEndReachedThreshold={0.4}
+          onEndReached={loadMore}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load({ isRefresh: true })} tintColor={colors.fgMuted} />}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accent} style={{ marginVertical: space.md }} /> : null}
           ListHeaderComponent={fbtSummary && (
             <View style={{ flexDirection: 'row', marginBottom: space.md }}>
-              <SummaryTile label='Business km' value={fbtSummary.businessKm?.toFixed(0) ?? 0} />
-              <SummaryTile label='Personal km' value={fbtSummary.personalKm?.toFixed(0) ?? 0} />
+              <SummaryTile label='Business km' value={formatNumber(fbtSummary.businessKm)} />
+              <SummaryTile label='Personal km' value={formatNumber(fbtSummary.personalKm)} />
               <SummaryTile label='Unclassified' value={fbtSummary.unclassifiedTrips ?? 0} highlight={fbtSummary.unclassifiedTrips > 0} />
             </View>
           )}

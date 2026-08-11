@@ -3,6 +3,7 @@ import { View, Text, Pressable, Alert } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { MapPin, Plus, X } from 'lucide-react-native'
 import api from '../../lib/api'
+import { useAuthStore } from '../../stores/authStore'
 import { useTheme } from '../../theme'
 import { Header, Card, Field, Button, Switch, StatusDot, EmptyState, ErrorState, Skeleton } from '../../components/ui'
 
@@ -27,6 +28,9 @@ function radiusLabel(metres) {
 
 export default function GeofenceScreen({ navigation }) {
   const { colors, space, radius, type } = useTheme()
+  // Creating a zone allows fleetManager; DELETE /geofences/:id is companyAdmin-only, so only the
+  // long-press-to-delete affordance is gated here (see backend/.../routes/geofences.ts).
+  const canDelete = useAuthStore((s) => s.canManage())
   const [zones, setZones]     = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
@@ -122,11 +126,10 @@ export default function GeofenceScreen({ navigation }) {
         <FlashList
           data={zones}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={80}
           contentContainerStyle={{ padding: space.lg, paddingBottom: space['4xl'] }}
           ListEmptyComponent={!showAdd && <EmptyState icon={<MapPin size={36} color={colors.fgSubtle} />} title='No zones yet' message='Tap + to create your first zone' />}
           renderItem={({ item }) => (
-            <Pressable onLongPress={() => confirmDelete(item.id, item.name)} style={{ marginBottom: space.sm }}>
+            <Pressable onLongPress={canDelete ? () => confirmDelete(item.id, item.name) : undefined} style={{ marginBottom: space.sm }}>
               <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginRight: space.md }}>
                   <MapPin size={18} color={colors.accent} />

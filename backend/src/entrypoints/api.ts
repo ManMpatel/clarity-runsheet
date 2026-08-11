@@ -20,6 +20,7 @@ import { apiRateLimit } from '../middleware/rate-limit'
 import authRoutes from '../modules/auth/routes/auth'
 import adminAuthRoutes from '../modules/auth/routes/admin-auth'
 import { webGoogleRouter, mobileGoogleRouter } from '../modules/auth/routes/google'
+import { mobileAppleRouter } from '../modules/auth/routes/apple'
 import billingRoutes from '../modules/billing/routes/billing'
 import upgradeRoutes from '../modules/billing/routes/upgrade'
 import vehicleRoutes from '../modules/fleet/routes/vehicles'
@@ -105,6 +106,8 @@ v1.use(apiRateLimit)
 
 v1.use('/auth', authRoutes)
 v1.use('/auth/google', mobileGoogleRouter)
+// Mobile only — Sign in with Apple has no browser-redirect half, unlike Google.
+v1.use('/auth/apple', mobileAppleRouter)
 v1.use('/admin/auth', adminAuthRoutes)
 v1.use('/vehicles', vehicleRoutes)
 v1.use('/telemetry', telemetryRoutes)

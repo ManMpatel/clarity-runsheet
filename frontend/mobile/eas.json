@@ -9,10 +9,24 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.clarity-software.com.au",
+        "EXPO_PUBLIC_SOCKET_URL": "wss://socket.clarity-software.com.au",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "881840591185-05qgra5gjvlkvddn8scf0694fmeirife.apps.googleusercontent.com",
+        "EXPO_PUBLIC_PRIVACY_URL": "https://clarity-software.com.au/privacy",
+        "EXPO_PUBLIC_TERMS_URL": "https://clarity-software.com.au/terms"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.clarity-software.com.au",
+        "EXPO_PUBLIC_SOCKET_URL": "wss://socket.clarity-software.com.au",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "881840591185-05qgra5gjvlkvddn8scf0694fmeirife.apps.googleusercontent.com",
+        "EXPO_PUBLIC_PRIVACY_URL": "https://clarity-software.com.au/privacy",
+        "EXPO_PUBLIC_TERMS_URL": "https://clarity-software.com.au/terms"
+      }
     }
   },
   "submit": {

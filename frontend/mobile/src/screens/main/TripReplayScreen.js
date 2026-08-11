@@ -5,21 +5,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { X, Play, Pause } from 'lucide-react-native'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
+import { formatKm, formatDuration } from '../../lib/format'
 import { Skeleton, ErrorState } from '../../components/ui'
-
-function formatDuration(mins) {
-  if (!mins) return '—'
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  return h > 0 ? `${h}h ${m}m` : `${m} min`
-}
 
 // Trip replay didn't exist on mobile at all before this rebuild — GET /trips/:id/replay already
 // existed server-side (used only by web's TripsHistory.jsx) and now already returns a
 // server-decimated point list (max 2000 points, see backend/src/modules/fleet/routes/trips.ts)
 // so this never has to render an unbounded polyline.
 export default function TripReplayScreen({ route, navigation }) {
-  const { tripId, trip: tripPreview } = route.params
+  // Defaulted rather than destructured straight off route.params: this screen is reachable from
+  // the root stack, so a deep link or a restored navigation state can land here with no params at
+  // all, and destructuring `undefined` would throw before the error boundary could show anything
+  // useful.
+  const { tripId, trip: tripPreview } = route.params || {}
   const { colors, space, radius, type, shadow } = useTheme()
   const insets = useSafeAreaInsets()
 
@@ -49,6 +47,11 @@ export default function TripReplayScreen({ route, navigation }) {
   }, [playing])
 
   async function load() {
+    if (!tripId) {
+      setError('No trip selected')
+      setLoading(false)
+      return
+    }
     try {
       const res = await api.get(`/trips/${tripId}/replay`)
       setTrip(res.data.trip)
@@ -100,7 +103,7 @@ export default function TripReplayScreen({ route, navigation }) {
           <View style={[styles.sheet, { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingBottom: insets.bottom + space.lg }, shadow('lg')]}>
             <Text style={[type.title3, { color: colors.fg }]}>{trip?.vehicleName || 'Trip'}</Text>
             <Text style={[type.caption, { color: colors.fgMuted, marginTop: 2, marginBottom: space.md }]}>
-              {formatDuration(trip?.durationMinutes)} · {trip?.distanceKm ? `${trip.distanceKm.toFixed(1)} km` : '—'}
+              {formatDuration(trip?.durationMinutes)} · {formatKm(trip?.distanceKm)}
             </Text>
 
             <View

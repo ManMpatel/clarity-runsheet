@@ -3,6 +3,7 @@ import { View, Text, Pressable } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { Users as UsersIcon, Plus, X, UserRound } from 'lucide-react-native'
 import api from '../../lib/api'
+import { useAuthStore } from '../../stores/authStore'
 import { useTheme } from '../../theme'
 import { Header, Card, Field, Button, Chip, Badge, EmptyState, ErrorState, Skeleton } from '../../components/ui'
 
@@ -11,6 +12,7 @@ const roleLabel = (r) => (r === 'companyAdmin' ? 'Admin' : r === 'fleetManager' 
 
 export default function UsersScreen({ navigation }) {
   const { colors, space, radius, type } = useTheme()
+  const canManage = useAuthStore((s) => s.canManage())
   const [users, setUsers]     = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
@@ -53,9 +55,9 @@ export default function UsersScreen({ navigation }) {
       <Header
         title='Team'
         onBack={() => navigation.goBack()}
-        right={<Pressable onPress={() => setShowAdd((s) => !s)} hitSlop={8}>{showAdd ? <X size={20} color={colors.fg} /> : <Plus size={20} color={colors.fg} />}</Pressable>}
+        right={canManage ? <Pressable onPress={() => setShowAdd((s) => !s)} hitSlop={8}>{showAdd ? <X size={20} color={colors.fg} /> : <Plus size={20} color={colors.fg} />}</Pressable> : null}
       />
-      {showAdd && (
+      {canManage && showAdd && (
         <Card style={{ marginHorizontal: space.lg, marginBottom: space.md }}>
           {!!formError && <Text style={[type.caption, { color: colors.danger, marginBottom: space.sm }]}>{formError}</Text>}
           <Field placeholder='Name' value={form.name} onChangeText={(t) => setForm((f) => ({ ...f, name: t }))} />
@@ -78,9 +80,8 @@ export default function UsersScreen({ navigation }) {
         <FlashList
           data={users}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={72}
           contentContainerStyle={{ padding: space.lg, paddingBottom: space['4xl'] }}
-          ListEmptyComponent={!showAdd && <EmptyState icon={<UsersIcon size={36} color={colors.fgSubtle} />} title='No other users yet' message='Tap + to invite your first team member' />}
+          ListEmptyComponent={!showAdd && <EmptyState icon={<UsersIcon size={36} color={colors.fgSubtle} />} title='No other users yet' message={canManage ? 'Tap + to invite your first team member' : 'Ask a company admin to invite team members'} />}
           renderItem={({ item }) => (
             <Card style={{ flexDirection: 'row', alignItems: 'center', marginBottom: space.sm }}>
               <View style={{ width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginRight: space.md }}>

@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { View, Text, ScrollView } from 'react-native'
-import { FlashList } from '@shopify/flash-list'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
+import { formatNumber } from '../../lib/format'
 import { Header, Field, Button, Chip, Card, EmptyState } from '../../components/ui'
 
 const REPORT_TYPES = [
@@ -36,29 +36,31 @@ export default function ReportsScreen({ navigation }) {
     }
   }
 
+  // NOTE: these lists render with .map(), not FlashList. A FlashList inside this screen's
+  // ScrollView is a same-orientation nested scroller with unbounded height — v2 can't virtualise
+  // that and the rows come out blank. Report result sets are date-range bounded and small, so
+  // there's nothing to virtualise anyway.
   function renderResults() {
     if (!data) return null
     if (selected === 'driver-scores') {
-      return (
-        <FlashList
-          data={data}
-          keyExtractor={(item, i) => item.id || String(i)}
-          estimatedItemSize={60}
-          ListEmptyComponent={<EmptyState title='No scores in this range' />}
-          renderItem={({ item }) => (
-            <ResultRow main={new Date(item.weekStart).toLocaleDateString('en-AU')} value={item.overallScore ?? '—'} />
-          )}
+      const rows = Array.isArray(data) ? data : []
+      if (rows.length === 0) return <EmptyState title='No scores in this range' />
+      return rows.map((item, i) => (
+        <ResultRow
+          key={item.id || i}
+          main={new Date(item.weekStart).toLocaleDateString('en-AU')}
+          value={formatNumber(item.overallScore)}
         />
-      )
+      ))
     }
     if (selected === 'trip-summary') {
       const s = data.summary || {}
       return (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           <SummaryBox label='Total trips' value={s.totalTrips ?? 0} />
-          <SummaryBox label='Total km' value={s.totalKm?.toFixed(1) ?? 0} />
-          <SummaryBox label='Total mins' value={s.totalDuration ?? 0} />
-          <SummaryBox label='Avg km/trip' value={s.avgKmPerTrip ?? 0} />
+          <SummaryBox label='Total km' value={formatNumber(s.totalKm, 1)} />
+          <SummaryBox label='Total mins' value={formatNumber(s.totalDuration)} />
+          <SummaryBox label='Avg km/trip' value={formatNumber(s.avgKmPerTrip, 1)} />
         </View>
       )
     }
@@ -71,17 +73,15 @@ export default function ReportsScreen({ navigation }) {
       )
     }
     if (selected === 'vehicle-health') {
-      return (
-        <FlashList
-          data={data}
-          keyExtractor={(item, i) => item.vehicle?.id || String(i)}
-          estimatedItemSize={60}
-          ListEmptyComponent={<EmptyState title='No vehicle health data yet' />}
-          renderItem={({ item }) => (
-            <ResultRow main={item.vehicle?.name} sub={item.latest ? new Date(item.latest.time).toLocaleDateString('en-AU') : 'No data yet'} />
-          )}
+      const rows = Array.isArray(data) ? data : []
+      if (rows.length === 0) return <EmptyState title='No vehicle health data yet' />
+      return rows.map((item, i) => (
+        <ResultRow
+          key={item.vehicle?.id || i}
+          main={item.vehicle?.name}
+          sub={item.latest ? new Date(item.latest.time).toLocaleDateString('en-AU') : 'No data yet'}
         />
-      )
+      ))
     }
     return null
   }

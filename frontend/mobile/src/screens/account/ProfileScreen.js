@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { ScrollView, View, Text, Alert } from 'react-native'
+import { Trash2 } from 'lucide-react-native'
 import api from '../../lib/api'
+import { useAuthStore } from '../../stores/authStore'
 import { useTheme } from '../../theme'
 import { Header, Card, Field, Button, Badge, Skeleton, ErrorState } from '../../components/ui'
 
 export default function ProfileScreen({ navigation }) {
-  const { colors, space, type } = useTheme()
+  const { colors, space, radius, type } = useTheme()
+  const logout = useAuthStore((s) => s.logout)
 
   const [user, setUser]       = useState(null)
   const [loading, setLoading] = useState(true)
@@ -14,6 +17,10 @@ export default function ProfileScreen({ navigation }) {
   const [pwForm, setPwForm]   = useState({ current: '', next: '', confirm: '' })
   const [saving, setSaving]   = useState(false)
   const [pwError, setPwError] = useState('')
+  const [showDelete, setShowDelete] = useState(false)
+  const [deletePw, setDeletePw]     = useState('')
+  const [deleting, setDeleting]     = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => { load() }, [])
 
@@ -42,6 +49,40 @@ export default function ProfileScreen({ navigation }) {
       setPwError(err.response?.data?.message || 'Could not update password')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Two-step on purpose: expanding the panel is step one, the native alert is step two. This is
+  // irreversible and, for a sole-user company, takes the entire fleet's history with it — so the
+  // confirmation spells out which of the two outcomes applies to this user.
+  function confirmDelete() {
+    // `hasPassword` is false for Google/Apple-only accounts, which have nothing to type — the
+    // backend skips its password check for exactly those, so don't demand one here either.
+    if (user?.hasPassword && !deletePw) {
+      setDeleteError('Enter your password to confirm')
+      return
+    }
+    Alert.alert(
+      'Delete account?',
+      'This cannot be undone. If you are the only person on your company account, all vehicles, trips, and tracking history will be permanently deleted too.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete account', style: 'destructive', onPress: runDelete },
+      ]
+    )
+  }
+
+  async function runDelete() {
+    setDeleteError('')
+    setDeleting(true)
+    try {
+      await api.delete('/auth/me', { data: { password: deletePw || undefined } })
+      // Clears the stored refresh token and user, which bounces back to the auth stack.
+      await logout()
+    } catch (err) {
+      setDeleteError(err.response?.data?.message || 'Could not delete account')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -80,6 +121,47 @@ export default function ProfileScreen({ navigation }) {
                 <Field placeholder='New password' secureTextEntry value={pwForm.next} onChangeText={(t) => setPwForm((f) => ({ ...f, next: t }))} />
                 <Field placeholder='Confirm new password' secureTextEntry value={pwForm.confirm} onChangeText={(t) => setPwForm((f) => ({ ...f, confirm: t }))} style={{ marginBottom: 0 }} />
                 <Button label='Update password' onPress={savePassword} loading={saving} style={{ marginTop: space.md }} />
+              </View>
+            )}
+          </Card>
+
+          {/* Required by App Store Guideline 5.1.1(v) — an app that creates accounts in-app must
+              let users delete them in-app. Deliberately last on the screen and behind a
+              disclosure + a native confirm, since for a sole-user company this wipes the whole
+              fleet's history. */}
+          <Text style={[type.captionMedium, { color: colors.fgSubtle, textTransform: 'uppercase', marginTop: space.xl, marginBottom: space.sm }]}>Danger zone</Text>
+          <Card>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={[type.bodyMedium, { color: colors.fg }]}>Delete account</Text>
+              <Text
+                onPress={() => { setShowDelete((s) => !s); setDeleteError(''); setDeletePw('') }}
+                style={[type.captionMedium, { color: showDelete ? colors.accent : colors.danger }]}
+              >
+                {showDelete ? 'Cancel' : 'Delete'}
+              </Text>
+            </View>
+            {showDelete && (
+              <View style={{ marginTop: space.md }}>
+                <View style={{ backgroundColor: colors.dangerSoft, borderRadius: radius.md, padding: space.md, marginBottom: space.md, flexDirection: 'row' }}>
+                  <Trash2 size={16} color={colors.dangerFg} style={{ marginTop: 2 }} />
+                  <Text style={[type.caption, { color: colors.dangerFg, marginLeft: space.sm, flex: 1, lineHeight: 18 }]}>
+                    Permanently deletes your account. If you're the only person on your company
+                    account, every vehicle, trip, and piece of tracking history goes with it. This
+                    can't be undone.
+                  </Text>
+                </View>
+                {!!deleteError && <Text style={[type.caption, { color: colors.danger, marginBottom: space.sm }]}>{deleteError}</Text>}
+                {user?.hasPassword && (
+                  <Field
+                    placeholder='Confirm your password'
+                    secureTextEntry
+                    value={deletePw}
+                    onChangeText={setDeletePw}
+                    autoCapitalize='none'
+                    style={{ marginBottom: space.md }}
+                  />
+                )}
+                <Button label='Delete my account' variant='danger' loading={deleting} onPress={confirmDelete} />
               </View>
             )}
           </Card>

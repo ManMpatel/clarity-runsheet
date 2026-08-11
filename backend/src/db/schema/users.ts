@@ -22,6 +22,10 @@ export const users = pgTable('users', {
   driverConsentGivenAt: timestamp('driver_consent_given_at', { withTimezone: true }),
   driverConsentIp: text('driver_consent_ip'),
   googleId: text('google_id'),
+  // Apple's `sub` claim. Stable per (Apple account, app) forever, unlike the email — Apple users
+  // can sign in with a Private Relay address and can later disable forwarding, so the email is
+  // NOT a reliable identity key for these accounts. Match on this first.
+  appleId: text('apple_id'),
   resetToken: text('reset_token'),
   resetTokenExpiry: timestamp('reset_token_expiry', { withTimezone: true }),
   pushToken: text('push_token'), // legacy Expo token column; superseded by device_tokens table, kept for now

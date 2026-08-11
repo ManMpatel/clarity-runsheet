@@ -1,23 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
-import { View, Text, Pressable, ActivityIndicator } from 'react-native'
+import { View, Text, Pressable, ActivityIndicator, RefreshControl } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FlashList } from '@shopify/flash-list'
-import { BellOff, Gauge, Clock, Wrench, BatteryWarning, MapPinOff, Truck, Siren, Cable } from 'lucide-react-native'
+import { BellOff, Gauge, Clock, Wrench, BatteryWarning, MapPinOff, Truck, Siren, Cable, TrendingDown, TrendingUp, CornerUpRight } from 'lucide-react-native'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
-import { EmptyState, ErrorState, Skeleton } from '../../components/ui'
+import { useTabBarClearance } from '../../navigation/tabBarLayout'
+import { EmptyState, ErrorState, Skeleton, useToast } from '../../components/ui'
 import { useFleetSocket } from '../../hooks/useSocket'
 
+// Must stay in step with alertTypeEnum in backend/src/db/schema/alerts.ts — anything missing here
+// renders as its raw identifier ("harshBraking") with a generic bell. The three harsh-driving
+// types were exactly that until now.
 const TYPE_META = {
-  afterHours:     { label: 'After Hours',       icon: Clock,          severity: 'warning' },
-  speeding:       { label: 'Speeding',          icon: Gauge,          severity: 'warning' },
-  engineFault:    { label: 'Engine Fault',      icon: Wrench,         severity: 'critical' },
-  lowBattery:     { label: 'Low Battery',       icon: BatteryWarning, severity: 'warning' },
-  geofenceBreach: { label: 'Geofence Breach',   icon: MapPinOff,      severity: 'warning' },
-  towing:         { label: 'Towing Detected',   icon: Truck,          severity: 'critical' },
-  crash:          { label: 'Crash Detected',    icon: Siren,          severity: 'critical' },
-  maintenanceDue: { label: 'Maintenance Due',   icon: Wrench,         severity: 'info' },
-  tamper:         { label: 'Tamper / Power Cut',icon: Cable,          severity: 'critical' },
+  afterHours:         { label: 'After Hours',        icon: Clock,          severity: 'warning' },
+  speeding:           { label: 'Speeding',           icon: Gauge,          severity: 'warning' },
+  engineFault:        { label: 'Engine Fault',       icon: Wrench,         severity: 'critical' },
+  lowBattery:         { label: 'Low Battery',        icon: BatteryWarning, severity: 'warning' },
+  geofenceBreach:     { label: 'Geofence Breach',    icon: MapPinOff,      severity: 'warning' },
+  towing:             { label: 'Towing Detected',    icon: Truck,          severity: 'critical' },
+  crash:              { label: 'Crash Detected',     icon: Siren,          severity: 'critical' },
+  harshBraking:       { label: 'Harsh Braking',      icon: TrendingDown,   severity: 'warning' },
+  harshAcceleration:  { label: 'Harsh Acceleration', icon: TrendingUp,     severity: 'warning' },
+  harshCornering:     { label: 'Harsh Cornering',    icon: CornerUpRight,  severity: 'warning' },
+  maintenanceDue:     { label: 'Maintenance Due',    icon: Wrench,         severity: 'info' },
+  tamper:             { label: 'Tamper / Power Cut', icon: Cable,          severity: 'critical' },
 }
 
 function dayLabel(dateStr) {
@@ -32,6 +39,8 @@ function dayLabel(dateStr) {
 export default function AlertsScreen() {
   const { colors, space, radius, type } = useTheme()
   const insets = useSafeAreaInsets()
+  const toast = useToast()
+  const tabBarClearance = useTabBarClearance()
 
   const [alerts, setAlerts] = useState([])
   const [unread, setUnread] = useState(0)
@@ -53,8 +62,9 @@ export default function AlertsScreen() {
     },
   })
 
-  async function load() {
-    setLoading(true)
+  async function load({ isRefresh = false } = {}) {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
     setError(null)
     try {
       const res = await api.get('/alerts?limit=25')
@@ -65,6 +75,7 @@ export default function AlertsScreen() {
       setError(err.response?.data?.message || 'Could not load alerts')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -76,29 +87,40 @@ export default function AlertsScreen() {
       setAlerts((list) => [...list, ...(res.data.alerts || [])])
       setCursor(res.data.nextCursor || null)
     } catch (err) {
-      console.log(err.message)
+      toast.show(err.response?.data?.message || 'Could not load more alerts', 'error')
     } finally {
       setLoadingMore(false)
     }
   }
 
+  // These three write optimistically and roll back on failure. They used to swallow the error into
+  // console.log, so a failed write left the UI showing a state the server never accepted — the
+  // alert looked read, then silently came back unread on the next load.
   async function markRead(id) {
+    const previous = alerts
+    const previousUnread = unread
     setAlerts((list) => list.map((a) => (a.id === id ? { ...a, read: true } : a)))
     setUnread((u) => Math.max(0, u - 1))
     try {
       await api.put(`/alerts/${id}/read`)
     } catch (err) {
-      console.log(err.message)
+      setAlerts(previous)
+      setUnread(previousUnread)
+      toast.show(err.response?.data?.message || 'Could not mark as read', 'error')
     }
   }
 
   async function markAllRead() {
+    const previous = alerts
+    const previousUnread = unread
     setAlerts((list) => list.map((a) => ({ ...a, read: true })))
     setUnread(0)
     try {
       await api.put('/alerts/read-all')
     } catch (err) {
-      console.log(err.message)
+      setAlerts(previous)
+      setUnread(previousUnread)
+      toast.show(err.response?.data?.message || 'Could not mark all as read', 'error')
     }
   }
 
@@ -140,10 +162,10 @@ export default function AlertsScreen() {
         <FlashList
           data={grouped}
           keyExtractor={(item) => item.id}
-          estimatedItemSize={76}
-          contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space['5xl'] }}
+          contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: tabBarClearance }}
           onEndReachedThreshold={0.4}
           onEndReached={loadMore}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load({ isRefresh: true })} tintColor={colors.fgMuted} />}
           ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accent} style={{ marginVertical: space.md }} /> : null}
           ListEmptyComponent={<EmptyState icon={<BellOff size={36} color={colors.fgSubtle} />} title="You're all caught up" message='New alerts will show up here' />}
           renderItem={({ item }) =>

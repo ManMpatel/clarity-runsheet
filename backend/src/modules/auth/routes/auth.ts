@@ -140,7 +140,74 @@ router.get('/me', requireAuth, asyncRoute(async (req, res) => {
   const [user] = await db.select().from(users).where(eq(users.id, (req.user!.userId as string))).limit(1)
   if (!user) return res.fail(null, 'User not found', 404)
   const { passwordHash, ...safe } = user
-  return res.success(safe)
+  // The hash itself never leaves the server, but clients need to know whether one EXISTS: an
+  // SSO-only account (Google/Apple) has nothing to type into a "confirm your password" prompt,
+  // and both the change-password and delete-account flows branch on that.
+  return res.success({ ...safe, hasPassword: !!passwordHash })
+}))
+
+// App Store Guideline 5.1.1(v): an app that lets users create an account in-app must let them
+// initiate deletion of it in-app too. There was no such path anywhere — this is the endpoint
+// behind ProfileScreen's "Delete account" row (frontend/mobile).
+//
+// Two shapes, because this is multi-tenant B2B and "delete my account" means different things
+// depending on who's asking:
+//   - Sole user of the company -> the whole tenant goes. Deleting the `companies` row cascades to
+//     vehicles, trips, telemetry, alerts, geofences, maintenance, drivers, safety scores and
+//     everything else (every company-scoped table declares onDelete:'cascade'), which is the
+//     honest reading of "delete my account and my data".
+//   - Other users remain -> only this user goes. If they were the last companyAdmin, the
+//     longest-standing remaining user is promoted so the company isn't left with no admin and no
+//     way to get one. Deliberately always succeeds rather than refusing with "transfer ownership
+//     first" — a deletion path that can dead-end is exactly what Apple rejects for.
+//
+// Password re-entry is required for accounts that have one. This destroys a whole company's data
+// and a stolen 15-minute access token shouldn't be enough to do it. SSO-only accounts (Google/
+// Apple) have no passwordHash and rely on the client's two-step confirmation instead.
+router.delete('/me', requireAuth, asyncRoute(async (req, res) => {
+  const { password } = req.body || {}
+  const userId = req.user!.userId as string
+
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1)
+  if (!user) return res.fail(null, 'User not found', 404)
+
+  if (user.role === 'superAdmin') {
+    return res.fail(null, 'Super admin accounts cannot be deleted from the app', 403)
+  }
+
+  if (user.passwordHash) {
+    if (!password) return res.fail(null, 'Enter your password to confirm deletion')
+    const valid = await verifyPassword(password, user.passwordHash)
+    if (!valid) return res.fail(null, 'Password incorrect', 401)
+  }
+
+  if (user.companyId) {
+    const companyUsers = await db.select({ id: users.id, role: users.role, createdAt: users.createdAt })
+      .from(users).where(eq(users.companyId, user.companyId))
+
+    const others = companyUsers.filter((u) => u.id !== user.id)
+
+    if (others.length === 0) {
+      // Sole user — drop the tenant. The users row goes with it via ON DELETE SET NULL on
+      // users.company_id, so delete the user explicitly afterwards.
+      await db.delete(companies).where(eq(companies.id, user.companyId))
+      await db.delete(users).where(eq(users.id, user.id))
+      clearRefreshCookie(res)
+      return res.success(null, 'Account and company data deleted')
+    }
+
+    const adminsLeft = others.filter((u) => u.role === 'companyAdmin')
+    if (user.role === 'companyAdmin' && adminsLeft.length === 0) {
+      const successor = [...others].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0]
+      await db.update(users).set({ role: 'companyAdmin', updatedAt: new Date() }).where(eq(users.id, successor.id))
+    }
+  }
+
+  // refresh_tokens and device_tokens both cascade on user_id, so sessions are revoked and push
+  // stops going to this user's devices as a side effect of the delete.
+  await db.delete(users).where(eq(users.id, user.id))
+  clearRefreshCookie(res)
+  return res.success(null, 'Account deleted')
 }))
 
 router.post('/resend-verification', requireAuth, asyncRoute(async (req, res) => {
