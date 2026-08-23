@@ -40,6 +40,7 @@ export default function Dialog({ open, onOpenChange, size = 'md', children, clas
         className={cn(
           'relative w-full bg-surface border border-border rounded-modal shadow-modal',
           'outline-none max-h-[calc(100svh-2rem)] flex flex-col',
+          'motion-safe:animate-[pop-in_180ms_ease-out]',
           SIZES[size], className
         )}
       >

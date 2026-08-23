@@ -76,6 +76,7 @@ export async function enrichAndSaveVanState(imei: string, companyId: string, veh
     lat,
     lng,
     speed: doc.speed,
+    angle: doc.angle ?? null,
     ignition: doc.ignition,
     odometer: doc.odometer,
     status: currentStatus,

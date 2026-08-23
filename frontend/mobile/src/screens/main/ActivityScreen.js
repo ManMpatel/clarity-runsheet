@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { View, Text, Pressable, RefreshControl, ActivityIndicator } from 'react-native'
+import { View, Text, Pressable, RefreshControl, ActivityIndicator, ScrollView } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import { FlashList } from '@shopify/flash-list'
 import { Truck, MapPinned } from 'lucide-react-native'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
 import { formatKm, formatNumber, formatDuration } from '../../lib/format'
 import { useTabBarClearance } from '../../navigation/tabBarLayout'
-import { Card, SegmentedControl, Skeleton, EmptyState, ErrorState, useToast } from '../../components/ui'
+import { Card, Chip, Field, SegmentedControl, Skeleton, EmptyState, ErrorState, useToast } from '../../components/ui'
 
 function formatTimeRange(start, end) {
   const opts = { hour: 'numeric', minute: '2-digit' }
@@ -28,7 +28,7 @@ function dayLabel(dateStr) {
 
 export default function ActivityScreen() {
   const { colors, space, radius, type } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useSafeInsets()
   const navigation = useNavigation()
   const toast = useToast()
   const tabBarClearance = useTabBarClearance()
@@ -44,30 +44,68 @@ export default function ActivityScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState(null)
+  const [vehicles, setVehicles] = useState([])
+  const [vehicleId, setVehicleId] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
 
-  useEffect(() => { load() }, [])
+  const dateFilterReady = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)
+  const fromKey = dateFilterReady ? from : ''
+  const toKey = dateFilterReady ? to : ''
 
-  async function load({ isRefresh = false } = {}) {
+  function tripsPath({ cursor } = {}) {
+    const params = new URLSearchParams({ limit: '25' })
+    if (vehicleId) params.set('vehicleId', vehicleId)
+    if (fromKey && toKey) {
+      params.set('from', fromKey)
+      params.set('to', toKey)
+    }
+    if (cursor) params.set('cursor', cursor)
+    return `/trips?${params}`
+  }
+
+  useEffect(() => {
+    api.get('/vehicles').then((res) => setVehicles(res.data || [])).catch(() => {})
+    loadFbt()
+  }, [])
+
+  useEffect(() => { loadTrips() }, [vehicleId, fromKey, toKey])
+
+  async function loadTrips({ isRefresh = false } = {}) {
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
     setError(null)
     try {
-      const [tripsRes, fbtRes, summaryRes] = await Promise.all([
-        api.get('/trips?limit=25'),
-        api.get('/fbt?limit=25'),
-        api.get('/fbt/summary'),
-      ])
+      const tripsRes = await api.get(tripsPath())
       setTrips(tripsRes.data.trips || [])
       setTripsCursor(tripsRes.data.nextCursor || null)
-      setFbtTrips(fbtRes.data.trips || [])
-      setFbtCursor(fbtRes.data.nextCursor || null)
-      setFbtSummary(summaryRes.data || null)
     } catch (err) {
       setError(err.response?.data?.message || 'Could not load activity')
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
+  }
+
+  async function loadFbt({ isRefresh = false } = {}) {
+    if (isRefresh) setRefreshing(true)
+    try {
+      const [fbtRes, summaryRes] = await Promise.all([
+        api.get('/fbt?limit=25'),
+        api.get('/fbt/summary'),
+      ])
+      setFbtTrips(fbtRes.data.trips || [])
+      setFbtCursor(fbtRes.data.nextCursor || null)
+      setFbtSummary(summaryRes.data || null)
+    } catch (err) {
+      if (!isRefresh) setError(err.response?.data?.message || 'Could not load activity')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  async function load({ isRefresh = false } = {}) {
+    await Promise.all([loadTrips({ isRefresh }), loadFbt({ isRefresh })])
   }
 
   // Both tabs page the same way; which one is driven by whichever list hit its end. Previously
@@ -78,8 +116,8 @@ export default function ActivityScreen() {
     if (!cursor || loadingMore) return
     setLoadingMore(true)
     try {
-      const path = tab === 'trips' ? '/trips' : '/fbt'
-      const res = await api.get(`${path}?limit=25&cursor=${encodeURIComponent(cursor)}`)
+      const path = tab === 'trips' ? tripsPath({ cursor }) : `/fbt?limit=25&cursor=${encodeURIComponent(cursor)}`
+      const res = await api.get(path)
       const page = res.data.trips || []
       if (tab === 'trips') {
         setTrips((list) => [...list, ...page])
@@ -93,7 +131,7 @@ export default function ActivityScreen() {
     } finally {
       setLoadingMore(false)
     }
-  }, [tab, tripsCursor, fbtCursor, loadingMore])
+  }, [tab, tripsCursor, fbtCursor, loadingMore, vehicleId, fromKey, toKey])
 
   async function classify(tripId, classification) {
     // Optimistic — the chip should respond to the tap immediately; roll back if the write fails.
@@ -135,6 +173,20 @@ export default function ActivityScreen() {
           onChange={setTab}
           options={[{ label: 'Trips', value: 'trips' }, { label: 'FBT Logbook', value: 'fbt' }]}
         />
+        {tab === 'trips' && (
+          <View style={{ marginTop: space.md }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: space.lg }}>
+              <Chip label='All' active={!vehicleId} onPress={() => setVehicleId('')} />
+              {vehicles.map((v) => (
+                <Chip key={v.id} label={v.name} active={vehicleId === v.id} onPress={() => setVehicleId(v.id)} />
+              ))}
+            </ScrollView>
+            <View style={{ flexDirection: 'row', marginTop: space.sm }}>
+              <Field placeholder='From (YYYY-MM-DD)' value={from} onChangeText={setFrom} style={{ flex: 1, marginRight: space.sm, marginBottom: 0 }} />
+              <Field placeholder='To (YYYY-MM-DD)' value={to} onChangeText={setTo} style={{ flex: 1, marginBottom: 0 }} />
+            </View>
+          </View>
+        )}
       </View>
 
       {loading ? (

@@ -326,6 +326,106 @@ keeps the UI honest. The app already mounts a `ToastProvider` app-wide; it just 
 
 ---
 
+## D-017 — `screens/auth/` follows Apple's design language, not the app's own
+
+**Decision.** The four auth screens were rebuilt in Apple's design language and now run on their own
+type scale (`appleType`), their own neutral tokens (`ios*`), and their own component kit
+(`components/auth/`). Every other screen is untouched and still follows the doctrine described at
+the bottom of `theme/tokens.js`.
+
+**Alternatives.** (a) Restyle the auth screens within the existing scale and palette. (b) Convert
+the whole app to Apple's language. (c) Leave them as they were.
+
+**Why.** These are the first two screens a new install sees, and they read generic. (b) is a
+multi-week change that would also desynchronise mobile from the web dashboard, which shares the
+palette. (a) can't get there: the two things that actually make a screen read as native iOS are the
+system typeface and the inset grouped list, and neither exists in the current system. Scoping the
+new doctrine to `screens/auth/` buys the visual result without touching the 20+ screens behind the
+login wall.
+
+**Why two type scales.** `appleType` omits `fontFamily` entirely on iOS, which is what makes React
+Native resolve the real system face — SF Pro — and get its automatic Display/Text optical sizing
+above ~20pt. Setting `fontFamily: 'System'` forfeits that. SF Pro isn't licensed off Apple's
+platforms, so Android falls back to the Inter cut already bundled for the same weight; the metrics
+are close enough that the layouts hold on both. `appleType` also uses Apple's 17pt body against the
+app scale's 15pt, so the two can't be merged without changing every existing screen.
+
+**Why `ios*` tokens.** The ported palette is Tailwind slate, which has a blue cast that visibly
+fights an iOS-native look. The six added keys per scheme are the real UIKit system greys. They're
+prefixed so there's never ambiguity about which doctrine a token belongs to.
+
+**Brand tint kept.** Auth uses `colors.accent` (indigo), not Apple system blue. Apple's own apps use
+Apple's brand tint; using ours is the native-correct choice and keeps parity with web.
+
+**Scoped exception to the "accent is for actions, not decoration" rule** in `theme/tokens.js`: the
+welcome screen's three feature icons are tinted. On Apple's onboarding pattern the tint *is* the
+visual system, and this screen sits outside the app's information hierarchy entirely.
+
+**Sign in with Apple is unchanged** — still `AppleAuthentication.AppleAuthenticationButton`, for the
+Guideline 4.8 reasons in D-003. It only exposes `height` and `cornerRadius`, so `AuthButton` was
+sized to match it (50pt / 14pt) rather than the reverse.
+
+**Also fixed.** `WelcomeScreen` was hardcoded to `#0B0B0F` regardless of the device setting, which
+is why it couldn't use the themed kit. It now follows the system scheme, and the splash background
+in `app.config.js` gained a light variant to match — it was `#0B0B0F` in both appearances, which
+would now flash near-black before a light-mode launch.
+
+**Touches.** `frontend/mobile/src/theme/{type,tokens,ThemeProvider}.js`,
+`frontend/mobile/src/components/auth/*` (new),
+`frontend/mobile/src/screens/auth/{Welcome,Login,Signup,ForgotPassword}Screen.js`,
+`frontend/mobile/app.config.js`.
+
+---
+
+## D-018 — `!override` on every `ports:`/`env_file:` in `docker-compose.prod.yml`
+
+**Decision.** Tag every overridden `ports:` and `env_file:` list in `docker-compose.prod.yml` with
+Compose's `!override`, and make "verify the merged bindings" an explicit numbered step in
+`DEPLOY.md` before the box is exposed.
+
+**Alternatives.** (a) A standalone production compose file duplicating all five services.
+(b) Plain override without the tag.
+
+**Why.** (b) is silently dangerous: Compose *concatenates* list fields across `-f` files rather
+than replacing them, so the dev file's `'5432:5432'` (bound to `0.0.0.0`) survives the override and
+the "hardened" production stack publishes Postgres and Redis to the open internet on a box with a
+public IP. The same merge rule applies to `env_file`, which would load the dev `./backend/.env`
+alongside `.env.production` and leak dev values for any key production doesn't redefine. (a) avoids
+the trap but duplicates config that then drifts. Verified with
+`docker compose -f docker-compose.yml -f docker-compose.prod.yml config`: exactly one binding per
+port, all `127.0.0.1` except 5027.
+
+**Cost.** Requires Docker Compose v2.24+. Older versions ignore the tag and silently fall back to
+merging, which is why `DEPLOY.md` step 3 gates on the version and step 8 re-checks the result.
+
+**Touches.** `docker-compose.prod.yml`, `DEPLOY.md`.
+
+---
+
+## D-019 — Device IMEI stays unauthenticated while 5027 goes public
+
+**Decision.** Ship the public device port with `parseImei()` unchanged — any connecting client is
+trusted to be whichever IMEI it claims. Add observability (`/health`, `connected[]` on
+`/internal/metrics`, an `unknownImei` counter) instead of enforcement.
+
+**Alternatives.** (a) Check the claimed IMEI against the `vehicles` table before registering the
+socket. (b) Per-SIM source-IP allowlisting in ufw.
+
+**Why.** Confirmed with the user at plan time: the immediate goal is getting one device tracking,
+and (a) adds a DB dependency to a process that deliberately has none today (`tcp-listener` only
+`depends_on: redis`), which is a real architectural change rather than a tweak.
+
+**Risk being carried.** With 5027 on the public internet, anyone who learns a valid IMEI can
+connect as that device, inject fabricated telemetry, and — because
+`registry/sockets.ts` `destroy()`s the existing socket when a second connection claims the same
+IMEI — knock the real device offline and take over its relay cut/restore channel. That channel
+drives the immobiliser. This is acceptable for a single test device and **is not acceptable once
+customer vehicles are on the platform**; revisit before then.
+
+**Touches.** Nothing (deliberate no-op). Recorded so it reads as a decision, not an oversight.
+
+---
+
 # Blocked on manual steps
 
 These are the things the code now depends on that can't be done from the repo. Each one has a

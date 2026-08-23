@@ -3,8 +3,7 @@ import { Sun, Moon, SmartphoneNfc, Check } from 'lucide-react-native'
 import { useTheme } from '../../theme'
 import { Header, Card } from '../../components/ui'
 
-// New — mobile had no dark mode at all before this rebuild. Mirrors the web dashboard's
-// light/dark/system control, persisted via ThemeProvider's setThemeOverride (expo-secure-store).
+// Light is the default. Dark and System remain available and persist via ThemeProvider.
 const OPTIONS = [
   { key: 'light', label: 'Light', icon: Sun },
   { key: 'dark', label: 'Dark', icon: Moon },
@@ -12,8 +11,8 @@ const OPTIONS = [
 ]
 
 export default function AppearanceScreen({ navigation }) {
-  const { colors, space, radius, type, override, setThemeOverride } = useTheme()
-  const current = override || 'system'
+  const { colors, space, type, preference, setThemeOverride } = useTheme()
+  const current = preference || 'light'
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>

@@ -1,0 +1,119 @@
+# Production override. Use ON TOP of docker-compose.yml, never alone:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# WHY EVERY `ports:` BELOW CARRIES THE `!override` TAG
+#
+# Compose merges list fields across files by CONCATENATING them, not replacing. Without the tag,
+# the base file's `'5432:5432'` would survive this override and simply gain a second entry — so
+# Postgres and Redis would still be listening on 0.0.0.0 on a box with a public IP. `!override`
+# replaces the list outright.
+#
+# This requires Docker Compose v2.24+. Verify the merge actually took effect before exposing the
+# box (DEPLOY.md step 8 covers this):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml config | grep -A3 published
+#
+# Every published port below except 5027 is bound to 127.0.0.1 and reached only via nginx
+# (deploy/nginx/clarity.conf) or an SSH tunnel. 5027 is deliberately public and raw: GPS hardware
+# speaks Codec 8/8E over bare TCP and cannot go through an HTTP reverse proxy.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    restart: always
+    ports: !override
+      - '127.0.0.1:5432:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in the shell env or a root .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD — do not ship the dev default}
+      POSTGRES_DB: ${POSTGRES_DB:-clarity_fleet}
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    restart: always
+    ports: !override
+      - '127.0.0.1:6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    restart: always
+    # !override here too: env_file is list-merged like ports, so without it the base file's
+    # dev ./backend/.env would still be loaded alongside this one, leaking dev-only values
+    # (localhost WEB_URL, test Stripe keys) for any key .env.production doesn't redefine.
+    env_file: !override
+      - ./backend/.env.production
+    environment: !override
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-clarity_fleet}
+      REDIS_URL: redis://redis:6379
+      TCP_INTERNAL_URL: http://tcp-listener:4001
+    ports: !override
+      - '127.0.0.1:3000:3000'
+    # storage/reports is written AND served by the api process only — reports-queue.ts's
+    # REPORTS_DIR resolves to /app/storage/reports, and the only importers are api.ts,
+    # fleet/routes/reports-async.ts and admin/routes/reports.ts. ingestion never touches it,
+    # so this is a single mount rather than a shared one.
+    volumes:
+      - report_storage:/app/storage
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  tcp-listener:
+    restart: always
+    # !override here too: env_file is list-merged like ports, so without it the base file's
+    # dev ./backend/.env would still be loaded alongside this one, leaking dev-only values
+    # (localhost WEB_URL, test Stripe keys) for any key .env.production doesn't redefine.
+    env_file: !override
+      - ./backend/.env.production
+    environment: !override
+      NODE_ENV: production
+      REDIS_URL: redis://redis:6379
+    # 5027 PUBLIC (device port, raw TCP — this is what the FTC921 dials).
+    # 4001 is the internal command/metrics server: localhost only, reached by api over the
+    # compose network as http://tcp-listener:4001, never from outside the box.
+    ports: !override
+      - '5027:5027'
+      - '127.0.0.1:4001:4001'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  ingestion:
+    restart: always
+    # !override here too: env_file is list-merged like ports, so without it the base file's
+    # dev ./backend/.env would still be loaded alongside this one, leaking dev-only values
+    # (localhost WEB_URL, test Stripe keys) for any key .env.production doesn't redefine.
+    env_file: !override
+      - ./backend/.env.production
+    environment: !override
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-clarity_fleet}
+      REDIS_URL: redis://redis:6379
+    ports: !override
+      - '127.0.0.1:3001:3001'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  report_storage:

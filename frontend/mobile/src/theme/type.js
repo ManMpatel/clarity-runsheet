@@ -6,6 +6,7 @@
 // top-level `require()` calls (every weight, plus every italic); Metro can't tree-shake those, so
 // importing four names from it pulled all 18 .ttf files — ~6.2 MB — into the bundle. These four
 // are the only cuts the scale below references.
+import { Platform } from 'react-native'
 import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular'
 import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium'
 import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold'
@@ -30,4 +31,46 @@ export const type = {
   micro: { fontFamily: 'Inter_500Medium', fontSize: 11, lineHeight: 14, letterSpacing: 0.2 },
   tabularTitle: { fontFamily: 'Inter_700Bold', fontSize: 24, lineHeight: 30, fontVariant: ['tabular-nums'] },
   tabularBody: { fontFamily: 'Inter_600SemiBold', fontSize: 15, lineHeight: 21, fontVariant: ['tabular-nums'] },
+}
+
+// ---------------------------------------------------------------------------
+// Apple text styles — used by screens/auth/ only (see DECISIONS.md D-017).
+//
+// The scale above is the app's own; this one is Apple's iOS ramp, and the two coexist
+// deliberately. Typography is the single biggest factor in whether a screen reads as native iOS,
+// so the auth flow uses the real system face rather than an approximation of it.
+// ---------------------------------------------------------------------------
+
+const interForWeight = {
+  '400': 'Inter_400Regular',
+  '500': 'Inter_500Medium',
+  '600': 'Inter_600SemiBold',
+  '700': 'Inter_700Bold',
+}
+
+// On iOS, omitting `fontFamily` entirely is what makes RN resolve the system face — SF Pro — and
+// `fontWeight` then picks the cut (iOS swaps to SF Pro Display above ~20pt on its own). Setting
+// fontFamily to *anything*, including 'System', costs you that automatic optical sizing.
+// SF Pro isn't licensed off-Apple-platforms, so Android falls back to the Inter cut already
+// bundled for that weight — near-identical metrics, so the layouts below hold on both.
+const face = (weight) =>
+  Platform.select({
+    ios: { fontWeight: weight },
+    default: { fontFamily: interForWeight[weight] },
+  })
+
+// Apple's default (non-Dynamic-Type) sizes. `letterSpacing` is points in RN, not em — these are
+// SF's tracking table rounded to the nearest sensible value at each size.
+export const appleType = {
+  largeTitle: { ...face('700'), fontSize: 34, lineHeight: 41, letterSpacing: -0.4 },
+  title1: { ...face('700'), fontSize: 28, lineHeight: 34, letterSpacing: -0.35 },
+  title2: { ...face('700'), fontSize: 22, lineHeight: 28, letterSpacing: -0.3 },
+  title3: { ...face('600'), fontSize: 20, lineHeight: 25, letterSpacing: -0.25 },
+  headline: { ...face('600'), fontSize: 17, lineHeight: 22, letterSpacing: -0.4 },
+  body: { ...face('400'), fontSize: 17, lineHeight: 22, letterSpacing: -0.4 },
+  callout: { ...face('400'), fontSize: 16, lineHeight: 21, letterSpacing: -0.3 },
+  subheadline: { ...face('400'), fontSize: 15, lineHeight: 20, letterSpacing: -0.2 },
+  footnote: { ...face('400'), fontSize: 13, lineHeight: 18, letterSpacing: -0.05 },
+  footnoteEmphasized: { ...face('600'), fontSize: 13, lineHeight: 18, letterSpacing: -0.05 },
+  caption1: { ...face('400'), fontSize: 12, lineHeight: 16, letterSpacing: 0 },
 }

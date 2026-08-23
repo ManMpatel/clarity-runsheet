@@ -31,4 +31,16 @@ function isConnected(imei) {
   return sockets.has(imei)
 }
 
-module.exports = { register, unregister, getSocket, isConnected }
+// Diagnostics for the /health probe and the admin metrics passthrough: "is anything actually
+// attached right now?" is the first question when a device looks configured but no telemetry
+// is landing. listImeis() lets you confirm the IMEI the device reports matches the one
+// provisioned in the vehicles table — a mismatch there is silent everywhere else.
+function count() {
+  return sockets.size
+}
+
+function listImeis() {
+  return Array.from(sockets.keys())
+}
+
+module.exports = { register, unregister, getSocket, isConnected, count, listImeis }

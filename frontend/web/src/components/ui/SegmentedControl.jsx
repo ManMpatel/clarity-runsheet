@@ -50,11 +50,11 @@ export default function SegmentedControl({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange?.(opt.value)}
             className={cn(
-              'inline-flex items-center justify-center gap-1.5 rounded-[0.375rem] font-medium',
+              'inline-flex items-center justify-center gap-1.5 rounded-md font-medium',
               'transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
               pad,
               active
-                ? 'bg-surface text-fg shadow-xs'
+                ? 'bg-surface text-fg shadow-sm'
                 : 'text-fg-muted hover:text-fg'
             )}
           >

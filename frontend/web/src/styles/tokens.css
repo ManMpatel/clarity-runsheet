@@ -2,104 +2,102 @@
  * Design tokens — raw values only. The Tailwind mapping lives in index.css's `@theme inline`
  * block; this file is deliberately plain CSS so it can be read without knowing Tailwind v4.
  *
- * Rule: nothing here redefines a stock Tailwind name. Every token is a NEW name, which is what
- * makes adding this layer incapable of changing how the ~35 pages that still use `bg-white` /
- * `text-gray-900` render in light mode.
+ * Surfaces, type colour and elevation follow Apple HIG (systemGroupedBackground, label colours,
+ * and the layered low-opacity shadows used on iOS/macOS). Radius and stock shadow *utilities*
+ * are remapped in index.css so legacy `rounded-xl` / `shadow-sm` pages pick this up too.
  */
 
 :root {
   color-scheme: light;
 
-  /* ---- surfaces ---- */
-  --canvas:        #f8fafc;   /* app background, behind cards */
-  --surface:       #ffffff;   /* cards, sidebar, topbar */
-  --surface-2:     #f1f5f9;   /* hover fills, skeleton base, chart grid bands */
-  --surface-3:     #e2e8f0;   /* pressed states, progress tracks */
-  --overlay:       rgb(15 23 42 / 0.40);   /* modal scrim */
+  /* ---- surfaces: Apple systemGroupedBackground / secondarySystemBackground ---- */
+  --canvas:        #f5f5f7;
+  --surface:       #ffffff;
+  --surface-2:     #f2f2f7;
+  --surface-3:     #e8e8ed;
+  --overlay:       rgb(0 0 0 / 0.32);
 
-  /* ---- borders ---- */
-  --border:        #e2e8f0;   /* the hairline default everywhere */
-  --border-strong: #cbd5e1;   /* inputs, hovered/focused cards */
+  /* ---- borders: Apple separator (60,60,67 @ 12–18%) ---- */
+  --border:        rgb(60 60 67 / 0.12);
+  --border-strong: rgb(60 60 67 / 0.22);
 
-  /* ---- text ---- */
-  --fg:            #0f172a;
-  --fg-muted:      #475569;   /* 7.4:1 on --surface — safe for body copy */
-  --fg-subtle:     #94a3b8;   /* decorative/tertiary ONLY — ~2.9:1, never essential text */
+  /* ---- text: Apple label / secondaryLabel / tertiaryLabel ---- */
+  --fg:            #1d1d1f;
+  --fg-muted:      #6e6e73;
+  --fg-subtle:     #86868b;
   --fg-on-accent:  #ffffff;
 
-  /* ---- accent: exactly one ---- */
-  --accent:        #4f46e5;
-  --accent-hover:  #4338ca;
-  --accent-fg:     #4338ca;   /* accent-coloured text sitting on --accent-soft */
-  --accent-soft:   color-mix(in oklab, #4f46e5 9%, #ffffff);
-  --ring:          #6366f1;
+  /* ---- accent: Apple system blue ---- */
+  --accent:        #0071e3;
+  --accent-hover:  #0077ed;
+  --accent-fg:     #0066cc;
+  --accent-soft:   color-mix(in oklab, #0071e3 9%, #ffffff);
+  --ring:          #0071e3;
 
   /* ---- semantic ---- */
-  --success:    #059669;  --success-fg: #047857;
-  --warning:    #d97706;  --warning-fg: #b45309;
-  --danger:     #dc2626;  --danger-fg:  #b91c1c;
-  --info:       #0284c7;  --info-fg:    #0369a1;
+  --success:    #34c759;  --success-fg: #248a3d;
+  --warning:    #ff9f0a;  --warning-fg: #c93400;
+  --danger:     #ff3b30;  --danger-fg:  #d70015;
+  --info:       #0077ed;  --info-fg:    #0071a4;
 
-  --success-soft: color-mix(in oklab, #059669 11%, #ffffff);
-  --warning-soft: color-mix(in oklab, #d97706 12%, #ffffff);
-  --danger-soft:  color-mix(in oklab, #dc2626 10%, #ffffff);
-  --info-soft:    color-mix(in oklab, #0284c7 11%, #ffffff);
+  --success-soft: color-mix(in oklab, #34c759 12%, #ffffff);
+  --warning-soft: color-mix(in oklab, #ff9f0a 14%, #ffffff);
+  --danger-soft:  color-mix(in oklab, #ff3b30 11%, #ffffff);
+  --info-soft:    color-mix(in oklab, #0071e3 10%, #ffffff);
 
-  /* ---- fleet status: the single source of truth for vehicle-state colour ---- */
-  --status-moving:  #059669;
-  --status-idle:    #d97706;
-  --status-stopped: #64748b;
-  --status-offline: #a855f7;
+  /* ---- fleet status ---- */
+  --status-moving:  #34c759;
+  --status-idle:    #ff9f0a;
+  --status-stopped: #8e8e93;
+  --status-offline: #af52de;
 
-  /* ---- elevation: restrained, Linear-style ---- */
-  --shadow-xs-v: 0 1px 2px 0 rgb(15 23 42 / 0.04);
-  --shadow-sm-v: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06);
-  --shadow-md-v: 0 4px 12px -2px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.05);
-  --shadow-lg-v: 0 16px 40px -12px rgb(15 23 42 / 0.18);
+  /* ---- elevation: Apple-style layered, low-contrast shadows ---- */
+  --shadow-xs-v: 0 0.5px 1px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.03);
+  --shadow-sm-v: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 12px rgb(0 0 0 / 0.05);
+  --shadow-md-v: 0 2px 6px rgb(0 0 0 / 0.04), 0 12px 28px rgb(0 0 0 / 0.08);
+  --shadow-lg-v: 0 4px 16px rgb(0 0 0 / 0.05), 0 24px 48px rgb(0 0 0 / 0.10);
 }
 
 .dark {
   color-scheme: dark;
 
-  --canvas:        #09090b;
-  --surface:       #111114;
-  --surface-2:     #18181b;
-  --surface-3:     #27272a;
-  --overlay:       rgb(0 0 0 / 0.65);
+  --canvas:        #000000;
+  --surface:       #1c1c1e;
+  --surface-2:     #2c2c2e;
+  --surface-3:     #3a3a3c;
+  --overlay:       rgb(0 0 0 / 0.56);
 
-  --border:        #27272a;
-  --border-strong: #3f3f46;
+  --border:        rgb(255 255 255 / 0.10);
+  --border-strong: rgb(255 255 255 / 0.18);
 
-  --fg:            #fafafa;
-  --fg-muted:      #a1a1aa;   /* 7.0:1 on --surface */
-  --fg-subtle:     #71717a;
+  --fg:            #f5f5f7;
+  --fg-muted:      #98989d;
+  --fg-subtle:     #636366;
   --fg-on-accent:  #ffffff;
 
-  --accent:        #6366f1;
-  --accent-hover:  #818cf8;
-  --accent-fg:     #a5b4fc;
-  --accent-soft:   color-mix(in oklab, #6366f1 16%, #111114);
-  --ring:          #818cf8;
+  --accent:        #0a84ff;
+  --accent-hover:  #409cff;
+  --accent-fg:     #64d2ff;
+  --accent-soft:   color-mix(in oklab, #0a84ff 18%, #1c1c1e);
+  --ring:          #0a84ff;
 
-  --success:    #10b981;  --success-fg: #34d399;
-  --warning:    #f59e0b;  --warning-fg: #fbbf24;
-  --danger:     #ef4444;  --danger-fg:  #f87171;
-  --info:       #38bdf8;  --info-fg:    #7dd3fc;
+  --success:    #30d158;  --success-fg: #30d158;
+  --warning:    #ffd60a;  --warning-fg: #ffd60a;
+  --danger:     #ff453a;  --danger-fg:  #ff453a;
+  --info:       #64d2ff;  --info-fg:    #64d2ff;
 
-  --success-soft: color-mix(in oklab, #10b981 18%, #111114);
-  --warning-soft: color-mix(in oklab, #f59e0b 18%, #111114);
-  --danger-soft:  color-mix(in oklab, #ef4444 18%, #111114);
-  --info-soft:    color-mix(in oklab, #38bdf8 18%, #111114);
+  --success-soft: color-mix(in oklab, #30d158 18%, #1c1c1e);
+  --warning-soft: color-mix(in oklab, #ffd60a 16%, #1c1c1e);
+  --danger-soft:  color-mix(in oklab, #ff453a 18%, #1c1c1e);
+  --info-soft:    color-mix(in oklab, #0a84ff 18%, #1c1c1e);
 
-  --status-moving:  #10b981;
-  --status-idle:    #f59e0b;
-  --status-stopped: #71717a;
-  --status-offline: #c084fc;
+  --status-moving:  #30d158;
+  --status-idle:    #ffd60a;
+  --status-stopped: #636366;
+  --status-offline: #bf5af2;
 
-  /* Shadows read as almost nothing on dark surfaces; the border tokens carry separation instead.
-     Kept non-zero so overlays still detach from the page. */
-  --shadow-xs-v: 0 1px 2px 0 rgb(0 0 0 / 0.30);
-  --shadow-sm-v: 0 1px 3px 0 rgb(0 0 0 / 0.40);
-  --shadow-md-v: 0 4px 12px -2px rgb(0 0 0 / 0.50);
-  --shadow-lg-v: 0 16px 40px -12px rgb(0 0 0 / 0.65);
+  --shadow-xs-v: 0 1px 2px rgb(0 0 0 / 0.40);
+  --shadow-sm-v: 0 2px 8px rgb(0 0 0 / 0.45);
+  --shadow-md-v: 0 8px 24px rgb(0 0 0 / 0.50);
+  --shadow-lg-v: 0 16px 48px rgb(0 0 0 / 0.60);
 }

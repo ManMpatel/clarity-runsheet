@@ -41,12 +41,37 @@ function handleRequest(req, res) {
   const url = new URL(req.url, `http://localhost:${INTERNAL_PORT}`)
   const parts = url.pathname.split('/').filter(Boolean) // ['internal','commands',':imei', ...]
 
+  // Liveness probe for docker-compose.prod.yml's healthcheck and any external uptime monitor.
+  // Deliberately NOT under /internal — it's a bare /health so it matches the api entrypoint's
+  // convention (api.ts's `app.get('/health')`). Port 4001 is bound to 127.0.0.1 in production,
+  // so this is not publicly reachable either way.
+  //
+  // `connectedDevices` is the useful signal here: the process can be perfectly alive while zero
+  // devices are attached, which is exactly the symptom of a misconfigured device or a blocked
+  // 5027. It reports liveness, so it stays 200 even at zero.
+  if (req.method === 'GET' && parts[0] === 'health' && parts.length === 1) {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      status: 'ok',
+      service: 'tcp-listener',
+      connectedDevices: socketRegistry.count(),
+      uptimeSeconds: Math.floor(process.uptime()),
+    }))
+    return
+  }
+
   // Rolling per-IMEI byte/record/CRC-failure counters — see metrics/usage.ts.
   // Diagnostic snapshot for confirming actual SIM data usage per device, not a
   // billing record (in-memory, resets on restart).
   if (req.method === 'GET' && parts[0] === 'internal' && parts[1] === 'metrics' && parts.length === 2) {
+    // `connected` is added alongside the existing per-IMEI counters (which persist for the life
+    // of the process even after a device drops). Without it you cannot tell "device sent 2 MB
+    // and is still attached" from "device sent 2 MB an hour ago and has since disappeared".
     res.writeHead(200, { 'Content-Type': 'application/json' })
-    res.end(JSON.stringify(getUsageSnapshot()))
+    res.end(JSON.stringify({
+      connected: socketRegistry.listImeis(),
+      devices: getUsageSnapshot(),
+    }))
     return
   }
 

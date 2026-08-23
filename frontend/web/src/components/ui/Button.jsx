@@ -6,25 +6,26 @@ import Spinner from './Spinner'
 // Heights are fixed at sm/md/lg here on purpose. Before this component the codebase had h-9, h-10
 // and h-11 primary buttons on different pages with otherwise identical styling.
 const button = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control font-medium ' +
-  'transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring ' +
-  'focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ' +
-  'disabled:opacity-50 disabled:pointer-events-none',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control font-semibold ' +
+    'transition-[background-color,box-shadow,transform,opacity] duration-150 ease-out ' +
+    'outline-none focus-visible:ring-2 focus-visible:ring-ring ' +
+    'focus-visible:ring-offset-2 focus-visible:ring-offset-canvas ' +
+    'active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none',
   {
     variants: {
       variant: {
-        primary:   'bg-accent text-fg-on-accent hover:bg-accent-hover shadow-xs',
-        secondary: 'bg-surface text-fg border border-border hover:bg-surface-2',
+        primary:   'bg-accent text-fg-on-accent hover:bg-accent-hover shadow-sm',
+        secondary: 'bg-surface text-fg border border-border hover:bg-surface-2 shadow-xs',
         outline:   'border border-border-strong text-fg hover:bg-surface-2',
         ghost:     'text-fg-muted hover:bg-surface-2 hover:text-fg',
-        danger:    'bg-danger text-white hover:brightness-110 shadow-xs',
+        danger:    'bg-danger text-white hover:brightness-110 shadow-sm',
         link:      'text-accent hover:underline underline-offset-4 h-auto p-0',
       },
       size: {
-        sm:   'h-8 px-3 text-xs',
-        md:   'h-9 px-4 text-sm',
-        lg:   'h-10 px-5 text-sm',
-        icon: 'h-9 w-9 p-0',
+        sm:   'h-9 px-3.5 text-xs',
+        md:   'h-10 px-4 text-sm',
+        lg:   'h-11 px-5 text-[15px]',
+        icon: 'h-10 w-10 p-0',
       },
       fullWidth: { true: 'w-full' },
     },

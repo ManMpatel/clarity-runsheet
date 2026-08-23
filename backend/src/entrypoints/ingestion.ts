@@ -12,7 +12,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '../db/client'
 import { vehicles } from '../db/schema'
 import { getClient } from '../modules/ingestion/queue/redis'
-import { init as initSocket, broadcastVanUpdate } from '../socket'
+import { init as initSocket, broadcastVanUpdate, recordProcessed, recordUnknownImei } from '../socket'
 import { writeTelemetry } from '../modules/ingestion/processors/telemetry'
 import { processDriverEvents } from '../modules/ingestion/processors/driver-events'
 import { processGeofences } from '../modules/ingestion/processors/geofence'
@@ -60,10 +60,17 @@ async function processPayload(payload: any) {
 
   const vehicle = await lookupVehicle(imei)
   if (!vehicle) {
-    console.warn(`[Ingestion] Unknown IMEI: ${imei}`)
+    // The device already got its ACK from tcp-listener before this point, so this record is gone
+    // for good — there is no retry or dead-letter. Counted so /health on this process exposes it;
+    // the warn line alone is invisible unless someone is tailing the right container's logs.
+    // If you see this for a device you expect to be tracking, the fix is a vehicles row with this
+    // exact IMEI (POST /api/v1/vehicles, or Settings -> Vehicles in the dashboard).
+    recordUnknownImei(imei)
+    console.warn(`[Ingestion] Unknown IMEI: ${imei} — no vehicles row, telemetry discarded`)
     return
   }
 
+  recordProcessed()
   const { companyId, vehicleId } = vehicle
 
   const [doc] = await writeTelemetry(imei, companyId, vehicleId, [record])

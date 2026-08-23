@@ -105,6 +105,11 @@ parsers) but nothing about their runtime lifecycle is merged.
 | `tcp-listener` | `npm run start:tcp-listener` | `5027` (device TCP), `4001` (internal HTTP) | Raw socket server devices connect to. Decodes Codec 8/8E packets, pushes to Redis. Also runs a tiny internal HTTP server so `api` can relay outbound commands (immobiliser cut/restore) to a connected device. |
 | `ingestion` | `npm run start:ingestion` | `3001` (Socket.io) | Long-running worker: drains the Redis queue, writes telemetry, runs geofence/trip/alert/safety-score logic, broadcasts live updates, hosts the cron jobs. |
 
+All three answer `GET /health` (api on 3000, ingestion on 3001, tcp-listener on 4001), which is what
+`docker-compose.prod.yml`'s healthchecks and any external uptime monitor poll. Production deployment
+is documented in [DEPLOY.md](DEPLOY.md); only `5027` is publicly exposed, everything else binds to
+`127.0.0.1` behind nginx.
+
 ```mermaid
 flowchart TB
   subgraph compose["docker-compose.yml"]
@@ -161,6 +166,32 @@ New module `backend/src/modules/tcp-listener/metrics/usage.ts` collects per-IMEI
 
 Exposed via **`GET /internal/metrics`** on the existing internal HTTP server (port 4001) — hit this after 24–48h with real traffic to answer: *How many bytes/record is each device actually sending?* and *Are CRC failures forcing retransmissions?* This data drives Phase 2's tuning.
 
+```jsonc
+{
+  "connected": ["865124073607428"],        // attached to the listener RIGHT NOW
+  "devices": {                              // cumulative, survives disconnect
+    "865124073607428": { "bytesReceived": 203, "recordsReceived": 3, "packetsReceived": 3,
+                         "crcFailures": 0, "reconnects": 1, "firstSeen": 0, "lastSeen": 0 }
+  }
+}
+```
+
+`connected` matters because the per-IMEI counters persist for the life of the process: without it
+you cannot tell "sent 2 MB and is still attached" from "sent 2 MB an hour ago and has since
+vanished".
+
+In production 4001 is bound to `127.0.0.1` (see `DEPLOY.md`), so the same payload is proxied for
+super-admins at **`GET /api/v1/admin/device-metrics`**.
+
+**Liveness:** all three entrypoints now answer `GET /health` — api on 3000, ingestion on 3001,
+tcp-listener on 4001. The ingestion one also reports `processed` / `unknownImei` counters, which is
+how you detect telemetry arriving for an IMEI that has no `vehicles` row (silently dropped in
+`processPayload`, *after* the device was already ACKed — so the device never resends it).
+
+**Simulating a device:** `npm run simulate-device -- --host <host> --imei <imei>` speaks the real
+Codec 8 protocol at the listener, so the whole pipeline can be verified without the physical
+hardware. It self-tests its encoder against `parseCodec8` before sending.
+
 ### Phase 1 — Code Efficiency (Low-hanging fruit)
 
 **BufferStitcher.feed() in `parser/buffer.ts`** — was doing `Buffer.concat(this.incomplete, chunk)` on **every** TCP segment, copying the entire accumulated buffer repeatedly. Replaced with append-then-concat-once: chunks accumulate in a list, concatenated only when a complete packet is ready. Same resync/partial/complete logic, zero behavior change, removes the O(n²) pattern.
@@ -205,7 +236,7 @@ Persist the Phase 0 per-IMEI counters to a daily rollup table (`device_usage_dai
 **Implementation status (Aug 2026):**
 - ✅ Phase 0: Metrics collection wired into `tcp-listener.ts`, `/internal/metrics` endpoint live
 - ✅ Phase 1: BufferStitcher and Redis pipelining optimized, CRC metrics instrumented
-- ⏳ Phase 2: Awaiting live device + Configurator to pull exact FTC921 parameter IDs
+- ⏳ Phase 2: Config sheet written — [docs/ftc921-reporting-profile.md](docs/ftc921-reporting-profile.md). Awaiting the on-site Configurator session to fill in exact FTC921 parameter IDs
 - ⏳ Phase 3: Ready to build once Phase 2 profile is finalized
 - ⏳ Phase 4: Awaiting Phase 2/3 rollout to define alert thresholds from real data
 

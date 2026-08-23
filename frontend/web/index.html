@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#09090b" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
     <title>Clarity Fleet</title>
     <!--
       Blocking, unbundled, and deliberately first: this must run before the stylesheet paints.
@@ -16,8 +16,12 @@
     <script>
       (function () {
         try {
-          var s = (JSON.parse(localStorage.getItem('clarity-ui') || '{}').state) || {}
+          var raw = JSON.parse(localStorage.getItem('clarity-ui') || '{}')
+          var s = raw.state || {}
           var t = s.theme || (s.darkMode ? 'dark' : 'light')
+          // v2: product default is light, not OS-follow. Match uiStore's migrate so the first
+          // paint isn't a dark flash for sessions that still have the old implicit 'system'.
+          if ((raw.version == null || raw.version < 2) && t === 'system') t = 'light'
           var d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
           var r = document.documentElement
           r.classList.toggle('dark', d)

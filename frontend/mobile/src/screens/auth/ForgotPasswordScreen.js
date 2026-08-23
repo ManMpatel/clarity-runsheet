@@ -1,17 +1,23 @@
 import { useState } from 'react'
-import { View, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ChevronLeft, MailCheck } from 'lucide-react-native'
+import { View, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
-import { Field, Button } from '../../components/ui'
+import {
+  AuthButton,
+  AuthHeader,
+  GroupedList,
+  GroupedField,
+  GroupedFooter,
+  SuccessState,
+} from '../../components/auth'
 
 // New — the old app just Linking.openURL'd to the web dashboard's /forgot-password page. The
 // backend endpoint (POST /auth/forgot-password) was always mobile-reachable, just never wired up
 // from a mobile screen.
 export default function ForgotPasswordScreen({ navigation }) {
-  const { colors, space, radius, type } = useTheme()
-  const insets = useSafeAreaInsets()
+  const { colors, space } = useTheme()
+  const insets = useSafeInsets()
 
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -37,43 +43,63 @@ export default function ForgotPasswordScreen({ navigation }) {
     }
   }
 
-  return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.canvas }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ padding: space.lg, marginTop: insets.top, alignSelf: 'flex-start' }}>
-        <ChevronLeft size={26} color={colors.fg} />
-      </Pressable>
-
-      <View style={{ flex: 1, paddingHorizontal: space['2xl'], justifyContent: 'center' }}>
-        {sent ? (
-          <View style={{ alignItems: 'center' }}>
-            <View style={{ width: 64, height: 64, borderRadius: radius.lg, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: space.lg }}>
-              <MailCheck size={28} color={colors.accent} />
-            </View>
-            <Text style={[type.title2, { color: colors.fg, textAlign: 'center' }]}>Check your inbox</Text>
-            <Text style={[type.body, { color: colors.fgMuted, textAlign: 'center', marginTop: space.xs }]}>
-              If an account exists for {email}, a reset link is on its way.
-            </Text>
-          </View>
-        ) : (
-          <>
-            <Text style={[type.title1, { color: colors.fg }]}>Reset your password</Text>
-            <Text style={[type.body, { color: colors.fgMuted, marginTop: space.xs, marginBottom: space['2xl'] }]}>
-              Enter the email on your account and we'll send a reset link.
-            </Text>
-            <Field
-              label='Email address'
-              value={email}
-              onChangeText={setEmail}
-              placeholder='driver@clarityfleet.com.au'
-              keyboardType='email-address'
-              autoCapitalize='none'
-              autoCorrect={false}
-              error={error}
-            />
-            <Button label='Send reset link' loading={loading} onPress={handleSubmit} />
-          </>
-        )}
+  if (sent) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.iosGroupedBg }}>
+        <SuccessState
+          title='Check your inbox'
+          message={`If an account exists for ${email}, a reset link is on its way.`}
+          actionLabel='Back to Sign In'
+          onAction={() => navigation.navigate('Login')}
+        />
       </View>
+    )
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.iosGroupedBg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: space.xl,
+          paddingBottom: insets.bottom + space['2xl'],
+        }}
+        keyboardShouldPersistTaps='handled'
+        showsVerticalScrollIndicator={false}
+      >
+        <AuthHeader title='Reset Password' onBack={() => navigation.goBack()} />
+
+        <GroupedList style={{ marginTop: space['3xl'] }}>
+          <GroupedField
+            label='Email'
+            value={email}
+            onChangeText={setEmail}
+            placeholder='you@company.com.au'
+            keyboardType='email-address'
+            autoCapitalize='none'
+            autoCorrect={false}
+            textContentType='emailAddress'
+            autoComplete='email'
+            returnKeyType='go'
+            onSubmitEditing={handleSubmit}
+          />
+        </GroupedList>
+
+        {/* The explanatory copy is the group's footer, which is where iOS keeps it — the error
+            replaces it in place rather than pushing the layout around. */}
+        <GroupedFooter tone={error ? 'danger' : 'secondary'}>
+          {error || "Enter the email on your account and we'll send a reset link."}
+        </GroupedFooter>
+
+        <AuthButton
+          label='Send Reset Link'
+          loading={loading}
+          onPress={handleSubmit}
+          style={{ marginTop: space['2xl'] }}
+        />
+      </ScrollView>
     </KeyboardAvoidingView>
   )
 }

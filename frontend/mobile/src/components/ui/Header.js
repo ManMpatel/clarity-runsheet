@@ -1,5 +1,5 @@
 import { View, Text, Pressable } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import { ChevronLeft } from 'lucide-react-native'
 import { useTheme } from '../../theme'
 
@@ -8,7 +8,7 @@ import { useTheme } from '../../theme'
 // themselves, so the back button, title, and trailing action all share one layout.
 export default function Header({ title, onBack, right }) {
   const { colors, space, type } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useSafeInsets()
 
   return (
     <View style={{ paddingTop: insets.top + space.sm, paddingHorizontal: space.lg, paddingBottom: space.md, backgroundColor: colors.canvas }}>

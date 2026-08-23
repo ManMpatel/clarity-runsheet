@@ -47,7 +47,7 @@ export default function KpiCard({
       {loading ? (
         <Skeleton className='h-7 w-16 mt-2' />
       ) : (
-        <p className='text-2xl font-semibold text-fg mt-1.5 tabular'>
+        <p className='text-2xl font-semibold text-fg mt-1.5 tabular tracking-tight'>
           {value}
           {unit && <span className='text-sm font-normal text-fg-muted ml-1'>{unit}</span>}
         </p>

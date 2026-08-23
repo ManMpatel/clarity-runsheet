@@ -2,12 +2,13 @@ import { forwardRef } from 'react'
 import { cn } from '../../lib/cn'
 
 const base =
-  'w-full bg-surface text-fg rounded-control border border-border placeholder:text-fg-subtle ' +
-  'transition-colors outline-none focus-visible:border-accent focus-visible:ring-2 ' +
-  'focus-visible:ring-ring/30 disabled:opacity-50 disabled:pointer-events-none ' +
-  'aria-[invalid=true]:border-danger aria-[invalid=true]:focus-visible:ring-danger/30'
+  'w-full bg-surface-2/60 text-fg rounded-control border border-border placeholder:text-fg-subtle ' +
+  'transition-[border-color,box-shadow,background-color] duration-150 outline-none ' +
+  'hover:border-border-strong focus-visible:bg-surface focus-visible:border-accent ' +
+  'focus-visible:ring-4 focus-visible:ring-ring/15 disabled:opacity-50 disabled:pointer-events-none ' +
+  'aria-[invalid=true]:border-danger aria-[invalid=true]:focus-visible:ring-danger/20'
 
-const SIZES = { sm: 'h-8 px-2.5 text-xs', md: 'h-9 px-3 text-sm', lg: 'h-10 px-3.5 text-sm' }
+const SIZES = { sm: 'h-9 px-3 text-xs', md: 'h-10 px-3.5 text-sm', lg: 'h-11 px-4 text-[15px]' }
 
 const Input = forwardRef(function Input(
   { className, size = 'md', iconLeft: IconLeft, invalid, ...rest }, ref

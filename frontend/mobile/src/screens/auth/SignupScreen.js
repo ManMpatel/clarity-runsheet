@@ -1,14 +1,22 @@
 import { useState } from 'react'
-import { View, Text, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ChevronLeft, MailCheck, Check } from 'lucide-react-native'
+import { View, Text, ScrollView, KeyboardAvoidingView, Platform } from 'react-native'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
-import { Field, Button } from '../../components/ui'
+import { Switch } from '../../components/ui'
+import {
+  AuthButton,
+  AuthHeader,
+  GroupedList,
+  GroupedField,
+  GroupedRow,
+  GroupedFooter,
+  SuccessState,
+} from '../../components/auth'
 
 export default function SignupScreen({ navigation }) {
-  const { colors, space, radius, type } = useTheme()
-  const insets = useSafeAreaInsets()
+  const { colors, space, appleType } = useTheme()
+  const insets = useSafeInsets()
 
   const [companyName, setCompanyName] = useState('')
   const [name, setName]               = useState('')
@@ -52,64 +60,122 @@ export default function SignupScreen({ navigation }) {
 
   if (done) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas, padding: space['2xl'] }}>
-        <View style={{ width: 64, height: 64, borderRadius: radius.lg, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginBottom: space.lg }}>
-          <MailCheck size={28} color={colors.accent} />
-        </View>
-        <Text style={[type.title2, { color: colors.fg }]}>Check your inbox</Text>
-        <Text style={[type.body, { color: colors.fgMuted, textAlign: 'center', marginTop: space.xs, marginBottom: space.xl }]}>
-          We sent a verification link to {email}
-        </Text>
-        <Button label='Back to login' variant='secondary' fullWidth={false} onPress={() => navigation.navigate('Login')} style={{ paddingHorizontal: space['2xl'] }} />
+      <View style={{ flex: 1, backgroundColor: colors.iosGroupedBg }}>
+        <SuccessState
+          title='Check your inbox'
+          message={`We sent a verification link to ${email}`}
+          actionLabel='Back to Sign In'
+          onAction={() => navigation.navigate('Login')}
+        />
       </View>
     )
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.canvas }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top }} keyboardShouldPersistTaps='handled'>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ padding: space.lg, alignSelf: 'flex-start' }}>
-          <ChevronLeft size={26} color={colors.fg} />
-        </Pressable>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.iosGroupedBg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: space.xl,
+          paddingBottom: insets.bottom + space['2xl'],
+        }}
+        keyboardShouldPersistTaps='handled'
+        showsVerticalScrollIndicator={false}
+      >
+        <AuthHeader
+          title='Create Account'
+          subtitle='Set up your company on Clarity Fleet'
+          onBack={() => navigation.goBack()}
+        />
 
-        <View style={{ paddingHorizontal: space['2xl'], paddingBottom: space['3xl'] }}>
-          <Text style={[type.title1, { color: colors.fg }]}>Create your account</Text>
-          <Text style={[type.body, { color: colors.fgMuted, marginTop: space.xs, marginBottom: space['2xl'] }]}>
-            Set up your company on Clarity Fleet
-          </Text>
+        {/* Apple splits a long form into semantic groups rather than one running list — who you
+            are, then how you sign in, then what you're agreeing to. Labels are kept short so they
+            fit GroupedField's fixed label column without truncating. */}
+        <GroupedList style={{ marginTop: space['3xl'] }}>
+          <GroupedField
+            label='Company'
+            value={companyName}
+            onChangeText={setCompanyName}
+            placeholder='Acme Logistics'
+            autoCapitalize='words'
+            textContentType='organizationName'
+          />
+          <GroupedField
+            label='Name'
+            value={name}
+            onChangeText={setName}
+            placeholder='Your full name'
+            autoCapitalize='words'
+            textContentType='name'
+            autoComplete='name'
+          />
+          <GroupedField
+            label='Email'
+            value={email}
+            onChangeText={setEmail}
+            placeholder='you@company.com.au'
+            keyboardType='email-address'
+            autoCapitalize='none'
+            autoCorrect={false}
+            textContentType='emailAddress'
+            autoComplete='email'
+          />
+        </GroupedList>
 
-          {!!error && (
-            <View style={{ backgroundColor: colors.dangerSoft, borderRadius: radius.md, padding: space.md, marginBottom: space.lg }}>
-              <Text style={[type.caption, { color: colors.dangerFg }]}>{error}</Text>
+        <GroupedList style={{ marginTop: space['2xl'] }}>
+          <GroupedField
+            label='Password'
+            value={password}
+            onChangeText={setPassword}
+            placeholder='At least 8 characters'
+            secureTextEntry
+            autoCapitalize='none'
+            autoCorrect={false}
+            textContentType='newPassword'
+            autoComplete='new-password'
+          />
+          <GroupedField
+            label='Confirm'
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            placeholder='Re-enter password'
+            secureTextEntry
+            autoCapitalize='none'
+            autoCorrect={false}
+            textContentType='newPassword'
+            autoComplete='new-password'
+          />
+        </GroupedList>
+
+        <GroupedList style={{ marginTop: space['2xl'] }}>
+          <GroupedRow>
+            <View style={{ flex: 1, marginRight: space.md }}>
+              <Text style={[appleType.body, { color: colors.fg }]}>Driver Consent</Text>
+              <Text style={[appleType.footnote, { color: colors.iosLabelSecondary, marginTop: 2 }]}>
+                All drivers have been informed their vehicle is tracked.
+              </Text>
             </View>
-          )}
+            <Switch value={driverConsent} onValueChange={setDriverConsent} />
+          </GroupedRow>
+        </GroupedList>
 
-          <Field label='Company name' value={companyName} onChangeText={setCompanyName} placeholder='e.g. Acme Logistics' autoCapitalize='words' />
-          <Field label='Your name' value={name} onChangeText={setName} placeholder='John Doe' autoCapitalize='words' />
-          <Field label='Email address' value={email} onChangeText={setEmail} placeholder='john.doe@acmelogistics.com' autoCapitalize='none' keyboardType='email-address' />
-          <Field label='Password' value={password} onChangeText={setPassword} placeholder='At least 8 characters' secureTextEntry />
-          <Field label='Confirm password' value={confirmPassword} onChangeText={setConfirmPassword} placeholder='Re-enter password' secureTextEntry />
+        {/* Validation lives in the footer, where iOS puts it — not in a filled banner. */}
+        {!!error && <GroupedFooter tone='danger'>{error}</GroupedFooter>}
 
-          <Pressable
-            onPress={() => setDriverConsent(v => !v)}
-            style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: space.lg }}
-          >
-            <View style={{
-              width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, marginTop: 1, marginRight: space.sm,
-              borderColor: driverConsent ? colors.accent : colors.border,
-              backgroundColor: driverConsent ? colors.accent : 'transparent',
-              alignItems: 'center', justifyContent: 'center',
-            }}>
-              {driverConsent && <Check size={13} color={colors.fgOnAccent} />}
-            </View>
-            <Text style={[type.caption, { flex: 1, color: colors.fgMuted, lineHeight: 18 }]}>
-              I confirm all drivers have been informed their vehicle is tracked
-            </Text>
-          </Pressable>
-
-          <Button label='Create account' loading={loading} onPress={handleSubmit} />
-          <Button label='Cancel' variant='ghost' onPress={() => navigation.navigate('Login')} style={{ marginTop: space.sm }} />
-        </View>
+        <AuthButton
+          label='Create Account'
+          loading={loading}
+          onPress={handleSubmit}
+          style={{ marginTop: space['2xl'] }}
+        />
+        <AuthButton
+          variant='plain'
+          label='Cancel'
+          onPress={() => navigation.navigate('Login')}
+          style={{ marginTop: space.xs }}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   )

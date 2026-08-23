@@ -5,7 +5,7 @@ import { applyTheme, isDark } from '../lib/theme'
 export const useUiStore = create(
   persist(
     (set, get) => ({
-      theme: 'system',          // 'light' | 'dark' | 'system'
+      theme: 'light',           // 'light' | 'dark' | 'system'
       darkMode: false,          // resolved boolean, mirrored for back-compat only
       sidebarCollapsed: false,  // replaces the old `sidebarOpen`, which nothing ever read
       mobileNavOpen: false,     // not persisted — see partialize
@@ -36,13 +36,19 @@ export const useUiStore = create(
     }),
     {
       name: 'clarity-ui',
-      version: 1,
+      version: 2,
       migrate(persisted, version) {
         if (version === 0 || version === undefined) {
           // v0 stored only a boolean. Map it to an EXPLICIT choice rather than 'system' — someone
           // who deliberately turned dark mode on should not silently start following their OS.
           const dark = persisted?.darkMode ?? false
           return { theme: dark ? 'dark' : 'light', darkMode: dark, sidebarCollapsed: false }
+        }
+        if (version < 2) {
+          // Product default is now light, not OS-follow. Remap the previous implicit 'system'
+          // default; leave an explicit dark choice alone. System remains available in the picker.
+          const theme = persisted?.theme === 'dark' ? 'dark' : 'light'
+          return { ...persisted, theme, darkMode: theme === 'dark' }
         }
         return persisted
       },

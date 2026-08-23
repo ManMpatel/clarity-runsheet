@@ -41,10 +41,12 @@ export function errorHandler(err: any, req: Request, res: Response, next: NextFu
   console.error('[API] Unhandled error:', err?.message || err)
 
   if (err instanceof ApiError) {
-    return res.fail(err.errors, err.message, err.status)
+    if (typeof res.fail === 'function') return res.fail(err.errors, err.message, err.status)
+    return res.status(err.status).json({ success: false, message: err.message, data: null, errors: err.errors })
   }
 
-  return res.fail(null, 'Server error', 500)
+  if (typeof res.fail === 'function') return res.fail(null, 'Server error', 500)
+  return res.status(500).json({ success: false, message: 'Server error', data: null, errors: null })
 }
 
 // Wraps an async route handler so a rejected promise reaches errorHandler instead of crashing

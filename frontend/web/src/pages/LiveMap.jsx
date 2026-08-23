@@ -10,6 +10,7 @@ export default function LiveMap() {
   const [selectedImei, setSelectedImei] = useState(null)
   const [mapReady, setMapReady]         = useState(false)
   const [activeFilter, setActiveFilter] = useState('all')
+  const [speedLimit, setSpeedLimit]     = useState(110)
   const setFleet  = useFleetStore(s => s.setFleet)
   const getAllVans = useFleetStore(s => s.getAllVans)
   const updateVan = useFleetStore(s => s.updateVan)
@@ -37,6 +38,10 @@ export default function LiveMap() {
       }
     }
     init()
+    api.get('/alerts/preferences').then((res) => {
+      const speeding = (res.data || []).find((r) => r.type === 'speeding')
+      if (speeding?.speedLimit) setSpeedLimit(speeding.speedLimit)
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -108,7 +113,7 @@ export default function LiveMap() {
     if (activeFilter === 'moving')    return v.speed > 0
     if (activeFilter === 'idle')      return v.speed === 0 && v.ignition
     if (activeFilter === 'stopped')   return !v.ignition && v.speed === 0
-    if (activeFilter === 'overspeed') return v.speed > 110
+    if (activeFilter === 'overspeed') return v.speed > speedLimit
     return true
   })
 

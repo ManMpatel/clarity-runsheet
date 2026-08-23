@@ -1,0 +1,29 @@
+# Build context exclusions. Without this file the entire local node_modules (and, worse, the
+# real .env with live Stripe/Twilio/Resend secrets) is uploaded to the Docker daemon on every
+# build and can be baked into a layer.
+
+node_modules
+npm-debug.log*
+
+# Secrets — production env is supplied at runtime via `env_file:` in docker-compose.prod.yml,
+# never copied into the image.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+.git
+.gitignore
+
+# Generated report output — belongs to the named volume, not the image.
+storage
+
+# Docs / specs not read at runtime (verified: nothing in src/ loads openapi.yaml).
+openapi.yaml
+*.md
+
+# Local editor / OS noise
+.vscode
+.idea
+.DS_Store
+Thumbs.db

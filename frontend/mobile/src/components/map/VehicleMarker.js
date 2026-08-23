@@ -1,6 +1,7 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { View } from 'react-native'
 import { MarkerAnimated, AnimatedRegion } from 'react-native-maps'
+import { Navigation2 } from 'lucide-react-native'
 import { statusColor } from '../ui/StatusDot'
 import { useTheme } from '../../theme'
 
@@ -15,6 +16,10 @@ function VehicleMarker({ vehicle, selected, onPress }) {
   const regionRef = useRef(
     new AnimatedRegion({ latitude: vehicle.latitude, longitude: vehicle.longitude, latitudeDelta: 0, longitudeDelta: 0 })
   )
+  // Custom marker views freeze unless tracksViewChanges is true for at least one frame after the
+  // bitmap contents change (angle, selection, status). Flip it on, then off on the next frame so
+  // we don't pay the per-frame cost of a constantly-redrawing marker.
+  const [tracksViewChanges, setTracksViewChanges] = useState(true)
 
   useEffect(() => {
     regionRef.current.timing({
@@ -25,22 +30,40 @@ function VehicleMarker({ vehicle, selected, onPress }) {
     }).start()
   }, [vehicle.latitude, vehicle.longitude])
 
+  useEffect(() => {
+    setTracksViewChanges(true)
+    const id = setTimeout(() => setTracksViewChanges(false), 80)
+    return () => clearTimeout(id)
+  }, [vehicle.angle, vehicle.status, selected])
+
+  const moving = vehicle.status === 'moving' && vehicle.angle != null
+  const size = selected ? 20 : 16
+
   return (
-    <MarkerAnimated coordinate={regionRef.current} onPress={onPress} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-      <View style={{ alignItems: 'center', justifyContent: 'center', width: 34, height: 34 }}>
+    <MarkerAnimated
+      coordinate={regionRef.current}
+      onPress={onPress}
+      anchor={{ x: 0.5, y: 0.5 }}
+      tracksViewChanges={tracksViewChanges}
+      rotation={0}
+    >
+      <View style={{ alignItems: 'center', justifyContent: 'center', width: 36, height: 36 }}>
         {selected && (
           <View style={{
-            position: 'absolute', width: 34, height: 34, borderRadius: 17,
+            position: 'absolute', width: 36, height: 36, borderRadius: 18,
             backgroundColor: color, opacity: 0.18,
           }} />
         )}
-        <View style={{
-          width: selected ? 18 : 14, height: selected ? 18 : 14, borderRadius: 9,
-          backgroundColor: color, borderWidth: 2.5, borderColor: '#fff',
-          // A heading pointer only makes sense while actually moving — a stationary/idle vehicle
-          // has no meaningful bearing to show.
-          transform: vehicle.status === 'moving' && vehicle.angle != null ? [{ rotate: `${vehicle.angle}deg` }] : undefined,
-        }} />
+        {moving ? (
+          <View style={{ transform: [{ rotate: `${vehicle.angle}deg` }] }}>
+            <Navigation2 size={size} color={color} fill={color} strokeWidth={2.4} />
+          </View>
+        ) : (
+          <View style={{
+            width: selected ? 18 : 14, height: selected ? 18 : 14, borderRadius: 9,
+            backgroundColor: color, borderWidth: 2.5, borderColor: colors.surface,
+          }} />
+        )}
       </View>
     </MarkerAnimated>
   )

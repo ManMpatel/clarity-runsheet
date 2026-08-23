@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import MapView, { Polyline, Marker } from 'react-native-maps'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import { X, Play, Pause } from 'lucide-react-native'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
@@ -19,7 +19,7 @@ export default function TripReplayScreen({ route, navigation }) {
   // useful.
   const { tripId, trip: tripPreview } = route.params || {}
   const { colors, space, radius, type, shadow } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useSafeInsets()
 
   const [trip, setTrip] = useState(tripPreview || null)
   const [points, setPoints] = useState([])
@@ -89,6 +89,8 @@ export default function TripReplayScreen({ route, navigation }) {
         </View>
       ) : (
         <>
+          <View style={{ height: insets.top, backgroundColor: colors.canvas }} />
+          <View style={{ flex: 1 }}>
           <MapView ref={mapRef} style={StyleSheet.absoluteFill}>
             {coords.length > 1 && <Polyline coordinates={coords} strokeColor={colors.accent} strokeWidth={4} />}
             {cursor && <Marker coordinate={cursor} anchor={{ x: 0.5, y: 0.5 }}>
@@ -96,7 +98,7 @@ export default function TripReplayScreen({ route, navigation }) {
             </Marker>}
           </MapView>
 
-          <Pressable onPress={() => navigation.goBack()} style={[styles.closeBtn, { top: insets.top + space.sm, backgroundColor: colors.surface, borderColor: colors.border }, shadow('sm')]}>
+          <Pressable onPress={() => navigation.goBack()} style={[styles.closeBtn, { top: space.sm, backgroundColor: colors.surface, borderColor: colors.border }, shadow('sm')]}>
             <X size={20} color={colors.fg} />
           </Pressable>
 
@@ -128,6 +130,7 @@ export default function TripReplayScreen({ route, navigation }) {
                 <Text style={[type.micro, { color: colors.fgMuted }]}>{cursor?.time ? new Date(cursor.time).toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit' }) : '—'}</Text>
               </View>
             </View>
+          </View>
           </View>
         </>
       )}

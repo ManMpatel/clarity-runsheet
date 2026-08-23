@@ -45,24 +45,24 @@ export default function Signup() {
   }
 
   if (done) return (
-    <div className='min-h-screen bg-gray-50 flex flex-col'>
-      <div className='h-14 flex items-center px-8 border-b border-gray-200 bg-white'>
-        <span className='text-base font-bold text-blue-600'>Clarity Fleet</span>
+    <div className='min-h-svh bg-canvas flex flex-col'>
+      <div className='h-14 flex items-center px-8 bg-surface/80 backdrop-blur-xl border-b border-border'>
+        <span className='text-[15px] font-semibold text-accent tracking-tight'>Clarity Fleet</span>
       </div>
       <div className='flex-1 flex items-center justify-center px-4'>
         <div className='w-full max-w-sm text-center'>
           <div className='text-5xl mb-4'>📬</div>
-          <h1 className='text-2xl font-bold text-gray-900 mb-2'>Check your inbox</h1>
-          <p className='text-sm text-gray-500 mb-1'>We sent a verification link to</p>
-          <p className='text-sm font-semibold text-gray-800 mb-6'>{submittedEmail}</p>
-          <div className='bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-left space-y-3 mb-6'>
-            <p className='text-sm text-gray-600'>1. Open the email from <strong>Clarity Fleet</strong></p>
-            <p className='text-sm text-gray-600'>2. Click <strong>"Confirm my email"</strong></p>
-            <p className='text-sm text-gray-600'>3. You'll be taken straight to your dashboard</p>
+          <h1 className='text-[28px] font-semibold text-fg mb-2 tracking-tight'>Check your inbox</h1>
+          <p className='text-[15px] text-fg-muted mb-1'>We sent a verification link to</p>
+          <p className='text-[15px] font-semibold text-fg mb-6'>{submittedEmail}</p>
+          <div className='bg-surface rounded-3xl border border-border shadow-md p-6 text-left space-y-3 mb-6'>
+            <p className='text-sm text-fg-muted'>1. Open the email from <strong className='text-fg'>Clarity Fleet</strong></p>
+            <p className='text-sm text-fg-muted'>2. Click <strong className='text-fg'>"Confirm my email"</strong></p>
+            <p className='text-sm text-fg-muted'>3. You'll be taken straight to your dashboard</p>
           </div>
-          <p className='text-xs text-gray-400'>
+          <p className='text-xs text-fg-subtle'>
             Didn't get it? Check your spam folder or{' '}
-            <button onClick={() => setDone(false)} className='text-blue-600 hover:underline'>
+            <button onClick={() => setDone(false)} className='text-accent hover:underline'>
               try again
             </button>
           </p>
@@ -72,26 +72,26 @@ export default function Signup() {
   )
 
   return (
-    <div className='min-h-screen bg-gray-50 flex items-center justify-center px-4'>
+    <div className='min-h-svh bg-canvas flex items-center justify-center px-4'>
       <div className='w-full max-w-md'>
 
         <div className='text-center mb-8'>
-          <h1 className='text-3xl font-bold text-blue-600 tracking-tight'>
+          <h1 className='text-[28px] font-semibold text-accent tracking-tight'>
             Clarity Fleet
           </h1>
-          <p className='text-sm text-gray-500 mt-2'>
+          <p className='text-[15px] text-fg-muted mt-2'>
             Create your fleet management account
           </p>
         </div>
 
-        <div className='bg-white rounded-xl border border-gray-200 p-8 shadow-sm'>
-          <h2 className='text-lg font-semibold text-gray-900 mb-6'>
+        <div className='bg-surface rounded-3xl border border-border p-8 shadow-md'>
+          <h2 className='text-lg font-semibold text-fg mb-6 tracking-tight'>
             Get started for free
           </h2>
 
           <form onSubmit={handleSubmit} className='space-y-4'>
             <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
+              <label className='block text-[13px] font-medium text-fg-muted mb-1'>
                 Company name
               </label>
               <input
@@ -99,12 +99,12 @@ export default function Signup() {
                 onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))}
                 placeholder='RunSheet Deliveries'
                 required
-                className='w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition'
+                className='w-full h-11 px-4 rounded-xl border border-border bg-surface-2/70 text-[15px] text-fg placeholder:text-fg-subtle focus:outline-none focus:bg-surface focus:ring-4 focus:ring-ring/15 focus:border-accent transition'
               />
             </div>
 
             <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
+              <label className='block text-[13px] font-medium text-fg-muted mb-1'>
                 Your name
               </label>
               <input
@@ -112,12 +112,12 @@ export default function Signup() {
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder='John Smith'
                 required
-                className='w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition'
+                className='w-full h-11 px-4 rounded-xl border border-border bg-surface-2/70 text-[15px] text-fg placeholder:text-fg-subtle focus:outline-none focus:bg-surface focus:ring-4 focus:ring-ring/15 focus:border-accent transition'
               />
             </div>
 
             <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
+              <label className='block text-[13px] font-medium text-fg-muted mb-1'>
                 Email address
               </label>
               <input
@@ -126,12 +126,12 @@ export default function Signup() {
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                 placeholder='name@company.com.au'
                 required
-                className='w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition'
+                className='w-full h-11 px-4 rounded-xl border border-border bg-surface-2/70 text-[15px] text-fg placeholder:text-fg-subtle focus:outline-none focus:bg-surface focus:ring-4 focus:ring-ring/15 focus:border-accent transition'
               />
             </div>
 
             <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
+              <label className='block text-[13px] font-medium text-fg-muted mb-1'>
                 Password
               </label>
               <input
@@ -140,12 +140,12 @@ export default function Signup() {
                 onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                 placeholder='Min 8 characters'
                 required
-                className='w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition'
+                className='w-full h-11 px-4 rounded-xl border border-border bg-surface-2/70 text-[15px] text-fg placeholder:text-fg-subtle focus:outline-none focus:bg-surface focus:ring-4 focus:ring-ring/15 focus:border-accent transition'
               />
             </div>
 
             <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>
+              <label className='block text-[13px] font-medium text-fg-muted mb-1'>
                 Confirm password
               </label>
               <input
@@ -154,32 +154,32 @@ export default function Signup() {
                 onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
                 placeholder='Repeat password'
                 required
-                className='w-full h-10 px-3 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition'
+                className='w-full h-11 px-4 rounded-xl border border-border bg-surface-2/70 text-[15px] text-fg placeholder:text-fg-subtle focus:outline-none focus:bg-surface focus:ring-4 focus:ring-ring/15 focus:border-accent transition'
               />
             </div>
 
-            <div className='flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3'>
+            <div className='flex items-start gap-3 bg-surface-2 border border-border rounded-xl p-3'>
               <input
                 type='checkbox'
                 id='driverConsent'
                 checked={form.driverConsent || false}
                 onChange={e => setForm(f => ({ ...f, driverConsent: e.target.checked }))}
                 required
-                className='mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
+                className='mt-0.5 h-4 w-4 rounded border-border text-accent focus:ring-accent'
               />
-              <label htmlFor='driverConsent' className='text-xs text-gray-600 leading-relaxed'>
+              <label htmlFor='driverConsent' className='text-xs text-fg-muted leading-relaxed'>
                 I confirm that all drivers have been informed their vehicle is being tracked by a GPS device. I understand it is my responsibility to obtain driver consent in accordance with Australian privacy law.
               </label>
             </div>
 
             {error && (
-              <div className='text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2'>
+              <div className='text-sm text-danger-fg bg-danger-soft border border-danger/20 rounded-xl px-3 py-2'>
                 {error}
               </div>
             )}
 
             <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/google`}
-              className='w-full flex items-center justify-center gap-3 h-10 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition mb-3'>
+              className='w-full flex items-center justify-center gap-3 h-11 border border-border-strong rounded-xl text-sm font-medium text-fg hover:bg-surface-2 transition mb-3'>
               <svg className='w-4 h-4' viewBox='0 0 24 24'>
                 <path fill='#4285F4' d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'/>
                 <path fill='#34A853' d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'/>
@@ -191,9 +191,9 @@ export default function Signup() {
 
             <div className='relative my-3'>
               <div className='absolute inset-0 flex items-center'>
-                <div className='w-full border-t border-gray-200' />
+                <div className='w-full border-t border-border' />
               </div>
-              <div className='relative flex justify-center text-xs text-gray-400 bg-white px-2'>
+              <div className='relative flex justify-center text-xs text-fg-subtle bg-surface px-2'>
                 or sign up with email
               </div>
             </div>
@@ -201,21 +201,21 @@ export default function Signup() {
             <button
               type='submit'
               disabled={loading}
-              className='w-full h-10 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition'
+              className='w-full h-12 bg-accent hover:bg-accent-hover disabled:opacity-50 text-fg-on-accent text-[15px] font-semibold rounded-xl shadow-sm transition active:scale-[0.98]'
             >
               {loading ? 'Creating account...' : 'Create account'}
             </button>
           </form>
 
-          <p className='text-center text-sm text-gray-500 mt-4'>
+          <p className='text-center text-sm text-fg-muted mt-4'>
             Already have an account?{' '}
-            <Link to='/login' className='text-blue-600 hover:underline'>
+            <Link to='/login' className='text-accent hover:underline font-semibold'>
               Sign in
             </Link>
           </p>
         </div>
 
-        <p className='text-center text-xs text-gray-400 mt-6'>
+        <p className='text-center text-xs text-fg-subtle mt-6'>
           By signing up you agree to our terms of service. No credit card required.
         </p>
 

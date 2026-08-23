@@ -10,15 +10,15 @@ try {
 }
 import { View, Text, Pressable, KeyboardAvoidingView, ScrollView, Platform, Alert } from 'react-native'
 import * as AppleAuthentication from 'expo-apple-authentication'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Eye, EyeOff, ChevronLeft } from 'lucide-react-native'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
+import { Eye, EyeOff } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useTheme } from '../../theme'
-import { Field, Button } from '../../components/ui'
+import { AuthButton, AuthHeader, GroupedList, GroupedField, GroupedFooter } from '../../components/auth'
 
 export default function LoginScreen({ navigation }) {
-  const { colors, space, radius, type, scheme } = useTheme()
-  const insets = useSafeAreaInsets()
+  const { colors, space, appleType, scheme } = useTheme()
+  const insets = useSafeInsets()
 
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -99,75 +99,127 @@ export default function LoginScreen({ navigation }) {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.canvas }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }} keyboardShouldPersistTaps='handled'>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ padding: space.lg, alignSelf: 'flex-start' }}>
-          <ChevronLeft size={26} color={colors.fg} />
-        </Pressable>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.iosGroupedBg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingHorizontal: space.xl,
+          paddingBottom: insets.bottom + space.xl,
+        }}
+        keyboardShouldPersistTaps='handled'
+        showsVerticalScrollIndicator={false}
+      >
+        <AuthHeader
+          title='Sign In'
+          subtitle='Sign in to access your fleet'
+          onBack={() => navigation.goBack()}
+        />
 
-        <View style={{ paddingHorizontal: space['2xl'], flex: 1, justifyContent: 'center', paddingBottom: space['4xl'] }}>
-          <Text style={[type.title1, { color: colors.fg }]}>Welcome back</Text>
-          <Text style={[type.body, { color: colors.fgMuted, marginTop: space.xs, marginBottom: space['2xl'] }]}>
-            Sign in to access your fleet
-          </Text>
+        <View style={{ marginTop: space['3xl'] }}>
+          <GroupedList>
+            <GroupedField
+              label='Email'
+              value={email}
+              onChangeText={setEmail}
+              placeholder='you@company.com.au'
+              keyboardType='email-address'
+              autoCapitalize='none'
+              autoCorrect={false}
+              textContentType='username'
+              autoComplete='email'
+              returnKeyType='next'
+            />
+            <GroupedField
+              label='Password'
+              value={password}
+              onChangeText={setPassword}
+              placeholder='Required'
+              secureTextEntry={!showPw}
+              autoCapitalize='none'
+              autoCorrect={false}
+              textContentType='password'
+              autoComplete='current-password'
+              returnKeyType='go'
+              onSubmitEditing={handleLogin}
+              right={
+                <Pressable
+                  onPress={() => setShowPw(s => !s)}
+                  hitSlop={12}
+                  accessibilityRole='button'
+                  accessibilityLabel={showPw ? 'Hide password' : 'Show password'}
+                >
+                  {showPw
+                    ? <EyeOff size={20} color={colors.iosLabelSecondary} />
+                    : <Eye size={20} color={colors.iosLabelSecondary} />}
+                </Pressable>
+              }
+            />
+          </GroupedList>
 
-          <Field
-            label='Email address'
-            value={email}
-            onChangeText={setEmail}
-            placeholder='driver@clarityfleet.com.au'
-            keyboardType='email-address'
-            autoCapitalize='none'
-            autoCorrect={false}
-          />
-
-          <Field
-            label='Password'
-            value={password}
-            onChangeText={setPassword}
-            placeholder='••••••••'
-            secureTextEntry={!showPw}
-            right={
-              <Pressable onPress={() => setShowPw(s => !s)} hitSlop={10}>
-                {showPw ? <EyeOff size={18} color={colors.fgMuted} /> : <Eye size={18} color={colors.fgMuted} />}
-              </Pressable>
-            }
-          />
-
-          <Pressable onPress={() => navigation.navigate('ForgotPassword')} style={{ alignSelf: 'flex-end', marginBottom: space.lg }}>
-            <Text style={[type.captionMedium, { color: colors.accent }]}>Forgot password?</Text>
+          {/* Apple puts links and hints in the footer below a group, not inside it. */}
+          <Pressable
+            onPress={() => navigation.navigate('ForgotPassword')}
+            hitSlop={8}
+            style={({ pressed }) => ({ alignSelf: 'flex-start', opacity: pressed ? 0.4 : 1 })}
+          >
+            <GroupedFooter style={{ color: colors.accentFg }}>Forgot Password?</GroupedFooter>
           </Pressable>
+        </View>
 
-          <Button label='Sign in' loading={loading} onPress={handleLogin} />
+        <AuthButton
+          label='Sign In'
+          loading={loading}
+          onPress={handleLogin}
+          style={{ marginTop: space['2xl'] }}
+        />
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: space.lg }}>
-            <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-            <Text style={[type.caption, { color: colors.fgMuted, marginHorizontal: space.md }]}>or</Text>
-            <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-          </View>
-
+        {/* No "or" divider — iOS separates these with whitespace rather than a rule. */}
+        <View style={{ marginTop: space['2xl'] }}>
           {/* Apple's own button component, not a look-alike — App Review checks that Sign in with
               Apple uses the system-provided styling, and it's required (Guideline 4.8) to sit
-              alongside Google wherever a third-party login is offered. */}
+              alongside Google wherever a third-party login is offered. Height and cornerRadius are
+              the only geometry it exposes, so AuthButton is sized to match it rather than the
+              reverse. */}
           {appleAvailable && (
             <AppleAuthentication.AppleAuthenticationButton
               buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
               buttonStyle={scheme === 'dark'
                 ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
                 : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-              cornerRadius={radius.md}
-              style={{ height: 52, width: '100%', marginBottom: space.md }}
+              cornerRadius={14}
+              style={{ height: 50, width: '100%', marginBottom: space.md }}
               onPress={handleAppleLogin}
             />
           )}
 
-          <Button label='Continue with Google' variant='secondary' onPress={handleGoogleLogin} disabled={loading} />
-
-          <Pressable onPress={() => navigation.navigate('Signup')} style={{ flexDirection: 'row', justifyContent: 'center', marginTop: space['2xl'] }}>
-            <Text style={[type.body, { color: colors.fgMuted }]}>Don't have an account? </Text>
-            <Text style={[type.bodySemibold, { color: colors.accent }]}>Sign up</Text>
-          </Pressable>
+          <AuthButton
+            variant='tinted'
+            label='Continue with Google'
+            onPress={handleGoogleLogin}
+            disabled={loading}
+          />
         </View>
+
+        {/* Grows to push the sign-up link to the bottom on tall devices, collapses on short ones. */}
+        <View style={{ flex: 1, minHeight: space['3xl'] }} />
+
+        <Pressable
+          onPress={() => navigation.navigate('Signup')}
+          hitSlop={8}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            justifyContent: 'center',
+            opacity: pressed ? 0.4 : 1,
+          })}
+        >
+          <Text style={[appleType.footnote, { color: colors.iosLabelSecondary }]}>
+            Don't have an account?{' '}
+          </Text>
+          <Text style={[appleType.footnoteEmphasized, { color: colors.accentFg }]}>Sign Up</Text>
+        </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
   )

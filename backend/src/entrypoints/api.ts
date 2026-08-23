@@ -71,7 +71,10 @@ app.use(cors({
     if (!origin) return callback(null, true)
     if (allowedOrigins.includes(origin.replace(/\/$/, ''))) return callback(null, true)
     if (!isProd && localhostOrigin.test(origin)) return callback(null, true)
-    return callback(new Error(`Origin not allowed by CORS: ${origin}`))
+    // Deny without throwing — a thrown Error skips responseEnvelope, so errorHandler then
+    // crashes on `res.fail is not a function` and the browser only sees a generic network error.
+    console.warn(`[API] Origin not allowed by CORS: ${origin}`)
+    return callback(null, false)
   },
   credentials: true
 }))

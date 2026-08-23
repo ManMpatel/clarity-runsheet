@@ -28,7 +28,7 @@ export default function Sidebar() {
             C
           </span>
         ) : (
-          <span className='text-base font-bold text-fg tracking-tight px-2'>Clarity Fleet</span>
+          <span className='text-[15px] font-semibold text-fg tracking-tight px-2'>Clarity Fleet</span>
         )}
       </div>
 
@@ -68,7 +68,7 @@ export default function Sidebar() {
             onClick={toggleSidebar}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-keyshortcuts='['
-            className='w-full flex items-center gap-3 px-3 h-9 rounded-control text-sm font-medium
+            className='w-full flex items-center gap-3 px-3 h-10 rounded-lg text-sm font-medium
                        text-fg-subtle hover:bg-surface-2 hover:text-fg transition-colors outline-none
                        focus-visible:ring-2 focus-visible:ring-ring justify-start'
           >

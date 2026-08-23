@@ -18,6 +18,7 @@ export const vehicleState = pgTable('vehicle_state', {
   lat: doublePrecision('lat'),
   lng: doublePrecision('lng'),
   speed: smallint('speed'),
+  angle: smallint('angle'),
   ignition: boolean('ignition'),
   odometer: integer('odometer'),
   status: vehicleStatusEnum('status'),

@@ -7,8 +7,8 @@ import Badge from '../ui/Badge'
 const TIER_NAMES = { mid: 'Mid', top: 'Top' }
 
 const baseRow =
-  'group relative flex items-center gap-3 mx-2 px-3 h-9 rounded-control text-sm font-medium ' +
-  'transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  'group relative flex items-center gap-3 mx-2 px-3 h-10 rounded-lg text-sm font-medium ' +
+  'transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 /**
  * One component for every nav row — sidebar, mobile drawer and (with labels hidden) the collapsed

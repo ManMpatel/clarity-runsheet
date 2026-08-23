@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
 import { Text, StyleSheet } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence, withDelay } from 'react-native-reanimated'
 import { CheckCircle2, XCircle, Info } from 'lucide-react-native'
 import { useTheme } from '../../theme'
@@ -32,7 +32,7 @@ export function ToastProvider({ children }) {
 
 function ToastView({ toast, opacity }) {
   const { colors, space, radius, type, shadow } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useSafeInsets()
   const animatedStyle = useAnimatedStyle(() => ({ opacity: opacity.value, transform: [{ translateY: (1 - opacity.value) * -8 }] }))
 
   const Icon = { success: CheckCircle2, error: XCircle, info: Info }[toast.tone] || Info

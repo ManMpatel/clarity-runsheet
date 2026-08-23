@@ -25,6 +25,8 @@ services:
     restart: unless-stopped
     env_file: ./backend/.env
     environment:
+      # Override the image's NODE_ENV=production so local Vite on :5174+ is allowed by CORS.
+      NODE_ENV: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/clarity_fleet
       REDIS_URL: redis://redis:6379
       TCP_INTERNAL_URL: http://tcp-listener:4001
@@ -54,6 +56,7 @@ services:
     restart: unless-stopped
     env_file: ./backend/.env
     environment:
+      NODE_ENV: development
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/clarity_fleet
       REDIS_URL: redis://redis:6379
     ports:
@@ -62,7 +65,11 @@ services:
       - postgres
       - redis
 
+  # Production-style nginx build of the dashboard. Opt-in so it doesn't steal :5173 from Vite
+  # during `npm run dev` (which is what forced the hop to :5174 and broke CORS).
+  # Start it with: docker compose --profile nginx up
   web:
+    profiles: ['nginx']
     build:
       context: ./frontend/web
       args:

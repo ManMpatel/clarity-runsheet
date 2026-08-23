@@ -35,7 +35,7 @@ function Root() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} backgroundColor={colors.canvas} />
       <RootNavigator />
     </NavigationContainer>
   )

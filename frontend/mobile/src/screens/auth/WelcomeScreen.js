@@ -1,60 +1,92 @@
-import { View, Text, Pressable } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import * as Haptics from 'expo-haptics'
+import { View, Text, ScrollView } from 'react-native'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
+import { Navigation, ShieldCheck, TrendingUp } from 'lucide-react-native'
 import { useTheme } from '../../theme'
+import { AuthButton, FeatureRow } from '../../components/auth'
 
-// New — the old app dropped straight into LoginScreen with no brand moment at all. Uber-style
-// full-bleed dark hero as the very first thing a new install sees, with Sign in / Create account
-// as the two entry points instead of guessing which one someone wants.
+// Apple's onboarding pattern — app mark, "Welcome to <product>" in a large title, three feature
+// rows, CTAs pinned at the bottom. It's what Health, Fitness and TV all open with, and unlike the
+// bare hero this replaced it actually says what the app does before asking anyone to sign in.
 //
-// Deliberately dark regardless of the device's light/dark setting (like Uber's own splash/auth
-// screens) — the shared <Button/> pulls its colours from useTheme() and would render invisible
-// text in light mode against this permanently-dark background, so this screen uses its own
-// plain Pressables instead of the themed kit.
-export default function WelcomeScreen({ navigation }) {
-  const { space, radius, type } = useTheme()
-  const insets = useSafeAreaInsets()
+// This screen used to be hardcoded to #0B0B0F regardless of the device setting. It now follows the
+// system like every other screen, which is what lets it use the themed kit instead of raw hex
+// Pressables. See DECISIONS.md D-017.
+const FEATURES = [
+  {
+    icon: Navigation,
+    title: 'Live Tracking',
+    description: 'Every vehicle on the map, second by second.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Driver Safety',
+    description: 'Harsh braking, speeding and idling, flagged as they happen.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Fleet Insight',
+    description: 'Trips, utilisation and running costs in one place.',
+  },
+]
 
-  function go(screen) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-    navigation.navigate(screen)
-  }
+export default function WelcomeScreen({ navigation }) {
+  const { colors, space, appleType } = useTheme()
+  const insets = useSafeInsets()
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0B0B0F', justifyContent: 'space-between', paddingTop: insets.top, paddingBottom: insets.bottom + space.xl }}>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space['2xl'] }}>
-        <View style={{
-          width: 72, height: 72, borderRadius: 20, backgroundColor: '#6366f1',
-          alignItems: 'center', justifyContent: 'center', marginBottom: space.xl,
-        }}>
-          <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 26 }}>CF</Text>
-        </View>
-        <Text style={[type.display, { color: '#fff', textAlign: 'center' }]}>Clarity Fleet</Text>
-        <Text style={[type.body, { color: '#a1a1aa', textAlign: 'center', marginTop: space.sm, maxWidth: 280 }]}>
-          Live GPS tracking, driver safety, and fleet insight — in your pocket.
-        </Text>
-      </View>
+    <View style={{ flex: 1, backgroundColor: colors.iosGroupedBg }}>
+      {/* Scrolls rather than clips: the feature list plus a large title doesn't fit an iPhone SE. */}
+      <ScrollView
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          paddingTop: insets.top + space['4xl'],
+          paddingBottom: space['2xl'],
+          paddingHorizontal: space.xl,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ alignItems: 'center', marginBottom: space['4xl'] }}>
+          <View
+            style={{
+              width: 76,
+              height: 76,
+              borderRadius: 18,
+              backgroundColor: colors.accent,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: space['2xl'],
+            }}
+          >
+            <Text style={[appleType.title1, { color: colors.fgOnAccent }]}>CF</Text>
+          </View>
 
-      <View style={{ paddingHorizontal: space['2xl'] }}>
-        <Pressable
-          onPress={() => go('Login')}
-          style={({ pressed }) => ({
-            height: 52, borderRadius: radius.md, backgroundColor: '#6366f1',
-            alignItems: 'center', justifyContent: 'center', marginBottom: space.md,
-            opacity: pressed ? 0.85 : 1,
-          })}
-        >
-          <Text style={[type.bodySemibold, { color: '#fff' }]}>Sign in</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => go('Signup')}
-          style={({ pressed }) => ({
-            height: 52, borderRadius: radius.md, borderWidth: 1, borderColor: '#3f3f46',
-            alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1,
-          })}
-        >
-          <Text style={[type.bodySemibold, { color: '#fff' }]}>Create an account</Text>
-        </Pressable>
+          {/* Tinting the product name is Apple's own treatment on this screen ("Welcome to
+              Fitness"). Two lines, because a 34pt large title won't fit on one. */}
+          <Text style={[appleType.largeTitle, { color: colors.fg, textAlign: 'center' }]}>
+            Welcome to
+          </Text>
+          <Text style={[appleType.largeTitle, { color: colors.accentFg, textAlign: 'center' }]}>
+            Clarity Fleet
+          </Text>
+        </View>
+
+        <View>
+          {FEATURES.map((feature) => (
+            <FeatureRow key={feature.title} {...feature} />
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Outside the ScrollView so the CTAs stay reachable no matter how short the device is. */}
+      <View style={{ paddingHorizontal: space.xl, paddingBottom: insets.bottom + space.lg }}>
+        <AuthButton label='Sign In' onPress={() => navigation.navigate('Login')} />
+        <AuthButton
+          variant='plain'
+          label='Create an Account'
+          onPress={() => navigation.navigate('Signup')}
+          style={{ marginTop: space.xs }}
+        />
       </View>
     </View>
   )

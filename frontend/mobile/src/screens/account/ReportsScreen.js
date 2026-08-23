@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { View, Text, ScrollView } from 'react-native'
+import { useEffect, useMemo, useState } from 'react'
+import { View, Text, ScrollView, Share } from 'react-native'
 import api from '../../lib/api'
 import { useTheme } from '../../theme'
-import { formatNumber } from '../../lib/format'
+import { formatKm, formatNumber } from '../../lib/format'
 import { Header, Field, Button, Chip, Card, EmptyState } from '../../components/ui'
 
 const REPORT_TYPES = [
@@ -12,14 +12,42 @@ const REPORT_TYPES = [
   { id: 'vehicle-health', label: 'Vehicle Health' },
 ]
 
+function csvEscape(value) {
+  const s = value == null ? '' : String(value)
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+function tripSummaryCsv(trips, nameById) {
+  const header = 'Vehicle,Start,End,Duration (min),Distance (km)'
+  const rows = (trips || []).map((t) => [
+    csvEscape(t.vehicleName || nameById[t.vehicleId] || t.vehicleId),
+    csvEscape(t.startTime ? new Date(t.startTime).toISOString() : ''),
+    csvEscape(t.endTime ? new Date(t.endTime).toISOString() : ''),
+    csvEscape(t.durationMinutes ?? ''),
+    csvEscape(t.distanceKm ?? ''),
+  ].join(','))
+  return [header, ...rows].join('\n')
+}
+
 export default function ReportsScreen({ navigation }) {
-  const { colors, space, radius, type } = useTheme()
+  const { colors, space, type } = useTheme()
   const [selected, setSelected] = useState('driver-scores')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [error, setError] = useState('')
+  const [vehicles, setVehicles] = useState([])
+
+  useEffect(() => {
+    api.get('/vehicles').then((res) => setVehicles(res.data || [])).catch(() => {})
+  }, [])
+
+  const nameById = useMemo(
+    () => Object.fromEntries(vehicles.map((v) => [v.id, v.name])),
+    [vehicles],
+  )
 
   async function handleGenerate() {
     if (!from || !to) return setError('Please enter a date range')
@@ -33,6 +61,22 @@ export default function ReportsScreen({ navigation }) {
       setError(err.response?.status === 403 ? 'This report requires a higher subscription tier' : 'Failed to generate report')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleShareCsv() {
+    const trips = data?.trips || []
+    if (trips.length === 0) return
+    setSharing(true)
+    try {
+      await Share.share({
+        title: 'Trip summary',
+        message: tripSummaryCsv(trips, nameById),
+      })
+    } catch {
+      setError('Could not share CSV')
+    } finally {
+      setSharing(false)
     }
   }
 
@@ -55,12 +99,32 @@ export default function ReportsScreen({ navigation }) {
     }
     if (selected === 'trip-summary') {
       const s = data.summary || {}
+      const trips = data.trips || []
       return (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-          <SummaryBox label='Total trips' value={s.totalTrips ?? 0} />
-          <SummaryBox label='Total km' value={formatNumber(s.totalKm, 1)} />
-          <SummaryBox label='Total mins' value={formatNumber(s.totalDuration)} />
-          <SummaryBox label='Avg km/trip' value={formatNumber(s.avgKmPerTrip, 1)} />
+        <View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+            <SummaryBox label='Total trips' value={s.totalTrips ?? 0} />
+            <SummaryBox label='Total km' value={formatNumber(s.totalKm, 1)} />
+            <SummaryBox label='Total mins' value={formatNumber(s.totalDuration)} />
+            <SummaryBox label='Avg km/trip' value={formatNumber(s.avgKmPerTrip, 1)} />
+          </View>
+          {trips.length > 0 && (
+            <Button
+              label='Share CSV'
+              variant='secondary'
+              loading={sharing}
+              onPress={handleShareCsv}
+              style={{ marginBottom: space.md }}
+            />
+          )}
+          {trips.map((trip, i) => (
+            <ResultRow
+              key={trip.id || i}
+              main={trip.vehicleName || nameById[trip.vehicleId] || 'Vehicle'}
+              sub={trip.startTime ? new Date(trip.startTime).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+              value={formatKm(trip.distanceKm)}
+            />
+          ))}
         </View>
       )
     }
@@ -112,7 +176,7 @@ export default function ReportsScreen({ navigation }) {
 }
 
 function SummaryBox({ label, value }) {
-  const { colors, space, radius, type } = useTheme()
+  const { colors, space, type } = useTheme()
   return (
     <View style={{ flexBasis: '48%', marginRight: '4%', marginBottom: space.sm }}>
       <Card style={{ alignItems: 'center' }}>

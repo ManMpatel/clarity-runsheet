@@ -66,11 +66,14 @@ module.exports = {
         color: '#ffffff',
         sounds: [],
       }],
+      // Matches WelcomeScreen's `iosGroupedBg` in each appearance. Both used to be #0B0B0F, from
+      // when that screen was hardcoded dark; now that it follows the system setting, a light-mode
+      // launch would flash near-black and then jump to #f2f2f7.
       ['expo-splash-screen', {
         image: './assets/splash-icon.png',
         resizeMode: 'contain',
-        backgroundColor: '#0B0B0F',
-        dark: { backgroundColor: '#0B0B0F' },
+        backgroundColor: '#f2f2f7',
+        dark: { backgroundColor: '#000000' },
       }],
     ],
 

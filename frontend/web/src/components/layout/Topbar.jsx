@@ -15,7 +15,7 @@ export default function Topbar() {
   return (
     <header
       className='sticky top-0 z-30 h-(--topbar-h) shrink-0 flex items-center gap-3 px-4 sm:px-6
-                 border-b border-border bg-surface/80 backdrop-blur-md'
+                 border-b border-border bg-surface/75 backdrop-blur-xl'
     >
       <button
         type='button'
@@ -27,7 +27,7 @@ export default function Topbar() {
         <Menu className='size-5' aria-hidden='true' />
       </button>
 
-      <h1 className='text-sm font-semibold text-fg truncate'>{title}</h1>
+      <h1 className='text-[15px] font-semibold text-fg tracking-tight truncate'>{title}</h1>
 
       <button
         type='button'

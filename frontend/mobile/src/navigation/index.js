@@ -2,13 +2,12 @@ import { useEffect } from 'react'
 import { View, ActivityIndicator, StyleSheet } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { BlurView } from 'expo-blur'
 import { MapPin, Route as RouteIcon, Bell, CircleUserRound } from 'lucide-react-native'
 import { useAuthStore } from '../stores/authStore'
 import { useTheme } from '../theme'
 import { useUnreadAlertCount } from '../hooks/useUnreadAlertCount'
 import { useNotificationDeepLink } from '../hooks/useNotificationDeepLink'
-import { TAB_BAR_HEIGHT, useTabBarBottomOffset } from './tabBarLayout'
+import { TAB_BAR_HEIGHT, useTabBarSafeBottom } from './tabBarLayout'
 
 import WelcomeScreen from '../screens/auth/WelcomeScreen'
 import LoginScreen from '../screens/auth/LoginScreen'
@@ -35,6 +34,7 @@ import MyPlanScreen from '../screens/account/MyPlanScreen'
 import UpgradeScreen from '../screens/account/UpgradeScreen'
 import BillingScreen from '../screens/account/BillingScreen'
 import AppearanceScreen from '../screens/account/AppearanceScreen'
+import AlertRulesScreen from '../screens/account/AlertRulesScreen'
 
 const RootStack = createNativeStackNavigator()
 const AuthStack = createNativeStackNavigator()
@@ -52,26 +52,10 @@ function AuthNavigator() {
   )
 }
 
-// Uber's floating translucent tab bar — position:absolute + a blurred background instead of the
-// RN default opaque bar glued to the bottom edge. `tabBarBackground` is the supported extension
-// point for this in @react-navigation/bottom-tabs v6.
-function TabBarBackground() {
-  const { scheme } = useTheme()
-  return (
-    <BlurView
-      intensity={80}
-      tint={scheme === 'dark' ? 'dark' : 'light'}
-      style={StyleSheet.absoluteFill}
-    />
-  )
-}
-
 function AppTabs() {
-  const { colors, space, radius } = useTheme()
+  const { colors } = useTheme()
   const unread = useUnreadAlertCount()
-  // Clears the iOS home indicator. At a flat 16pt the bar sat inside the home-indicator gesture
-  // area, so a swipe near a tab was ambiguous between switching tabs and going home.
-  const bottomOffset = useTabBarBottomOffset()
+  const bottomInset = useTabBarSafeBottom()
 
   return (
     <Tab.Navigator
@@ -80,23 +64,24 @@ function AppTabs() {
         tabBarShowLabel: true,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.fgSubtle,
-        tabBarBackground: () => <TabBarBackground />,
+        tabBarHideOnKeyboard: true,
+        // We apply the inset as padding ourselves so the opaque fill reaches the physical
+        // bottom edge while icons/labels stay above the home indicator / system nav bar.
+        safeAreaInsets: { top: 0, bottom: 0 },
         tabBarStyle: {
-          position: 'absolute',
-          left: space.lg,
-          right: space.lg,
-          bottom: bottomOffset,
-          height: TAB_BAR_HEIGHT,
-          borderRadius: radius.xl,
-          borderTopWidth: 0,
-          overflow: 'hidden',
-          elevation: 8,
+          backgroundColor: colors.surface,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          borderTopColor: colors.border,
+          height: TAB_BAR_HEIGHT + bottomInset,
+          paddingBottom: bottomInset,
+          paddingTop: 6,
+          elevation: 12,
           shadowColor: '#000',
-          shadowOpacity: 0.15,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: -2 },
         },
-        tabBarItemStyle: { paddingTop: 8 },
+        tabBarItemStyle: { paddingTop: 4 },
         tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
         tabBarIcon: ({ color, size, focused }) => {
           const props = { color, size: size - 2, strokeWidth: focused ? 2.4 : 2 }
@@ -140,6 +125,7 @@ function AccountNavigator() {
       <AccountStack.Screen name='Upgrade' component={UpgradeScreen} />
       <AccountStack.Screen name='Billing' component={BillingScreen} />
       <AccountStack.Screen name='Appearance' component={AppearanceScreen} />
+      <AccountStack.Screen name='AlertRules' component={AlertRulesScreen} />
     </AccountStack.Navigator>
   )
 }

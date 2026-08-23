@@ -40,49 +40,49 @@ export default function ResetPassword() {
 
   if (!token) {
     return (
-      <div className='min-h-screen flex items-center justify-center bg-gray-50'>
-        <p className='text-sm text-gray-500'>Invalid link. <Link to='/forgot-password' className='text-blue-600 hover:underline'>Request a new one</Link></p>
+      <div className='min-h-svh flex items-center justify-center bg-canvas'>
+        <p className='text-sm text-fg-muted'>Invalid link. <Link to='/forgot-password' className='text-accent hover:underline'>Request a new one</Link></p>
       </div>
     )
   }
 
   return (
-    <div className='min-h-screen bg-gray-50 flex flex-col'>
-      <div className='h-14 flex items-center px-8 border-b border-gray-200 bg-white'>
-        <span className='text-base font-bold text-blue-600'>Clarity Fleet</span>
+    <div className='min-h-svh bg-canvas flex flex-col'>
+      <div className='h-14 flex items-center px-8 bg-surface/80 backdrop-blur-xl border-b border-border'>
+        <span className='text-[15px] font-semibold text-accent tracking-tight'>Clarity Fleet</span>
       </div>
       <div className='flex-1 flex items-center justify-center px-4'>
         <div className='w-full max-w-sm'>
           {done ? (
             <div className='text-center'>
               <div className='text-5xl mb-4'>✅</div>
-              <h1 className='text-2xl font-bold text-gray-900 mb-2'>Password updated</h1>
-              <p className='text-sm text-gray-500'>Taking you to login...</p>
+              <h1 className='text-[22px] font-semibold text-fg mb-2 tracking-tight'>Password updated</h1>
+              <p className='text-[15px] text-fg-muted'>Taking you to login...</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className='bg-white rounded-2xl border border-gray-200 shadow-sm p-6'>
-              <h1 className='text-xl font-bold text-gray-900 mb-5'>Set a new password</h1>
-              {error && <p className='text-sm text-red-600 mb-3'>{error}</p>}
-              <label className='block text-xs font-semibold text-gray-600 mb-1.5'>New password</label>
+            <form onSubmit={handleSubmit} className='bg-surface rounded-3xl border border-border shadow-md p-8'>
+              <h1 className='text-[22px] font-semibold text-fg mb-5 tracking-tight'>Set a new password</h1>
+              {error && <p className='text-sm text-danger-fg mb-3'>{error}</p>}
+              <label className='block text-[13px] font-medium text-fg-muted mb-1.5'>New password</label>
               <input
                 type='password'
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder='At least 8 characters'
                 required
-                className='w-full h-11 px-4 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4'
+                className='w-full h-12 px-4 rounded-xl border border-border bg-surface-2/70 text-[15px] text-fg placeholder:text-fg-subtle focus:outline-none focus:bg-surface focus:ring-4 focus:ring-ring/15 focus:border-accent mb-4 transition'
               />
-              <label className='block text-xs font-semibold text-gray-600 mb-1.5'>Confirm new password</label>
+              <label className='block text-[13px] font-medium text-fg-muted mb-1.5'>Confirm new password</label>
               <input
                 type='password'
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder='Re-enter password'
                 required
-                className='w-full h-11 px-4 rounded-xl border border-gray-200 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4'
+                className='w-full h-12 px-4 rounded-xl border border-border bg-surface-2/70 text-[15px] text-fg placeholder:text-fg-subtle focus:outline-none focus:bg-surface focus:ring-4 focus:ring-ring/15 focus:border-accent mb-4 transition'
               />
               <button type='submit' disabled={loading}
-                className='w-full h-11 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition'>
+                className='w-full h-12 bg-accent hover:bg-accent-hover disabled:opacity-50 text-fg-on-accent text-[15px] font-semibold rounded-xl shadow-sm transition active:scale-[0.98]'>
                 {loading ? 'Saving...' : 'Update password'}
               </button>
             </form>

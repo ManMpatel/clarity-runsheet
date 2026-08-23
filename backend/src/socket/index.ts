@@ -10,8 +10,53 @@ const { verifyAccessToken } = require('../modules/auth/services/tokens')
 
 let io = null
 
+// Ingestion-side diagnostic counters, surfaced on /health below.
+//
+// WHY: processPayload() in entrypoints/ingestion.ts drops telemetry for any IMEI with no matching
+// vehicles row — after tcp-listener has already ACKed the records to the device. The device sees a
+// successful delivery, the tcp-listener log says "N records queued", and the only trace is one
+// console.warn in a different process. That makes an unprovisioned device look completely healthy
+// while every packet is discarded. These counters turn that into something observable.
+const stats = {
+  processed: 0,
+  unknownImei: 0,
+  unknownImeis: {},   // imei -> times seen, so you can read off the exact unprovisioned IMEI
+  lastProcessedAt: null,
+}
+
+function recordProcessed() {
+  stats.processed += 1
+  stats.lastProcessedAt = Date.now()
+}
+
+function recordUnknownImei(imei) {
+  stats.unknownImei += 1
+  stats.unknownImeis[imei] = (stats.unknownImeis[imei] || 0) + 1
+}
+
+function getStats() {
+  return stats
+}
+
 function init() {
-  const httpServer = http.createServer()
+  const httpServer = http.createServer((req, res) => {
+    // Liveness probe for docker-compose.prod.yml and external uptime monitors. Attached to the
+    // socket.io HTTP server because ingestion has no Express app of its own — socket.io only
+    // handles requests under its own path (/socket.io/), so a plain /health here does not
+    // collide with it.
+    if (req.method === 'GET' && req.url && req.url.split('?')[0] === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({
+        status: 'ok',
+        service: 'ingestion',
+        uptimeSeconds: Math.floor(process.uptime()),
+        ...stats,
+      }))
+      return
+    }
+    res.writeHead(404, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ error: 'not found' }))
+  })
 
   // Same origin allowlist as the api entrypoint: comma-separated env lists, plus any localhost
   // port outside production (Vite moves to 5174+ when 5173 is taken).
@@ -29,7 +74,8 @@ function init() {
         if (!origin) return callback(null, true)
         if (allowedOrigins.includes(origin.replace(/\/$/, ''))) return callback(null, true)
         if (!isProd && localhostOrigin.test(origin)) return callback(null, true)
-        return callback(new Error(`Origin not allowed by CORS: ${origin}`))
+        console.warn(`[socket] Origin not allowed by CORS: ${origin}`)
+        return callback(null, false)
       },
       methods: ['GET', 'POST'],
       credentials: true
@@ -96,5 +142,5 @@ function getIo() {
 // `export {}` (not `module.exports =`) so TS recognizes this file as an ES module for importers
 // even under @ts-nocheck — module.exports assignments aren't reliably picked up as an export
 // shape by files that import this one without their own @ts-nocheck.
-export { init, broadcastVanUpdate, broadcastAlert, getIo }
+export { init, broadcastVanUpdate, broadcastAlert, getIo, recordProcessed, recordUnknownImei, getStats }
 

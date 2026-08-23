@@ -42,6 +42,17 @@ export const light = {
   statusIdle: '#d97706',
   statusStopped: '#64748b',
   statusOffline: '#a855f7',
+
+  // Apple's own system greys, used by screens/auth/ only (see DECISIONS.md D-017). The palette
+  // above is Tailwind slate, which carries a blue cast that visibly fights an iOS-native look;
+  // these are the real UIKit values. Deliberately `ios`-prefixed so there is no ambiguity about
+  // which doctrine a token belongs to.
+  iosGroupedBg: '#f2f2f7',
+  iosGroupedSurface: '#ffffff',
+  iosSeparator: 'rgba(60, 60, 67, 0.29)',
+  iosLabelSecondary: 'rgba(60, 60, 67, 0.60)',
+  iosLabelTertiary: 'rgba(60, 60, 67, 0.30)',
+  iosFill: 'rgba(120, 120, 128, 0.12)',
 }
 
 export const dark = {
@@ -82,6 +93,16 @@ export const dark = {
   statusIdle: '#f59e0b',
   statusStopped: '#71717a',
   statusOffline: '#c084fc',
+
+  // Dark-mode counterparts of the iOS system greys above. Note the grouped background is true
+  // #000 — that's UIKit's systemGroupedBackground in dark, and it's what makes the elevated
+  // #1c1c1e cards read as cards on an OLED panel.
+  iosGroupedBg: '#000000',
+  iosGroupedSurface: '#1c1c1e',
+  iosSeparator: 'rgba(84, 84, 88, 0.65)',
+  iosLabelSecondary: 'rgba(235, 235, 245, 0.60)',
+  iosLabelTertiary: 'rgba(235, 235, 245, 0.30)',
+  iosFill: 'rgba(120, 120, 128, 0.24)',
 }
 
 // Uber's actual visual language on top of the ported palette: a near-black/white neutral base

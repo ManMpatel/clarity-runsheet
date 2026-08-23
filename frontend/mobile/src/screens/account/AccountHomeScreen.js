@@ -1,11 +1,11 @@
 import { ScrollView, View, Text, Pressable } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import * as WebBrowser from 'expo-web-browser'
 import Constants from 'expo-constants'
 import {
   Building2, Truck, Users as UsersIcon, IdCard, Wrench, MapPin, HeartPulse,
   Video, BarChart3, CreditCard, ArrowUpCircle, Receipt, Palette, LogOut,
-  Shield, FileText,
+  Shield, FileText, Bell,
 } from 'lucide-react-native'
 import { useAuthStore } from '../../stores/authStore'
 import { useTheme } from '../../theme'
@@ -49,6 +49,7 @@ const SECTIONS = [
   {
     title: 'Preferences',
     items: [
+      { label: 'Alert rules', icon: Bell, screen: 'AlertRules' },
       { label: 'Appearance', icon: Palette, screen: 'Appearance' },
     ],
   },
@@ -63,7 +64,7 @@ const SECTIONS = [
 
 export default function AccountHomeScreen({ navigation }) {
   const { colors, space, radius, type } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useSafeInsets()
   const { user, logout } = useAuthStore()
   const tabBarClearance = useTabBarClearance()
 

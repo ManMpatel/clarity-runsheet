@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { View, Text, Pressable, ActivityIndicator, RefreshControl } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import { FlashList } from '@shopify/flash-list'
 import { BellOff, Gauge, Clock, Wrench, BatteryWarning, MapPinOff, Truck, Siren, Cable, TrendingDown, TrendingUp, CornerUpRight } from 'lucide-react-native'
 import api from '../../lib/api'
@@ -38,7 +38,7 @@ function dayLabel(dateStr) {
 
 export default function AlertsScreen() {
   const { colors, space, radius, type } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useSafeInsets()
   const toast = useToast()
   const tabBarClearance = useTabBarClearance()
 

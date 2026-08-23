@@ -179,6 +179,33 @@ router.get('/companies/:id/users', requireSuperAdmin, asyncRoute(async (req, res
   return res.success(safe)
 }))
 
+// Device connectivity diagnostics. The tcp-listener's per-IMEI counters (metrics/usage.ts) live
+// on its internal HTTP server on port 4001, which docker-compose.prod.yml binds to 127.0.0.1 and
+// DEPLOY.md's ufw rules keep off the public interface — so it's unreachable from a browser without
+// an SSH tunnel. This proxies it behind the existing super-admin guard, reusing the same
+// TCP_INTERNAL_URL hop that fleet/routes/vehicles.ts already uses for relay cut/restore.
+//
+// Answers, for a device that "should be tracking but isn't":
+//   connected[]           — is the device attached to the listener AT ALL right now?
+//   devices[imei].bytes   — is it sending, and how much against the ~273 KB/day SIM budget?
+//   devices[imei].crcFailures — is it sending corrupt frames (which burn data on retransmit)?
+const TCP_INTERNAL_URL = process.env.TCP_INTERNAL_URL || 'http://localhost:4001'
+
+router.get('/device-metrics', requireSuperAdmin, asyncRoute(async (req, res) => {
+  try {
+    // The tcp-listener is a separate container/process; if it's down this fetch rejects rather
+    // than returning a status, so a plain 502 is more honest than letting it 500 as an unhandled
+    // error — "listener unreachable" is itself the diagnostic answer.
+    const upstream = await fetch(`${TCP_INTERNAL_URL}/internal/metrics`)
+    if (!upstream.ok) {
+      return res.fail({ upstreamStatus: upstream.status }, 'tcp-listener metrics unavailable', 502)
+    }
+    return res.success(await upstream.json())
+  } catch (err: any) {
+    return res.fail({ reason: err.message }, 'tcp-listener unreachable', 502)
+  }
+}))
+
 router.put('/companies/:id/billing', requireSuperAdmin, asyncRoute(async (req, res) => {
   const { billingMode, customPrice } = req.body
   if (!['stripe', 'becs', 'manual'].includes(billingMode)) {

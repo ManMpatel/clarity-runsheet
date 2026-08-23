@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, StyleSheet, Linking, Platform } from 'react-native'
-import MapView from 'react-native-maps'
+import MapView, { Circle, Marker, Polygon } from 'react-native-maps'
 import BottomSheet, { BottomSheetFlatList, BottomSheetTextInput } from '@gorhom/bottom-sheet'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Search, LocateFixed, Navigation2, Power, X, Gauge, Fuel, BatteryMedium, SignalHigh } from 'lucide-react-native'
+import { Search, LocateFixed, Navigation2, Power, X, Gauge, Fuel, BatteryMedium, SignalHigh, Shapes, Route } from 'lucide-react-native'
 import { useTheme } from '../../theme'
 import { useToast, Button, Card, StatTile, StatusDot, Skeleton, ErrorState } from '../../components/ui'
 import VehicleMarker from '../../components/map/VehicleMarker'
 import { useSocket } from '../../hooks/useSocket'
+import { useSafeInsets } from '../../hooks/useSafeInsets'
 import { mapStyleLight, mapStyleDark } from '../../lib/mapStyle'
 import { num, formatKm, formatVolts } from '../../lib/format'
 import api from '../../lib/api'
+
+// Handle height matches @gorhom/bottom-sheet's DEFAULT_HANDLE_HEIGHT. The collapsed snap is
+// sized to the handle + stats/search header only — the vehicle list stays clipped until the
+// user drags the tray up.
+const HANDLE_HEIGHT = 24
+const COLLAPSED_SHEET = 140
 
 const SYDNEY = { latitude: -33.8688, longitude: 151.2093, latitudeDelta: 0.2, longitudeDelta: 0.2 }
 
@@ -19,6 +25,16 @@ const SYDNEY = { latitude: -33.8688, longitude: 151.2093, latitudeDelta: 0.2, lo
 // slower map instead of a silently frozen one — which is exactly what shipped before, since
 // EXPO_PUBLIC_SOCKET_URL was never set and the socket therefore never connected at all.
 const POLL_INTERVAL_MS = 30000
+const DEFAULT_SPEED_LIMIT = 110
+
+function zonePolygonCoords(zone) {
+  const ring = zone?.geometry?.coordinates?.[0]
+  if (!Array.isArray(ring) || ring.length < 3) return null
+  const coords = ring
+    .map((pair) => ({ latitude: pair?.[1], longitude: pair?.[0] }))
+    .filter((p) => p.latitude != null && p.longitude != null)
+  return coords.length >= 3 ? coords : null
+}
 
 function deriveStatus(v) {
   if (v.speed > 0) return 'moving'
@@ -28,7 +44,7 @@ function deriveStatus(v) {
 
 export default function MapScreen() {
   const { colors, space, radius, type, scheme, shadow } = useTheme()
-  const insets = useSafeAreaInsets()
+  const insets = useSafeInsets()
   const toast = useToast()
 
   const [vehicles, setVehicles] = useState([])
@@ -41,17 +57,29 @@ export default function MapScreen() {
   // once-per-second re-render doesn't drag the whole screen (and every map marker) with it.
   const [lastUpdate, setLastUpdate] = useState(() => Date.now())
   const [commandBusy, setCommandBusy] = useState(false)
+  const [speedLimit, setSpeedLimit] = useState(DEFAULT_SPEED_LIMIT)
+  const [zones, setZones] = useState([])
+  const [showZones, setShowZones] = useState(true)
 
   const mapRef = useRef(null)
   const sheetRef = useRef(null)
   const hasFitOnce = useRef(false)
   const mountedRef = useRef(true)
+  const [headerHeight, setHeaderHeight] = useState(0)
 
-  const snapPoints = useMemo(() => ['16%', '45%', '92%'], [])
+  const collapsedSheet = headerHeight > 0 ? headerHeight + HANDLE_HEIGHT : COLLAPSED_SHEET
+  const snapPoints = useMemo(() => [collapsedSheet, '48%', '90%'], [collapsedSheet])
 
   useEffect(() => {
     mountedRef.current = true
     load()
+    api.get('/alerts/preferences').then((res) => {
+      const speeding = (res.data || []).find((r) => r.type === 'speeding')
+      if (speeding?.speedLimit) setSpeedLimit(num(speeding.speedLimit) || DEFAULT_SPEED_LIMIT)
+    }).catch(() => {})
+    api.get('/geofences').then((res) => {
+      setZones((res.data || []).filter((z) => z.active !== false))
+    }).catch(() => {})
     return () => { mountedRef.current = false }
   }, [])
 
@@ -86,6 +114,7 @@ export default function MapScreen() {
           odometer: data.odometer != null ? num(data.odometer) : v.odometer,
           batteryVoltage: data.batteryVoltage != null ? num(data.batteryVoltage) : v.batteryVoltage,
           externalVoltage: data.externalVoltage != null ? num(data.externalVoltage) : v.externalVoltage,
+          angle: data.angle != null ? num(data.angle) : v.angle,
         }
       })
       return matched ? next : prev
@@ -118,6 +147,7 @@ export default function MapScreen() {
           odometer: num(item.state.odometer),
           batteryVoltage: num(item.state.batteryVoltage),
           externalVoltage: num(item.state.externalVoltage),
+          angle: num(item.state.angle),
         }))
       if (!mountedRef.current) return
       setVehicles(mapped)
@@ -139,7 +169,7 @@ export default function MapScreen() {
     const coords = (list || vehicles).map((v) => ({ latitude: v.latitude, longitude: v.longitude }))
     if (coords.length === 0 || !mapRef.current) return
     mapRef.current.fitToCoordinates(coords, {
-      edgePadding: { top: 100, right: 60, bottom: 340, left: 60 },
+      edgePadding: { top: 80, right: 60, bottom: collapsedSheet + 24, left: 60 },
       animated: true,
     })
   }
@@ -150,19 +180,19 @@ export default function MapScreen() {
     moving: decorated.filter((v) => v.status === 'moving').length,
     idle: decorated.filter((v) => v.status === 'idle').length,
     stopped: decorated.filter((v) => v.status === 'stopped').length,
-    overspeed: decorated.filter((v) => v.speed > 110).length,
-  }), [decorated])
+    overspeed: decorated.filter((v) => v.speed > speedLimit).length,
+  }), [decorated, speedLimit])
 
   const filtered = useMemo(() => {
     let list = decorated
-    if (activeFilter === 'overspeed') list = list.filter((v) => v.speed > 110)
+    if (activeFilter === 'overspeed') list = list.filter((v) => v.speed > speedLimit)
     else if (activeFilter !== 'all') list = list.filter((v) => v.status === activeFilter)
     if (query.trim()) {
       const q = query.trim().toLowerCase()
       list = list.filter((v) => v.name?.toLowerCase().includes(q) || v.address?.toLowerCase().includes(q))
     }
     return list
-  }, [decorated, activeFilter, query])
+  }, [decorated, activeFilter, query, speedLimit])
 
   const selected = decorated.find((v) => v.id === selectedId) || null
 
@@ -222,6 +252,8 @@ export default function MapScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+      <View style={{ height: insets.top, backgroundColor: colors.canvas }} />
+      <View style={{ flex: 1 }}>
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
@@ -238,16 +270,63 @@ export default function MapScreen() {
         toolbarEnabled={false}
         onPress={() => setSelectedId(null)}
       >
+        {showZones && zones.map((zone) => {
+          const lat = zone.centreLat
+          const lng = zone.centreLng
+          const radiusMetres = zone.radiusMetres
+          if (lat != null && lng != null && radiusMetres) {
+            return (
+              <Circle
+                key={zone.id}
+                center={{ latitude: lat, longitude: lng }}
+                radius={radiusMetres}
+                strokeColor={colors.accent}
+                fillColor={colors.accent + '33'}
+                strokeWidth={2}
+              />
+            )
+          }
+          const coords = zonePolygonCoords(zone)
+          if (!coords) return null
+          return (
+            <Polygon
+              key={zone.id}
+              coordinates={coords}
+              strokeColor={colors.accent}
+              fillColor={colors.accent + '33'}
+              strokeWidth={2}
+            />
+          )
+        })}
+        {showZones && zones.map((zone) => {
+          const lat = zone.centreLat ?? zone.geometry?.coordinates?.[0]?.[0]?.[1]
+          const lng = zone.centreLng ?? zone.geometry?.coordinates?.[0]?.[0]?.[0]
+          if (lat == null || lng == null) return null
+          return (
+            <Marker key={`label-${zone.id}`} coordinate={{ latitude: lat, longitude: lng }} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+              <View style={{ backgroundColor: colors.surface, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={[type.micro, { color: colors.fg }]}>{zone.name}</Text>
+              </View>
+            </Marker>
+          )
+        })}
         {decorated.map((v) => (
           <VehicleMarker key={v.id} vehicle={v} selected={v.id === selectedId} onPress={() => selectVehicle(v)} />
         ))}
       </MapView>
 
-      <FreshnessPill since={lastUpdate} socketStatus={socketStatus} top={insets.top + space.sm} />
+      <FreshnessPill since={lastUpdate} socketStatus={socketStatus} top={space.sm} />
+
+      <Pressable
+        onPress={() => setShowZones((s) => !s)}
+        style={[styles.fab, { bottom: collapsedSheet + space.md + 52, backgroundColor: showZones ? colors.accent : colors.surface, borderColor: showZones ? colors.accent : colors.border }, shadow('sm')]}
+      >
+        <Shapes size={20} color={showZones ? colors.fgOnAccent : colors.fg} />
+      </Pressable>
 
       <Pressable
         onPress={() => fitToFleet()}
-        style={[styles.fab, { bottom: 230, backgroundColor: colors.surface, borderColor: colors.border }, shadow('sm')]}
+        style={[styles.fab, { bottom: collapsedSheet + space.md, backgroundColor: colors.surface, borderColor: colors.border }, shadow('sm')]}
       >
         <LocateFixed size={20} color={colors.fg} />
       </Pressable>
@@ -256,7 +335,10 @@ export default function MapScreen() {
         ref={sheetRef}
         index={0}
         snapPoints={snapPoints}
-        backgroundStyle={{ backgroundColor: colors.surface }}
+        enableDynamicSizing={false}
+        topInset={0}
+        bottomInset={0}
+        backgroundStyle={{ backgroundColor: colors.surface, overflow: 'hidden' }}
         handleIndicatorStyle={{ backgroundColor: colors.border, width: 40 }}
       >
         {selected ? (
@@ -269,7 +351,13 @@ export default function MapScreen() {
           />
         ) : (
           <>
-            <View style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}>
+            <View
+              onLayout={(e) => {
+                const next = Math.ceil(e.nativeEvent.layout.height)
+                setHeaderHeight((prev) => (prev === next ? prev : next))
+              }}
+              style={{ paddingHorizontal: space.lg, paddingBottom: space.sm }}
+            >
               <View style={styles.statRow}>
                 <StatTile label='Moving' value={counts.moving} color={colors.statusMoving} active={activeFilter === 'moving'} onPress={() => toggleFilter('moving')} />
                 <StatTile label='Idle' value={counts.idle} color={colors.statusIdle} active={activeFilter === 'idle'} onPress={() => toggleFilter('idle')} />
@@ -282,6 +370,7 @@ export default function MapScreen() {
                 <BottomSheetTextInput
                   value={query}
                   onChangeText={setQuery}
+                  onFocus={() => sheetRef.current?.snapToIndex(1)}
                   placeholder='Search vehicles or address'
                   placeholderTextColor={colors.fgSubtle}
                   style={[type.body, { flex: 1, color: colors.fg, paddingVertical: 10, marginLeft: space.sm }]}
@@ -309,6 +398,7 @@ export default function MapScreen() {
           </>
         )}
       </BottomSheet>
+      </View>
     </View>
   )
 }
@@ -363,7 +453,7 @@ function VehicleRow({ vehicle, onPress }) {
 function StatRow({ icon, label, value }) {
   const { colors, space, type } = useTheme()
   return (
-    <View style={{ flex: 1, alignItems: 'center', paddingVertical: space.sm }}>
+    <View style={{ width: '33.33%', alignItems: 'center', paddingVertical: space.sm }}>
       {icon}
       <Text style={[type.tabularBody, { color: colors.fg, marginTop: space.xs }]}>{value}</Text>
       <Text style={[type.micro, { color: colors.fgMuted }]}>{label}</Text>
@@ -402,6 +492,7 @@ function VehicleDetail({ vehicle, busy, onClose, onToggleImmobilise, onNavigate 
       <View style={[styles.detailGrid, { backgroundColor: colors.surface2, borderRadius: radius.lg }]}>
         <StatRow icon={<Gauge size={16} color={colors.fgMuted} />} label='Speed' value={`${vehicle.speed} km/h`} />
         <StatRow icon={<Fuel size={16} color={colors.fgMuted} />} label='Today' value={formatKm(vehicle.todayKm)} />
+        <StatRow icon={<Route size={16} color={colors.fgMuted} />} label='Odometer' value={formatKm(vehicle.odometer, 0)} />
         <StatRow icon={<BatteryMedium size={16} color={colors.fgMuted} />} label='Voltage' value={formatVolts(vehicle.externalVoltage)} />
         <StatRow icon={<SignalHigh size={16} color={colors.fgMuted} />} label='Since' value={sinceLabel(vehicle.stateChangedAt)} />
       </View>
