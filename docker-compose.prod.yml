@@ -23,6 +23,58 @@
 services:
   postgres:
     restart: always
+    # ─────────────────────────────────────────────────────────────────────────
+    # MEMORY TUNING — capped at ~1 GB, deliberately BELOW what the image picks.
+    #
+    # timescaledb-ha auto-tunes from *detected host RAM* on first start and writes the result to
+    # pgdata/data/postgresql.conf. Measured inside a 4.8 GB Docker VM it chose:
+    #
+    #   shared_buffers 1.23 GB | work_mem 25.6 MB | maintenance_work_mem 615 MB
+    #   max_connections 75 | autovacuum_max_workers 10 | timescaledb.max_background_workers 16
+    #
+    # On an 8 GB VPS those scale to roughly shared_buffers 2 GB and maintenance_work_mem 1 GB,
+    # which is most of the box for a fleet this size. Two of them are worse than they look:
+    #
+    #   work_mem is per sort/hash NODE per connection, not per connection. A single query with
+    #   several sort nodes allocates several multiples of it — and fleet/reports-queue.ts's
+    #   fuel-idle report SELECTs telemetry over an arbitrary date range with no LIMIT.
+    #
+    #   maintenance_work_mem is taken by EACH autovacuum worker and by TimescaleDB's compression
+    #   jobs. At the auto-tuned 10 workers x ~1 GB that is a multi-GB exposure on an 8 GB box.
+    #
+    # Passing these as `-c` flags on the command line OVERRIDES postgresql.conf (verified:
+    # pg_settings.source reads 'command line' for every value below), so it works on an existing
+    # data volume without editing or mounting a config file. The entrypoint is the stock
+    # docker-entrypoint.sh, which ends in `exec "$@"` — args go straight to the postgres binary.
+    #
+    # Steady-state result: ~700-800 MB, ~1 GB peak, vs ~2.5 GB unmanaged.
+    #
+    # RAISE shared_buffers (and effective_cache_size) if the fleet grows past ~50 vehicles or
+    # dashboard queries start hitting disk — 512 MB comfortably holds the working set for the
+    # live map (vehicle_state is one row per vehicle) plus recent telemetry chunks, but it is
+    # sized for a small fleet, not an unbounded one.
+    #
+    # max_worker_processes must stay >= timescaledb.max_background_workers + max_parallel_workers
+    # + a small margin, or TimescaleDB's compression and retention jobs silently fail to start.
+    # ─────────────────────────────────────────────────────────────────────────
+    command:
+      - postgres
+      - -c
+      - shared_buffers=512MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - effective_cache_size=2GB      # planner hint only — allocates nothing
+      - -c
+      - max_connections=50            # app needs ~20 (pg pool default max 10 x api + ingestion)
+      - -c
+      - autovacuum_max_workers=3
+      - -c
+      - timescaledb.max_background_workers=8
+      - -c
+      - max_worker_processes=13
     ports: !override
       - '127.0.0.1:5432:5432'
     environment:

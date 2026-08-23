@@ -25,6 +25,38 @@ the vehicle provisioned *before* any real device is pointed at this box.
 
 Ubuntu 22.04+, 2 vCPU / 4 GB minimum (TimescaleDB plus three Node processes). Note the public IP.
 
+**Sizing.** An 8 GB box runs this comfortably — measured steady state is roughly 3 GB, leaving
+headroom for the report spike described below.
+
+| | Steady state |
+|---|---|
+| Postgres / TimescaleDB (tuned — see below) | ~0.8 GB |
+| api + ingestion + tcp-listener | ~0.4 GB |
+| redis + nginx + web | ~0.1 GB |
+| Ubuntu + Docker daemon | ~0.6 GB |
+| **Total** | **~2 GB, ~3 GB under load** |
+
+Disk: **~12 GB** to stand up (the `timescaledb-ha:pg16-all` image alone is 6.3 GB, plus ~5 GB of
+build cache — reclaim that with `docker builder prune` once the stack is running). Telemetry
+itself is small and self-capping: the 1-year retention and 30-day compression policies in
+`0001_telemetry_hypertable.sql` hold it to roughly **15 MB per vehicle per year** at steady state.
+
+**Postgres memory is pinned deliberately.** `timescaledb-ha` auto-tunes from detected host RAM on
+first start; left alone on an 8 GB box it takes ~2 GB of `shared_buffers` and ~1 GB of
+`maintenance_work_mem` *per autovacuum worker*. `docker-compose.prod.yml` overrides that with
+`-c` flags on the postgres `command:` (~1 GB ceiling) — the header comment there explains each
+value and when to raise it. Verify it took effect in step 9.
+
+> Node count, not user count, is what scales here. The `pg` pool in `db/client.ts` sets no `max`,
+> so it defaults to 10 connections per process (api + ingestion = 20 backends) no matter how many
+> people are logged in. More users means more queueing on that pool, not more RAM.
+
+**The one thing that can spike memory** is the fuel-idle report: `generateFuelIdle` in
+`backend/src/modules/fleet/reports-queue.ts` SELECTs `telemetry` across an arbitrary date range
+with no LIMIT, buffers every row in the api process, then `JSON.stringify`s it. A year-wide
+report over a 10-vehicle fleet is ~2M rows — several hundred MB in one request, inside the same
+process that serves live traffic. Size for that, or cap the range before you expose reports.
+
 ## 2. DNS
 
 Point these at the VPS IP, all proxying **disabled** (grey-cloud in Cloudflare — see the warning
@@ -140,6 +172,31 @@ curl -s localhost:4001/health    # {"status":"ok","service":"tcp-listener","conn
 curl -s localhost:3001/health    # {"status":"ok","service":"ingestion","processed":0,"unknownImei":0,...}
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps   # all "healthy"
 ```
+
+**Confirm the Postgres memory caps took effect** (step 1). Without this the box silently runs on
+the image's auto-tuned values, which are sized to the host, not to this workload:
+
+```bash
+CP="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+$CP exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c \
+  "SELECT name, setting, unit, source FROM pg_settings WHERE name IN
+   ('shared_buffers','work_mem','maintenance_work_mem','max_connections',
+    'autovacuum_max_workers','timescaledb.max_background_workers') ORDER BY name;"
+```
+
+Every row must read `source = command line`. `shared_buffers` should be `65536` (8 kB units =
+512 MB). If any row says `configuration file`, the `command:` override is not being applied —
+check you passed **both** `-f` files.
+
+Then confirm the actual footprint:
+
+```bash
+docker stats --no-stream --format "{{.Name}}\t{{.MemUsage}}"
+```
+
+> These are start-up parameters, so changing them later requires the container to be **recreated**,
+> not just restarted: `$CP up -d postgres`. The data volume is untouched by this — it is a config
+> change, not a schema one, and needs no dump/restore.
 
 ## 10. TLS
 
