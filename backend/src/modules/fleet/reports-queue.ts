@@ -17,7 +17,7 @@
 // job's companyId before streaming the file.
 import fs from 'fs'
 import path from 'path'
-import { and, eq, gte, lte } from 'drizzle-orm'
+import { and, count, eq, gte, isNotNull, lte } from 'drizzle-orm'
 import { db } from '../../db/client'
 import { reportJobs, safetyScores, telemetry, trips, vehicles, vehicleState } from '../../db/schema'
 
@@ -89,26 +89,71 @@ async function generateDriverScores(companyId: string, params: Record<string, an
   return db.select().from(safetyScores).where(and(...conditions)).orderBy(safetyScores.weekStart)
 }
 
+// Hard limits on the fuel-idle report. This is the only query in the codebase that reads
+// `telemetry` over a caller-supplied range with no bound, and it runs INSIDE the api process
+// that serves live traffic: a year-wide report over a 10-vehicle fleet is roughly 2M rows, all
+// buffered in memory and then handed to JSON.stringify. That is a several-hundred-MB spike on a
+// box whose Postgres is deliberately capped at ~1 GB (see docker-compose.prod.yml).
+//
+// Two independent guards, because either alone is escapable: the range cap stops the obvious
+// year-wide request, and the row cap stops a short range over a large fleet reporting at a high
+// duty cycle.
+const FUEL_IDLE_MAX_RANGE_DAYS = 90
+const FUEL_IDLE_MAX_ROWS = 50_000
+
 async function generateFuelIdle(companyId: string, params: Record<string, any>) {
   const { vehicleId, from, to } = params
   if (!from || !to) throw new Error('from and to required for fuel-idle report')
 
+  const fromDate = new Date(from)
+  const toDate = new Date(to)
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    throw new Error('from and to must be valid dates')
+  }
+  if (toDate < fromDate) throw new Error('to must be on or after from')
+
+  const rangeDays = (toDate.getTime() - fromDate.getTime()) / 86_400_000
+  if (rangeDays > FUEL_IDLE_MAX_RANGE_DAYS) {
+    throw new Error(
+      `fuel-idle range is limited to ${FUEL_IDLE_MAX_RANGE_DAYS} days (requested ${Math.ceil(rangeDays)}). Narrow the range or filter to a single vehicle.`
+    )
+  }
+
   const conditions = [
     eq(telemetry.companyId, companyId),
-    gte(telemetry.time, new Date(from)),
-    lte(telemetry.time, new Date(to)),
+    gte(telemetry.time, fromDate),
+    lte(telemetry.time, toDate),
   ]
   if (vehicleId) conditions.push(eq(telemetry.vehicleId, vehicleId))
 
-  const records = await db.select({
+  // `total` is a COUNT in the database rather than `records.length` in JS — the previous code
+  // selected every row in the range purely to take its length, then threw ~all of them away in
+  // the filter below.
+  const [{ value: total }] = await db
+    .select({ value: count() })
+    .from(telemetry)
+    .where(and(...conditions))
+
+  // The idle filter moved from JS (`records.filter(...)`) into SQL, so only the rows that end up
+  // in the output are ever materialised.
+  const idleRecords = await db.select({
     time: telemetry.time,
     vehicleId: telemetry.vehicleId,
     speed: telemetry.speed,
     fuelLevel: telemetry.fuelLevel,
-  }).from(telemetry).where(and(...conditions))
+  }).from(telemetry)
+    .where(and(...conditions, eq(telemetry.speed, 0), isNotNull(telemetry.fuelLevel)))
+    .orderBy(telemetry.time)
+    .limit(FUEL_IDLE_MAX_ROWS)
 
-  const idleRecords = records.filter((r) => r.speed === 0 && r.fuelLevel !== null)
-  return { total: records.length, idleCount: idleRecords.length, records: idleRecords }
+  return {
+    total,
+    idleCount: idleRecords.length,
+    // Signals that `records` is a prefix, not the whole set — without it a capped report is
+    // indistinguishable from a complete one.
+    truncated: idleRecords.length === FUEL_IDLE_MAX_ROWS,
+    records: idleRecords,
+  }
 }
 
 async function generateTripSummary(companyId: string, params: Record<string, any>) {
