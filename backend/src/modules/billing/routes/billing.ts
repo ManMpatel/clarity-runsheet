@@ -27,11 +27,27 @@ import { idempotent } from '../../../middleware/idempotency'
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null
 const router = express.Router()
 const PRICE_ID = process.env.STRIPE_PRICE_ID
-const WEB_URL = process.env.WEB_URL || process.env.DASHBOARD_URL || 'https://track.clarity-software.com.au'
+const WEB_URL = process.env.WEB_URL || process.env.DASHBOARD_URL || 'https://clarity-software.com.au'
+
+type Tier = 'entry' | 'mid' | 'top'
+
+// Tier -> price-ID map, the direction /checkout needs. Built from the same three env vars the
+// webhook's reverse map uses, so checkout can never be pointed at a price the webhook cannot
+// resolve back into a slot count.
+//
+// This replaces `line_items: [{ price: STRIPE_PRICE_ID }]`. STRIPE_PRICE_ID appeared in NEITHER
+// .env.example nor .env.production.example, so on a fresh deploy it was always undefined and
+// every checkout attempt failed at the Stripe API with an unhelpful "price required" — i.e.
+// self-serve billing was dead on arrival. It is kept below only as a legacy fallback for 'entry'.
+const TIER_PRICE_MAP: Partial<Record<Tier, string>> = {}
+if (process.env.STRIPE_PRICE_ID_ENTRY) TIER_PRICE_MAP.entry = process.env.STRIPE_PRICE_ID_ENTRY
+if (process.env.STRIPE_PRICE_ID_MID) TIER_PRICE_MAP.mid = process.env.STRIPE_PRICE_ID_MID
+if (process.env.STRIPE_PRICE_ID_TOP) TIER_PRICE_MAP.top = process.env.STRIPE_PRICE_ID_TOP
+if (PRICE_ID) TIER_PRICE_MAP.entry = TIER_PRICE_MAP.entry || PRICE_ID
 
 // Price-ID -> tier map. Only entries actually configured are trusted — an unmapped price ID's
 // quantity is ignored rather than guessed into a tier, which is the safer failure mode.
-const PRICE_TIER_MAP: Record<string, 'entry' | 'mid' | 'top'> = {}
+const PRICE_TIER_MAP: Record<string, Tier> = {}
 if (process.env.STRIPE_PRICE_ID_ENTRY) PRICE_TIER_MAP[process.env.STRIPE_PRICE_ID_ENTRY] = 'entry'
 if (process.env.STRIPE_PRICE_ID_MID) PRICE_TIER_MAP[process.env.STRIPE_PRICE_ID_MID] = 'mid'
 if (process.env.STRIPE_PRICE_ID_TOP) PRICE_TIER_MAP[process.env.STRIPE_PRICE_ID_TOP] = 'top'
@@ -54,11 +70,28 @@ router.get('/status', requireAuth, requireCompany, asyncRoute(async (req, res) =
 
 router.post('/checkout', requireAuth, requireCompany, idempotent, asyncRoute(async (req, res) => {
   if (!stripe) return res.fail(null, 'Billing is not configured', 503)
-  const { quantity = 1 } = req.body
+
+  // `tier` is optional and defaults to 'entry' — frontend/web/src/pages/Billing.jsx posts only
+  // { quantity }, and that call must keep working unchanged.
+  const { quantity = 1, tier = 'entry' } = req.body
+
+  if (!['entry', 'mid', 'top'].includes(tier)) {
+    return res.fail(null, `Unknown tier '${tier}'`, 400)
+  }
+  const price = TIER_PRICE_MAP[tier as Tier]
+  // Fail loudly and specifically rather than handing Stripe `price: undefined`, which comes back
+  // as a generic 400 that looks like a card problem to the user and tells the operator nothing.
+  if (!price) {
+    return res.fail(null, `Billing is not configured for the '${tier}' tier`, 503)
+  }
+
+  const qty = parseInt(quantity, 10)
+  if (!Number.isFinite(qty) || qty < 1) return res.fail(null, 'quantity must be a positive integer', 400)
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],
-    line_items: [{ price: PRICE_ID, quantity: parseInt(quantity, 10) }],
+    line_items: [{ price, quantity: qty }],
     metadata: { companyId: req.companyId! },
     success_url: `${WEB_URL}/settings?tab=billing&success=true`,
     cancel_url: `${WEB_URL}/settings?tab=billing&cancelled=true`,

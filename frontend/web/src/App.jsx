@@ -94,6 +94,15 @@ export default function App() {
       <Route path='/auth/google/success' element={<GoogleAuthSuccess />} />
       <Route path='/verify-email'        element={<VerifyEmail />} />
       <Route path='/admin/login'         element={<AdminLogin />} />
+
+      {/* Legal pages are deliberately PUBLIC and must stay outside ProtectedRoute below.
+          They were previously nested in the authenticated `path='/'` block, so an anonymous
+          visitor was bounced to /login. Three things depend on them resolving without a session:
+          the mobile Account tab's links (EXPO_PUBLIC_PRIVACY_URL / _TERMS_URL in eas.json point
+          at these exact paths), App Store Connect's privacy-policy URL field, and Play Console's
+          Data Safety form — the latter two are checked by a reviewer who is not logged in. */}
+      <Route path='/privacy' element={<Privacy />} />
+      <Route path='/terms'   element={<Terms />} />
       <Route path='/onboarding' element={
         <ProtectedRoute>
           <Onboarding />
@@ -140,8 +149,7 @@ export default function App() {
         <Route path='garage/my-devices'      element={<MyDevices />} />
         <Route path='garage/earnings' element={<GarageEarnings />} />
         <Route path='billing'                element={<Billing />} />
-        <Route path='/privacy' element={<Privacy />} />
-        <Route path='/terms'   element={<Terms />} />
+        {/* Stays protected — unlike /privacy and /terms above, this one acts on a session. */}
         <Route path="/delete-account" element={<DeleteAccount />} />
 
       </Route>

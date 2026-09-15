@@ -1,13 +1,16 @@
 # DEPLOY.md — single-VPS production runbook
 
 Deploys the Clarity Fleet backend (api + tcp-listener + ingestion + Postgres + Redis) as Docker
-containers on one VPS, behind nginx for TLS. `frontend/web` stays on Vercel; `frontend/mobile`
-ships through EAS. Neither is covered here.
+containers on one VPS, behind nginx for TLS. `frontend/web` goes to Vercel (step 11).
+`frontend/mobile` ships through EAS and is **not** covered here.
 
-This replaces the three-droplet topology in `.github/workflows/deploy.yml`
-(`209.38.83.138` api / `170.64.148.64` tcp / `134.199.144.238` worker). That workflow is left in
-place but **will fight this deployment if it still runs on push to `main`** — disable it before
-cutting over (step 11).
+This replaces the three-droplet topology that used to live in `.github/workflows/deploy.yml`
+(`209.38.83.138` api / `170.64.148.64` tcp / `134.199.144.238` worker). **That workflow has been
+deleted** — it SSHed into three hosts that no longer exist and would have fought this deployment
+on every push to `main`.
+
+This is a **first deployment**: there is no existing database to migrate and no old `pm2`
+processes to stop. Every step below assumes an empty schema.
 
 ---
 
@@ -16,7 +19,7 @@ cutting over (step 11).
 `tcp-listener` ACKs every telemetry record to the device the instant it parses it, *before*
 `ingestion` looks up which vehicle the IMEI belongs to
 (`backend/src/entrypoints/ingestion.ts` → `processPayload`). If no `vehicles` row matches, the
-record is dropped and **the device will never resend it**. So the database must be restored and
+record is dropped and **the device will never resend it**. So the schema must be migrated and
 the vehicle provisioned *before* any real device is pointed at this box.
 
 ---
@@ -26,13 +29,18 @@ the vehicle provisioned *before* any real device is pointed at this box.
 Ubuntu 22.04+, 2 vCPU / 4 GB minimum (TimescaleDB plus three Node processes). Note the public IP.
 
 **Sizing.** An 8 GB box runs this comfortably — measured steady state is roughly 3 GB, leaving
-headroom for the report spike described below.
+headroom for the report spike described below. Add 2 GB of swap as a cushion for that spike:
+
+```bash
+fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
+```
 
 | | Steady state |
 |---|---|
 | Postgres / TimescaleDB (tuned — see below) | ~0.8 GB |
 | api + ingestion + tcp-listener | ~0.4 GB |
-| redis + nginx + web | ~0.1 GB |
+| redis + nginx (the dashboard is on Vercel, not this box) | ~0.1 GB |
 | Ubuntu + Docker daemon | ~0.6 GB |
 | **Total** | **~2 GB, ~3 GB under load** |
 
@@ -59,14 +67,20 @@ process that serves live traffic. Size for that, or cap the range before you exp
 
 ## 2. DNS
 
-Point these at the VPS IP, all proxying **disabled** (grey-cloud in Cloudflare — see the warning
-in step 5):
+Three records point at the VPS, all proxying **disabled** (grey-cloud in Cloudflare — see the
+warning in step 5). The apex and `www` point at **Vercel**, not at this box:
 
-| Record | Host | Purpose |
-|---|---|---|
-| A | `api.clarity-software.com.au` | REST API (nginx → 3000) |
-| A | `socket.clarity-software.com.au` | socket.io realtime (nginx → 3001) |
-| A | `tcp.clarity-software.com.au` | **device port 5027, raw TCP** |
+| Record | Host | Points at | Purpose |
+|---|---|---|---|
+| A | `clarity-software.com.au` (apex) | Vercel | dashboard **and the public `/privacy` + `/terms` pages** |
+| CNAME | `www` | Vercel | same app; must also be in `CORS_ORIGINS` |
+| A | `api.clarity-software.com.au` | **VPS IP** | REST API (nginx → 3000) |
+| A | `socket.clarity-software.com.au` | **VPS IP** | socket.io realtime (nginx → 3001) |
+| A | `tcp.clarity-software.com.au` | **VPS IP** | **device port 5027, raw TCP** |
+
+The apex is load-bearing beyond the dashboard: `https://clarity-software.com.au/privacy` is the URL
+baked into the mobile app (`eas.json`) and submitted to App Store Connect and Play Console, and both
+are checked by a reviewer who is not logged in.
 
 `tcp.clarity-software.com.au` is the hostname configured into each FTC921. Use the **name**, never
 the raw IP: changing it later is a DNS edit instead of another on-site visit to every vehicle.
@@ -105,10 +119,16 @@ $EDITOR backend/.env.production
 ```
 
 Fill in at minimum: `POSTGRES_PASSWORD`, `JWT_SECRET` (`openssl rand -base64 48`), the live Stripe
-keys and `STRIPE_PRICE_ID_*`, `MAPBOX_TOKEN`, `RESEND_API_KEY`, Twilio, `EXPO_ACCESS_TOKEN`.
+keys, `STRIPE_PRICE_ID_ENTRY` (**checkout returns 503 without it**), `MAPBOX_TOKEN`,
+`RESEND_API_KEY`, Twilio, `EXPO_ACCESS_TOKEN`.
 
-`WEB_URL` / `DASHBOARD_URL` must list the real Vercel origin. `NODE_ENV=production` disables the
-localhost CORS escape hatch in `api.ts` and `socket/index.ts`, so anything not listed is refused.
+`WEB_URL` / `DASHBOARD_URL` are the apex `https://clarity-software.com.au`, and `CORS_ORIGINS`
+carries `https://www.clarity-software.com.au` — Vercel serves both hosts and a browser on `www`
+sends `Origin: www`. `NODE_ENV=production` disables the localhost CORS escape hatch in `api.ts`
+and `socket/index.ts`, so anything not listed is refused.
+
+Also add `https://api.clarity-software.com.au/auth/google/callback` as an authorised redirect URI
+in the Google Cloud console, or web Google sign-in fails at the callback.
 
 Compose also interpolates `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` into the postgres
 service, so they must exist in a root-level `.env` as well. Create `/root/clarity/.env` with those
@@ -141,18 +161,27 @@ $CP exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   < backend/src/db/migrations/0001_telemetry_hypertable.sql
 ```
 
-**Migrating existing production data.** You already have a working dashboard account, so the
-current droplets hold the live database. Move it before provisioning anything new, or you will be
-working against an empty schema:
+**Seed the first super-admin.** There is no data to migrate — this is a fresh deployment against an
+empty schema. `create-admin` takes its credentials from the environment (it used to hardcode
+`admin@claritysoftware.au` / `Admin2026!`, which is in this repo's git history), so pass them for
+this one command rather than leaving the password on disk:
 
 ```bash
-# on the OLD api droplet
-pg_dump -U <user> -d clarity_fleet | gzip > clarity.sql.gz
-# copy over, then on the NEW VPS
-gunzip -c clarity.sql.gz | $CP exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+export SUPERADMIN_EMAIL=you@clarity-software.com.au
+export SUPERADMIN_PASSWORD="$(openssl rand -base64 24)"
+echo "SAVE THIS NOW: $SUPERADMIN_PASSWORD"     # the script never prints it back
+
+$CP exec -e SUPERADMIN_EMAIL -e SUPERADMIN_PASSWORD api npm run create-admin
+
+unset SUPERADMIN_PASSWORD                      # keep it out of the rest of the session
 ```
 
-Only if starting genuinely fresh: `$CP exec api npm run create-admin`.
+`export` matters: `docker compose exec -e VAR` forwards the variable from the calling process's
+environment, so a plain shell variable would arrive empty and the script would exit 1.
+
+Put that password in a password manager before you clear the terminal. Then bind Google
+Authenticator immediately via `POST /api/v1/admin/auth/setup-totp` — the super-admin realm is
+TOTP-gated, and the password alone is not enough to finish signing in.
 
 ## 8. Verify the port bindings before exposing the box
 
@@ -209,11 +238,30 @@ nginx -t && systemctl reload nginx
 
 `tcp.clarity-software.com.au` gets **no certificate** — it is not HTTP.
 
-## 11. Disable the old CI pipeline
+## 11. Deploy the dashboard to Vercel
 
-`.github/workflows/deploy.yml` still SSHes into the three old droplets on every push to `main`.
-Either delete it or gate it (`if: false`), and stop the old `pm2` processes so two tcp-listeners
-aren't competing for the same devices.
+Import the repo with **Root Directory `frontend/web`** (framework: Vite). Set:
+
+```
+VITE_API_URL=https://api.clarity-software.com.au
+VITE_SOCKET_URL=wss://socket.clarity-software.com.au
+VITE_MAPBOX_TOKEN=<pk token>
+```
+
+Add **both** `clarity-software.com.au` and `www.clarity-software.com.au` as domains.
+`frontend/web/vercel.json` already carries the SPA rewrite. Then verify, in a private window:
+
+- `https://clarity-software.com.au/privacy` and `/terms` load **without logging in**. These routes
+  sit outside `ProtectedRoute` in `App.jsx` precisely so App Review and the mobile Account tab can
+  reach them; if they redirect to `/login`, that change has been reverted.
+- The topbar connection indicator reads *connected*, not polling — if it polls, the socket host's
+  WebSocket upgrade headers are wrong (step 10).
+
+Finally, restrict the Mapbox token to `clarity-software.com.au` in your Mapbox account. It is a
+public `pk.` token embedded in the bundle; the URL restriction is what stops it being reused.
+
+> The old three-droplet GitHub Actions pipeline has been **deleted** from this repo, so there is
+> nothing left to disable here and no `pm2` processes competing for devices.
 
 ## 12. Backups
 
@@ -221,6 +269,18 @@ aren't competing for the same devices.
 install -m 0750 deploy/backup.sh /usr/local/bin/clarity-backup
 /usr/local/bin/clarity-backup          # run once now to prove it works
 crontab -e   # 15 3 * * * /usr/local/bin/clarity-backup >> /var/log/clarity-backup.log 2>&1
+```
+
+**Then restore one into a scratch database.** An untested backup is not a backup, and this DB holds
+telemetry, trips *and* billing state — none of it reconstructable, because the devices do not
+buffer: `tcp-listener` ACKs each record the moment it parses it.
+
+```bash
+$CP exec -T postgres createdb -U "$POSTGRES_USER" restore_test
+gunzip -c /var/backups/clarity/clarity-$(date +%F).sql.gz \
+  | $CP exec -T postgres psql -U "$POSTGRES_USER" -d restore_test
+$CP exec -T postgres psql -U "$POSTGRES_USER" -d restore_test -c '\dt'   # tables present?
+$CP exec -T postgres dropdb -U "$POSTGRES_USER" restore_test
 ```
 
 ## 13. Restart on boot
