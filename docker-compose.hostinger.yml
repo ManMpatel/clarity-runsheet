@@ -1,0 +1,51 @@
+services:
+  postgres:
+    container_name: clarity-postgres
+    mem_limit: 1g
+    cpus: 0.5
+
+  redis:
+    container_name: clarity-redis
+    mem_limit: 256m
+    cpus: 0.25
+
+  api:
+    container_name: clarity-api
+    mem_limit: 512m
+    cpus: 0.5
+    networks:
+      - default
+      - proxy-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy-net"
+      - "traefik.http.routers.clarity-api.rule=Host(`api.clarity-software.com.au`)"
+      - "traefik.http.routers.clarity-api.entrypoints=websecure"
+      - "traefik.http.routers.clarity-api.tls.certresolver=leresolver"
+      - "traefik.http.routers.clarity-api.middlewares=clarity-api-bodylimit"
+      - "traefik.http.middlewares.clarity-api-bodylimit.buffering.maxRequestBodyBytes=26214400"
+      - "traefik.http.services.clarity-api.loadbalancer.server.port=3000"
+
+  tcp-listener:
+    container_name: clarity-tcp
+    mem_limit: 256m
+    cpus: 0.25
+
+  ingestion:
+    container_name: clarity-ingestion
+    mem_limit: 512m
+    cpus: 0.5
+    networks:
+      - default
+      - proxy-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy-net"
+      - "traefik.http.routers.clarity-socket.rule=Host(`socket.clarity-software.com.au`)"
+      - "traefik.http.routers.clarity-socket.entrypoints=websecure"
+      - "traefik.http.routers.clarity-socket.tls.certresolver=leresolver"
+      - "traefik.http.services.clarity-socket.loadbalancer.server.port=3001"
+
+networks:
+  proxy-net:
+    external: true
