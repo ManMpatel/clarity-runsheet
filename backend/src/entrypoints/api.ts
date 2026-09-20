@@ -16,6 +16,8 @@ import passport from '../modules/auth/passport'
 import { responseEnvelope, errorHandler } from '../middleware/response-envelope'
 import { platform } from '../middleware/platform'
 import { apiRateLimit } from '../middleware/rate-limit'
+import { db } from '../db/client'
+import { sql } from 'drizzle-orm'
 
 import authRoutes from '../modules/auth/routes/auth'
 import adminAuthRoutes from '../modules/auth/routes/admin-auth'
@@ -94,7 +96,14 @@ app.use(responseEnvelope)
 app.use(platform)
 app.use(passport.initialize())
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }))
+app.get('/health', async (req, res) => {
+  try {
+    await db.execute(sql`SELECT 1`)
+    res.json({ status: 'ok' })
+  } catch (err) {
+    res.status(503).json({ status: 'error', detail: 'db unreachable' })
+  }
+})
 
 // The async report-job output (fleet/reports-queue.ts) used to be served here via
 // `express.static` with zero auth — any client that guessed/observed a job UUID could download

@@ -23,9 +23,10 @@ jobs:
       - name: Deploy
         run: |
           ssh -i ~/.ssh/id_rsa root@${{ secrets.VPS_HOST }} "
-            cd ~/clarity &&
+            cd /opt/apps/clarity-fleet &&
+            git rev-parse HEAD > /opt/apps/.clarity_prev_sha &&
             git pull origin main &&
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hostinger.yml up -d --build
           "
 
       - name: Wait for services to start
@@ -46,7 +47,7 @@ jobs:
         if: failure() && steps.healthcheck.outcome == 'failure'
         run: |
           ssh -i ~/.ssh/id_rsa root@${{ secrets.VPS_HOST }} "
-            cd ~/clarity &&
-            git revert HEAD --no-edit &&
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+            cd /opt/apps/clarity-fleet &&
+            git reset --hard \$(cat /opt/apps/.clarity_prev_sha) &&
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.hostinger.yml up -d --build
           "
