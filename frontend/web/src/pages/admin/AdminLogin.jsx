@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuthStore } from "../../store/authStore"
-
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+import { API_URL as API } from '../../lib/config'
 
 export default function AdminLogin() {
   const navigate              = useNavigate()

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import api from '../lib/api'
+import { API_URL } from '../lib/config'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -117,7 +118,7 @@ export default function Login() {
             </div>
           </div>
 
-          <a href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/auth/google`}
+          <a href={`${API_URL}/auth/google`}
             className='w-full flex items-center justify-center gap-3 h-11 border border-border-strong rounded-xl text-sm font-medium text-fg hover:bg-surface-2 transition'>
             <svg className='w-4 h-4' viewBox='0 0 24 24'>
               <path fill='#4285F4' d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'/>
